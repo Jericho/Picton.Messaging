@@ -5,28 +5,20 @@ using Picton.WorkerRoles;
 namespace Picton.UnitTests
 {
 	[TestClass]
-	public class AsyncQueueWorkerTests
+	public class AsyncMessagePumpTests
 	{
 		[TestMethod]
 		[ExpectedException(typeof(ArgumentException))]
 		public void Negative_min_concurrent_tasks_throws()
 		{
-			var worker = new AsyncQueueWorker("unittestworker", -1);
+			var worker = new AsyncMessagePump(-1);
 		}
 
 		[TestMethod]
 		[ExpectedException(typeof(ArgumentException))]
 		public void Too_small_max_concurrent_tasks_throws()
 		{
-			var worker = new AsyncQueueWorker("unittestworker", 2, 1);
-		}
-
-		[TestMethod]
-		public void Name()
-		{
-			var worker = new AsyncQueueWorker("unittestworker");
-
-			Assert.AreEqual("unittestworker", worker.WorkerName);
+			var worker = new AsyncMessagePump(2, 1);
 		}
 	}
 }

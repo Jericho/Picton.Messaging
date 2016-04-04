@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Picton.WorkerRoles
 {
-	public class AsyncQueueWorker : BaseWorker
+	public class AsyncMessagePump
 	{
 		#region FIELDS
 
@@ -21,20 +21,58 @@ namespace Picton.WorkerRoles
 
 		#endregion
 
+		#region PROPERTIES
+
+		/// <summary>
+		/// Gets the queue to process.
+		/// </summary>
+		public Func<CloudQueue> GetQueue { get; set; }
+
+		/// <summary>
+		/// Gets or sets the logic to execute when a message is retrieved from the queue.
+		/// </summary>
+		/// <remarks>
+		/// If exception is thrown when calling OnMessage, it will regard this queue message as failed.
+		/// </remarks>
+		public Action<CloudQueueMessage, CancellationToken> OnMessage { get; set; }
+
+		/// <summary>
+		/// Gets or sets the logic to execute when an error occurs.
+		/// </summary>
+		/// <example>
+		/// OnError = (message, exception, isPoison) => Trace.TraceError("An error occured: {0}", exception);
+		/// </example>
+		/// <remarks>
+		/// When isPoison is set to true, you should copy this message to a poison queue because it will be deleted from the original queue.
+		/// </remarks>
+		public Action<CloudQueueMessage, Exception, bool> OnError { get; set; }
+
+		/// <summary>
+		/// Gets or sets the logic to execute when queue is empty.
+		/// </summary>
+		/// <example>
+		/// Here's an example:
+		/// OnQueueEmpty = cancellationToken => Task.Delay(2500, cancellationToken).Wait();
+		/// </example>
+		/// <remarks>
+		/// If this property is not set, the default logic is to pause for 1 second.
+		/// </remarks>
+		public Action<CancellationToken> OnQueueEmpty { get; set; }
+
+		#endregion
+
 		#region CONSTRUCTOR
 
 		/// <summary>
-		/// High performance worker role that is designed to monitor a Azure storage queue and process the message as quickly and efficiently as possible.
+		/// High performance message processor (also known as a message "pump") for Azure storage queues. Designed to monitor an Azure storage queue and process the message as quickly and efficiently as possible.
 		/// When messages are present in the queue, this worker will increase the number of tasks that can concurrently process messages.
 		/// Conversly, this worker will reduce the number of tasks that can concurrently process messages when the queue is empty.
 		/// </summary>
-		/// <param name="workerName">The name of the worker. This information is used when writing to the Trace.</param>
 		/// <param name="minConcurrentTasks">The minimum number of tasks. The AsyncQueueworker will not scale down below this value.</param>
 		/// <param name="maxConcurrentTasks">The maximum number of tasks. The AsyncQueueworker will not scale up above this value.</param>
 		/// <param name="visibilityTimeout">The queue visibility timeout</param>
 		/// <param name="maxDequeuecount">The number of times to retry before giving up</param>
-		public AsyncQueueWorker(string workerName, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 5)
-			: base(workerName)
+		public AsyncMessagePump(int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
 		{
 			if (minConcurrentTasks < 1) throw new ArgumentException("minConcurrentTasks must be greather than zero");
 			if (maxConcurrentTasks < minConcurrentTasks) throw new ArgumentException("maxConcurrentTasks must be greather than or equal to minConcurrentTasks");
@@ -45,95 +83,19 @@ namespace Picton.WorkerRoles
 			_maxDequeueCount = maxDequeueCount;
 
 			_cancellationTokenSource = new CancellationTokenSource();
+
+			OnQueueEmpty = cancellationToken => Task.Delay(1000, cancellationToken).Wait();
+			OnError = (message, exception, isPoison) => Trace.TraceError("An error occured: {0}", exception);
+
 		}
 
 		#endregion
 
 		#region PUBLIC METHODS
 
-		/// <summary>
-		/// Must be overridden on derived classes to provide the storage queue.
-		/// </summary>
-		/// <example>
-		/// Here's an example when you are running in the emulator:
-		/// public override CloudQueue GetQueue()
-		/// {
-		///		var storageAccount = CloudStorageAccount.DevelopmentStorageAccount;
-		///		var cloudQueueClient = storageAccount.CreateCloudQueueClient();
-		///		cloudQueueClient.DefaultRequestOptions.RetryPolicy = new NoRetry();
-		///		var cloudQueue = cloudQueueClient.GetQueueReference("myqueue");
-		///		cloudQueue.CreateIfNotExists();
-		///		return cloudQueue;
-		///	}
-		/// 
-		/// Here's an example when runing in Azure:
-		/// public override CloudQueue GetQueue()
-		/// {
-		///		var storageCredentials = new StorageCredentials("your account name", "your shared key");
-		///		var storageAccount = new CloudStorageAccount(storageCredentials, true);
-		///		
-		/// 	// Improve transfer speeds for small requests
-		/// 	// http://blogs.msdn.com/b/windowsazurestorage/archive/2010/06/25/nagle-s-algorithm-is-not-friendly-towards-small-requests.aspx
-		/// 	ServicePointManager.FindServicePoint(storageAccount.BlobEndpoint).UseNagleAlgorithm = false;
-		/// 	ServicePointManager.FindServicePoint(storageAccount.QueueEndpoint).UseNagleAlgorithm = false;
-		/// 	ServicePointManager.FindServicePoint(storageAccount.TableEndpoint).UseNagleAlgorithm = false;
-		/// 	ServicePointManager.FindServicePoint(storageAccount.FileEndpoint).UseNagleAlgorithm = false;
-		/// 	
-		///		var cloudQueueClient = storageAccount.CreateCloudQueueClient();
-		///		cloudQueueClient.DefaultRequestOptions.RetryPolicy = new ExponentialRetry();
-		///		var cloudQueue = cloudQueueClient.GetQueueReference("myqueue");
-		///		cloudQueue.CreateIfNotExists();
-		///		return cloudQueue;
-		///	}
-		/// </example>
-		/// <returns>The storage queue</returns>
-		public virtual CloudQueue GetQueue()
+		public void Start()
 		{
-			throw new NotImplementedException("The GetQueue method must be overridden");
-		}
-
-		/// <summary>
-		/// Must be overridden on derived classes to provide the logic to execute when a message is retrieved from the queue.
-		/// </summary>
-		public virtual void OnMessage(CloudQueueMessage message, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			throw new NotImplementedException("The OnMessage method must be overridden");
-		}
-
-		/// <summary>
-		/// Must be overridden on derived classes to provide the logic to execute when an error occurs.
-		/// </summary>
-		/// <remarks>
-		/// When isPoison is set to true, you will want to copy this message to a poison queue because it will be deleted from the original queue.
-		/// </remarks>
-		public virtual void OnError(CloudQueueMessage message, Exception exception, bool isPoison)
-		{
-			Trace.TraceError("'{0}'.OnError: {1}", this.WorkerName, exception);
-		}
-
-		/// <summary>
-		/// Povides the logic to execute when the queue is empty.
-		/// </summary>
-		/// <example>
-		/// Here's an example:
-		/// public override void OnEmptyQueue(CancellationToken cancellationToken = default(CancellationToken))
-		/// {
-		///		Task.Delay(2500, cancellationToken).Wait();
-		///	}
-		/// </example>
-		/// <remarks>
-		/// If this method is not overwritten in a derived class, the default logic is to pause for 1 second.
-		/// </remarks>
-		/// <returns>The storage queue</returns>
-		public virtual void OnQueueEmpty(CancellationToken cancellationToken = default(CancellationToken))
-		{
-			// Wait a little bit in order to avoid overwhelming the queue storage
-			Task.Delay(1000, cancellationToken).Wait();
-		}
-
-		public override void Run()
-		{
-			Trace.TraceInformation("'{0}'.Run called", this.WorkerName);
+			Trace.TraceInformation("AsyncMessagePump starting...");
 
 			_cancellationTokenSource = new CancellationTokenSource();
 			_safeToExitHandle = new ManualResetEvent(false);
@@ -142,17 +104,16 @@ namespace Picton.WorkerRoles
 
 			_cancellationTokenSource.Dispose();
 
-			Trace.TraceInformation("'{0}' ready to exit", this.WorkerName);
+			Trace.TraceInformation("AsyncMessagePump ready to exit");
 			_safeToExitHandle.Set();
 		}
 
-		public override void OnStop()
+		public void Stop()
 		{
-			Trace.TraceInformation("'{0}'.OnStop called", this.WorkerName);
+			Trace.TraceInformation("AsyncMessagePump stopping...");
 			_cancellationTokenSource.Cancel();
-			base.OnStop();
 			_safeToExitHandle.WaitOne();
-			Trace.TraceInformation("'{0}'.OnStop complete, exiting safely", this.WorkerName);
+			Trace.TraceInformation("AsyncMessagePump stopped, exiting safely");
 		}
 
 		#endregion
@@ -161,6 +122,9 @@ namespace Picton.WorkerRoles
 
 		private async Task ProcessMessages(TimeSpan? visibilityTimeout = null, CancellationToken cancellationToken = default(CancellationToken))
 		{
+			if (this.GetQueue == null) throw new NotImplementedException("The GetQueue property must be provided");
+			if (this.OnMessage == null) throw new NotImplementedException("The OnMessage property must be provided");
+
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlimEx(_minConcurrentTasks, _minConcurrentTasks, _maxConcurrentTasks);
 			var queue = GetQueue();
@@ -180,7 +144,7 @@ namespace Picton.WorkerRoles
 							try
 							{
 								// The queue is empty
-								OnQueueEmpty(cancellationToken);
+								if (this.OnQueueEmpty != null) OnQueueEmpty(cancellationToken);
 							}
 							catch
 							{
@@ -195,7 +159,7 @@ namespace Picton.WorkerRoles
 							try
 							{
 								// Process the message
-								OnMessage(message, cancellationToken);
+								if (this.OnMessage != null) OnMessage(message, cancellationToken);
 
 								// Delete the processed message from the queue
 								queue.DeleteMessage(message);
@@ -228,7 +192,7 @@ namespace Picton.WorkerRoles
 							var scaleUp = Task.Run(() =>
 							{
 								var increased = semaphore.TryIncrease();
-								if (increased) Debug.WriteLine("'{0}' semaphone slots increased: {1}", this.WorkerName, semaphore.AvailableSlotsCount);
+								if (increased) Debug.WriteLine("Semaphone slots increased: {0}", semaphore.AvailableSlotsCount);
 							});
 							runningTasks.TryAdd(scaleUp, scaleUp);
 						}
@@ -238,7 +202,7 @@ namespace Picton.WorkerRoles
 							var scaleDown = Task.Run(() =>
 							{
 								var decreased = semaphore.TryDecrease();
-								if (decreased) Debug.WriteLine("'{0}' semaphone slots decreased: {1}", this.WorkerName, semaphore.AvailableSlotsCount);
+								if (decreased) Debug.WriteLine("Semaphone slots decreased: {0}", semaphore.AvailableSlotsCount);
 							});
 							runningTasks.TryAdd(scaleDown, scaleDown);
 						}
