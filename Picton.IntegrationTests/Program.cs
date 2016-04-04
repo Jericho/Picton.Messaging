@@ -1,23 +1,21 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Microsoft.WindowsAzure.Storage;
+﻿using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Moq;
 using Picton.WorkerRoles;
 using System;
 using System.Diagnostics;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Picton.UnitTests
+namespace Picton.IntegrationTests
 {
-	[TestClass]
-	public class AsyncQueueWorkerTests
+	class Program
 	{
-		[TestMethod]
-		public void TestMethod1()
+		static void Main(string[] args)
 		{
+			AzureStorageEmulatorManager.StartStorageEmulator();
+
 			var storageAccount = CloudStorageAccount.DevelopmentStorageAccount;
 			var cloudQueueClient = storageAccount.CreateCloudQueueClient();
 			cloudQueueClient.DefaultRequestOptions.RetryPolicy = new NoRetry();
@@ -34,7 +32,7 @@ namespace Picton.UnitTests
 			}
 
 
-			var mockWorker = new Mock<AsyncQueueWorker>("TestWorker", 1, 25, TimeSpan.FromMilliseconds(500)) { CallBase = true };
+			var mockWorker = new Mock<AsyncQueueWorker>("TestWorker", 1, 25, TimeSpan.FromMilliseconds(500), 5) { CallBase = true };
 			mockWorker.Setup(m => m.GetQueue()).Returns(() =>
 			{
 				sw = Stopwatch.StartNew();
@@ -42,7 +40,7 @@ namespace Picton.UnitTests
 			});
 			mockWorker.Setup(m => m.OnMessage(It.IsAny<CloudQueueMessage>(), It.IsAny<CancellationToken>())).Callback((CloudQueueMessage msg, CancellationToken cancellationToken) =>
 			{
-				Debug.WriteLine(msg.AsString);
+				Console.WriteLine(msg.AsString);
 			});
 			mockWorker.Setup(m => m.OnQueueEmpty(It.IsAny<CancellationToken>())).Callback(() =>
 			{
@@ -72,32 +70,12 @@ namespace Picton.UnitTests
 			mockWorker.Object.OnStart();
 			mockWorker.Object.Run();
 
-			Debug.Write("Elapsed Milliseconds: " + ToDurationString(sw.Elapsed));
-		}
+			Console.WriteLine("Elapsed Milliseconds: " + sw.Elapsed.ToDurationString());
 
-		private static string ToDurationString(TimeSpan timeSpan)
-		{
-			// In case the TimeSpan is extremely short
-			if (timeSpan.TotalMilliseconds <= 1) return "1 millisecond";
+			Console.WriteLine("");
+			Console.WriteLine("Press any key to exit...");
+			Console.ReadKey();
 
-			var result = new StringBuilder();
-
-			if (timeSpan.Days == 1) result.Append(" 1 day");
-			else if (timeSpan.Days > 1) result.AppendFormat(" {0} days", timeSpan.Days);
-
-			if (timeSpan.Hours == 1) result.Append(" 1 hour");
-			else if (timeSpan.Hours > 1) result.AppendFormat(" {0} hours", timeSpan.Hours);
-
-			if (timeSpan.Minutes == 1) result.Append(" 1 minute");
-			else if (timeSpan.Minutes > 1) result.AppendFormat(" {0} minutes", timeSpan.Minutes);
-
-			if (timeSpan.Seconds == 1) result.Append(" 1 second");
-			else if (timeSpan.Seconds > 1) result.AppendFormat(" {0} seconds", timeSpan.Seconds);
-
-			if (timeSpan.Milliseconds == 1) result.Append(" 1 millisecond");
-			else if (timeSpan.Milliseconds > 1) result.AppendFormat(" {0} milliseconds", timeSpan.Milliseconds);
-
-			return result.ToString().Trim();
 		}
 	}
 }
