@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 
 namespace Picton.Azure.Utils
 {
@@ -13,33 +14,36 @@ namespace Picton.Azure.Utils
 		public SemaphoreSlimEx(int minCount, int initialCount, int maxCount)
 			: base(initialCount, maxCount)
 		{
+			_lock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
+
 			this.MinimumSlotsCount = minCount;
 			this.AvailableSlotsCount = initialCount;
 			this.MaximumSlotsCount = maxCount;
-			_lock = Locks.GetLockInstance();
+
 		}
 
-		public bool TryIncrease()
+		public bool TryIncrease(int timeout = 500)
+		{
+			return TryIncrease(TimeSpan.FromMilliseconds(timeout));
+		}
+
+		public bool TryIncrease(TimeSpan timeout)
 		{
 			var increased = false;
 			try
 			{
-				using (new ReadLock(_lock))
+				if (this.AvailableSlotsCount < this.MaximumSlotsCount)
 				{
-					if (this.AvailableSlotsCount < this.MaximumSlotsCount)
+					var lockAcquired = _lock.TryEnterWriteLock(timeout);
+					if (lockAcquired)
 					{
-						using (new WriteLock(_lock))
+						if (this.AvailableSlotsCount < this.MaximumSlotsCount)
 						{
-							if (this.AvailableSlotsCount < this.MaximumSlotsCount)
-							{
-								using (new WriteLock(_lock))
-								{
-									base.Release();
-									this.AvailableSlotsCount++;
-								}
-								increased = true;
-							}
+							base.Release();
+							this.AvailableSlotsCount++;
+							increased = true;
 						}
+						if (_lock.IsWriteLockHeld) _lock.ExitWriteLock();
 					}
 				}
 			}
@@ -53,23 +57,27 @@ namespace Picton.Azure.Utils
 
 		public bool TryDecrease(int timeout = 500)
 		{
+			return TryDecrease(TimeSpan.FromMilliseconds(timeout));
+		}
+
+		public bool TryDecrease(TimeSpan timeout)
+		{
 			var decreased = false;
 
-			using (new ReadLock(_lock))
+			if (this.AvailableSlotsCount > this.MinimumSlotsCount)
 			{
-				if (this.AvailableSlotsCount > this.MinimumSlotsCount)
+				var lockAcquired = _lock.TryEnterWriteLock(timeout);
+				if (lockAcquired)
 				{
-					using (new WriteLock(_lock))
+					if (this.AvailableSlotsCount > this.MinimumSlotsCount)
 					{
-						if (this.AvailableSlotsCount > this.MinimumSlotsCount)
+						if (base.Wait(timeout))
 						{
-							if (base.Wait(timeout))
-							{
-								this.AvailableSlotsCount--;
-								decreased = true;
-							}
+							this.AvailableSlotsCount--;
+							decreased = true;
 						}
 					}
+					if (_lock.IsWriteLockHeld) _lock.ExitWriteLock();
 				}
 			}
 			return decreased;

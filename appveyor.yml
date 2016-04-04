@@ -9,7 +9,7 @@
 #---------------------------------#
 
 # version format
-version: 0.1.{build}-{branch}
+version: 1.0.{build}-{branch}
 
 # Do not build on tags (GitHub only)
 skip_tags: true
@@ -31,7 +31,7 @@ nuget:
 
 environment:
   COVERALLS_REPO_TOKEN:
-    secure: UFzWya6z1lSVM9ns9TIhin52+NW1NkH6lov5kRm91AWnK83utbXWDlUwtnXeeshJ
+    secure: zgKaPkJ5MJbWj2TPDFwAmjDBAgnTquNrhW/A+XbyyxAHhQoOgItlOZKKMVlJRyq3
 
 
 #---------------------------------#

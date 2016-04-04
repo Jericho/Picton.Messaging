@@ -17,6 +17,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{F496B9
 		.nuget\packages.config = .nuget\packages.config
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Picton.Azure.IntegrationTests", "Picton.Azure.UnitTests\Picton.Azure.IntegrationTests.csproj", "{C59C62F6-D47A-4FCA-A2E9-797AE5BED617}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{4B13C2FA-965C-484D-BA29-9DB26A029E99}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4B13C2FA-965C-484D-BA29-9DB26A029E99}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4B13C2FA-965C-484D-BA29-9DB26A029E99}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C59C62F6-D47A-4FCA-A2E9-797AE5BED617}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C59C62F6-D47A-4FCA-A2E9-797AE5BED617}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C59C62F6-D47A-4FCA-A2E9-797AE5BED617}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C59C62F6-D47A-4FCA-A2E9-797AE5BED617}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
