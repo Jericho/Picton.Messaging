@@ -46,7 +46,7 @@ configuration: Release
 
 build:
   parallel: true                  # enable MSBuild parallel builds
-  project: Picton.Azure.sln       # path to Visual Studio solution or project
+  project: Picton.sln             # path to Visual Studio solution or project
   publish_nuget: true             # package projects with .nuspec files and push to artifacts
   verbosity: minimal              # MSBuild verbosity level (quiet|minimal|normal|detailed)
 
@@ -71,7 +71,7 @@ notifications:
 - provider: Email
   to:
   - desautelsj@hotmail.com
-  subject: Picton.Azure Build
+  subject: Picton Build
   on_build_success: false
   on_build_failure: true
   on_build_status_changed: true

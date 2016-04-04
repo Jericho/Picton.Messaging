@@ -1,12 +1,12 @@
 ﻿using Microsoft.WindowsAzure.Storage.Queue;
-using Picton.Azure.Utils;
+using Picton.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Picton.Azure.WorkerRoles
+namespace Picton.WorkerRoles
 {
 	public class AsyncQueueWorker : BaseWorker
 	{

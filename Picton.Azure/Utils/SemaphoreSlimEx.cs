@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 
-namespace Picton.Azure.Utils
+namespace Picton.Utils
 {
 	public class SemaphoreSlimEx : SemaphoreSlim
 	{

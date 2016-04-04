@@ -1,6 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace Picton.Azure.IntegrationTests
+namespace Picton.IntegrationTests
 {
 	[TestClass]
 	public class AssemblyInitialize

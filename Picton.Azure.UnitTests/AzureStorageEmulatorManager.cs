@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
-namespace Picton.Azure.IntegrationTests
+namespace Picton.IntegrationTests
 {
 	/// <summary>
 	/// This class attempts to detect which version of the Azure emulator is installed on your machine.

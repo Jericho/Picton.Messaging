@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace Picton.Azure
+namespace Picton
 {
 	public static class Extensions
 	{

@@ -3,14 +3,14 @@ using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Moq;
-using Picton.Azure.WorkerRoles;
+using Picton.WorkerRoles;
 using System;
 using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Picton.Azure.UnitTests
+namespace Picton.UnitTests
 {
 	[TestClass]
 	public class AsyncQueueWorkerTests

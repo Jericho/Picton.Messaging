@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 
-namespace Picton.Azure.WorkerRoles
+namespace Picton.WorkerRoles
 {
 	public abstract class BaseWorker : RoleEntryPoint
 	{
