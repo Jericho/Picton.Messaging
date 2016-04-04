@@ -97,7 +97,7 @@ namespace Picton.WorkerRoles
 		/// </summary>
 		public virtual void OnMessage(CloudQueueMessage message, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			throw new NotImplementedException("The ProcessMessage method must be overridden");
+			throw new NotImplementedException("The OnMessage method must be overridden");
 		}
 
 		/// <summary>
@@ -108,7 +108,7 @@ namespace Picton.WorkerRoles
 		/// </remarks>
 		public virtual void OnError(CloudQueueMessage message, Exception exception, bool isPoison)
 		{
-			Trace.TraceInformation("OnError: {0}", exception);
+			Trace.TraceError("'{0}'.OnError: {1}", this.WorkerName, exception);
 		}
 
 		/// <summary>
@@ -122,7 +122,7 @@ namespace Picton.WorkerRoles
 		///	}
 		/// </example>
 		/// <remarks>
-		/// If this method is not overwrittn in a derived class, the default logic is to pause for 1 second.
+		/// If this method is not overwritten in a derived class, the default logic is to pause for 1 second.
 		/// </remarks>
 		/// <returns>The storage queue</returns>
 		public virtual void OnQueueEmpty(CancellationToken cancellationToken = default(CancellationToken))
@@ -225,13 +225,21 @@ namespace Picton.WorkerRoles
 						if (t.Result)
 						{
 							// The queue is not empty, therefore increase the number of concurrent tasks
-							var scaleUp = Task.Run(() => semaphore.TryIncrease());
+							var scaleUp = Task.Run(() =>
+							{
+								var increased = semaphore.TryIncrease();
+								if (increased) Debug.WriteLine("'{0}' semaphone slots increased: {1}", this.WorkerName, semaphore.AvailableSlotsCount);
+							});
 							runningTasks.TryAdd(scaleUp, scaleUp);
 						}
 						else
 						{
 							// The queue is empty, therefore reduce the number of concurrent tasks
-							var scaleDown = Task.Run(() => semaphore.TryDecrease());
+							var scaleDown = Task.Run(() =>
+							{
+								var decreased = semaphore.TryDecrease();
+								if (decreased) Debug.WriteLine("'{0}' semaphone slots decreased: {1}", this.WorkerName, semaphore.AvailableSlotsCount);
+							});
 							runningTasks.TryAdd(scaleDown, scaleDown);
 						}
 					}, TaskContinuationOptions.ExecuteSynchronously)
