@@ -29,7 +29,7 @@ The sample code that Daniel shared during his webinars was very generic and not 
 Picton is available as a Nuget package.
 
 [![NuGet Version](http://img.shields.io/nuget/v/Picton.svg)](https://www.nuget.org/packages/Picton/)
-[![AppVeyor](https://img.shields.io/appveyor/ci/Jericho/picton.svg)](https://ci.appveyor.com/project/Jericho/picton)
+
 
 ## Release Notes
 
