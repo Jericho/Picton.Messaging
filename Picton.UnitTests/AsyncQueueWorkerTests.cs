@@ -20,5 +20,13 @@ namespace Picton.UnitTests
 		{
 			var worker = new AsyncQueueWorker("unittestworker", 2, 1);
 		}
-}
+
+		[TestMethod]
+		public void Name()
+		{
+			var worker = new AsyncQueueWorker("unittestworker");
+
+			Assert.AreEqual("unittestworker", worker.WorkerName);
+		}
+	}
 }
