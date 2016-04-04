@@ -33,7 +33,7 @@ namespace Picton.WorkerRoles
 		/// <param name="maxConcurrentTasks">The maximum number of tasks. The AsyncQueueworker will not scale up above this value.</param>
 		/// <param name="visibilityTimeout">The queue visibility timeout</param>
 		/// <param name="maxDequeuecount">The number of times to retry before giving up</param>
-		public AsyncQueueWorker(string workerName, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeuecount = 5)
+		public AsyncQueueWorker(string workerName, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 5)
 			: base(workerName)
 		{
 			if (minConcurrentTasks < 1) throw new ArgumentException("minConcurrentTasks must be greather than zero");
@@ -42,8 +42,9 @@ namespace Picton.WorkerRoles
 			_minConcurrentTasks = minConcurrentTasks;
 			_maxConcurrentTasks = maxConcurrentTasks;
 			_visibilityTimeout = visibilityTimeout;
+			_maxDequeueCount = maxDequeueCount;
+
 			_cancellationTokenSource = new CancellationTokenSource();
-			_maxConcurrentTasks = maxConcurrentTasks;
 		}
 
 		#endregion
