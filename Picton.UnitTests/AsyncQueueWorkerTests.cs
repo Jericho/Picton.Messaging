@@ -13,5 +13,12 @@ namespace Picton.UnitTests
 		{
 			var worker = new AsyncQueueWorker("unittestworker", -1);
 		}
-	}
+
+		[TestMethod]
+		[ExpectedException(typeof(ArgumentException))]
+		public void Too_small_max_concurrent_tasks_throws()
+		{
+			var worker = new AsyncQueueWorker("unittestworker", 2, 1);
+		}
+}
 }
