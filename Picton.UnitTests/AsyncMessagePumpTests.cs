@@ -1,6 +1,5 @@
-﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Picton.WorkerRoles;
+﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 
 namespace Picton.UnitTests
 {

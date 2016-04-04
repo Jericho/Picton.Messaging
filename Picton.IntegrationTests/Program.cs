@@ -1,7 +1,6 @@
 ﻿using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
-using Picton.WorkerRoles;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;

@@ -6,7 +6,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Picton.WorkerRoles
+namespace Picton
 {
 	public class AsyncMessagePump
 	{

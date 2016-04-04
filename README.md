@@ -48,24 +48,28 @@ PM> Install-Package Picton
 Once you have the Picton library properly referenced in your project, modify your RoleEntryPoint like this example:
 
 ```csharp
-namespace MyNamespace
+using Microsoft.WindowsAzure.ServiceRuntime;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.RetryPolicies;
+using Picton;
+using System;
+using System.Diagnostics;
+
+namespace WorkerRole1
 {
-	public class MyQueueWorker : RoleEntryPoint
+	public class WorkerRole : RoleEntryPoint
 	{
 		private AsyncMessagePump _messagePump;
 
+		public override void Run()
+		{
+			Trace.TraceInformation("WorkerRole1 is running");
+			_messagePump.Start();
+		}
+
 		public override bool OnStart()
 		{
-			// Set the maximum number of concurrent connections 
-			ServicePointManager.DefaultConnectionLimit = 100;
-
-			// Setup to handle service configuration changes at runtime.
-			// For information on handling configuration changes
-			// see the MSDN topic at http://go.microsoft.com/fwlink/?LinkId=166357.
-			RoleEnvironment.Changing += this.RoleEnvironmentChanging;
-			RoleEnvironment.Changed += this.RoleEnvironmentChanged;
-
-			// Configure and start the message pump
+			// Configure the message pump
 			_messagePump = new AsyncMessagePump(1, 25, TimeSpan.FromMilliseconds(500), 5)
 			{
 				GetQueue = () =>
@@ -90,17 +94,18 @@ namespace MyNamespace
 					}
 				}
 			};
-			_messagePump.Start();
-			
+
 			Trace.TraceInformation("MyQueueWorker started");
 
 			return base.OnStart();
 		}
-		
+
 		public override void OnStop()
 		{
+			Trace.TraceInformation("WorkerRole1 is stopping");
 			_messagePump.Stop();
 			base.OnStop();
+			Trace.TraceInformation("WorkerRole1 has stopped");
 		}
 	}
 }
