@@ -1,8 +1,8 @@
 # Picton
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://jericho.mit-license.org/)
-[![Build status](https://ci.appveyor.com/api/projects/status/0fvehdd2lwfjaiyh?svg=true)](https://ci.appveyor.com/project/Jericho/picton-azure)
-[![Coverage Status](https://coveralls.io/repos/github/Jericho/Picton.Azure/badge.svg?branch=master)](https://coveralls.io/github/Jericho/Picton.Azure?branch=master)
+[![Build status](https://ci.appveyor.com/api/projects/status/2tl8wuancvf3awap?svg=true)](https://ci.appveyor.com/project/Jericho/picton)
+[![Coverage Status](https://coveralls.io/repos/github/Jericho/Picton/badge.svg?branch=master)](https://coveralls.io/github/Jericho/Picton?branch=master)
 
 ## About
 
@@ -12,8 +12,8 @@ Picton is a C# library client containing a high performance worker role designed
 
 Picton is available as a Nuget package.
 
-[![NuGet Version](http://img.shields.io/nuget/v/Picton,Azure.svg)](https://www.nuget.org/packages/Picton.Azure/)
-[![AppVeyor](https://img.shields.io/appveyor/ci/Jericho/picton-azure.svg)](https://ci.appveyor.com/project/Jericho/picton-azure)
+[![NuGet Version](http://img.shields.io/nuget/v/Picton.svg)](https://www.nuget.org/packages/Picton/)
+[![AppVeyor](https://img.shields.io/appveyor/ci/Jericho/picton.svg)](https://ci.appveyor.com/project/Jericho/picton)
 
 ## Release Notes
 
