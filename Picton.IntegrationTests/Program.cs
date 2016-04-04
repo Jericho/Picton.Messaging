@@ -30,7 +30,7 @@ namespace Picton.IntegrationTests
 			}
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePump(1, 25, TimeSpan.FromMilliseconds(500), 5);
+			var messagePump = new AsyncMessagePump(1, 25, TimeSpan.FromMilliseconds(500), 3);
 			messagePump.GetQueue = () =>
 			{
 				sw = Stopwatch.StartNew();

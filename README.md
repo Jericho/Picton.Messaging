@@ -70,7 +70,7 @@ namespace WorkerRole1
 		public override bool OnStart()
 		{
 			// Configure the message pump
-			_messagePump = new AsyncMessagePump(1, 25, TimeSpan.FromMilliseconds(500), 5)
+			_messagePump = new AsyncMessagePump(1, 25, TimeSpan.FromMilliseconds(500), 3)
 			{
 				GetQueue = () =>
 				{
