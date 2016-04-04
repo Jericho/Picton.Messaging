@@ -1,11 +1,8 @@
 ﻿using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
-using Moq;
-using Picton.WorkerRoles;
 using System;
 using System.Diagnostics;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Picton.IntegrationTests
@@ -26,26 +23,27 @@ namespace Picton.IntegrationTests
 			var stopping = false;
 			Stopwatch sw = null;
 
+			// Add messages to our testing queue
 			for (var i = 0; i < 100; i++)
 			{
 				cloudQueue.AddMessage(new CloudQueueMessage(string.Format("Hello world {0}", i)));
 			}
 
-
-			var mockWorker = new Mock<AsyncQueueWorker>("TestWorker", 1, 25, TimeSpan.FromMilliseconds(500), 5) { CallBase = true };
-			mockWorker.Setup(m => m.GetQueue()).Returns(() =>
+			// Configure the message pump
+			var messagePump = new AsyncMessagePump(1, 25, TimeSpan.FromMilliseconds(500), 3);
+			messagePump.GetQueue = () =>
 			{
 				sw = Stopwatch.StartNew();
 				return cloudQueue;
-			});
-			mockWorker.Setup(m => m.OnMessage(It.IsAny<CloudQueueMessage>(), It.IsAny<CancellationToken>())).Callback((CloudQueueMessage msg, CancellationToken cancellationToken) =>
+			};
+			messagePump.OnMessage = (message, cancellationToken) =>
 			{
-				Console.WriteLine(msg.AsString);
-			});
-			mockWorker.Setup(m => m.OnQueueEmpty(It.IsAny<CancellationToken>())).Callback(() =>
+				Console.WriteLine(message.AsString);
+			};
+			messagePump.OnQueueEmpty = cancellationToken =>
 			{
-				// Stop the worker role when the queue is empty.
-				// However, ensure that we try to stop the role only once (otherwise each concurrent task would try to top the role)
+				// Stop the message pump when the queue is empty.
+				// However, ensure that we try to stop the role only once (otherwise each concurrent task would try to stop the role)
 				if (!stopping)
 				{
 					lock (lockObject)
@@ -59,19 +57,18 @@ namespace Picton.IntegrationTests
 							// Run the 'OnStop' on a different thread so we don't block it
 							Task.Run(() =>
 							{
-								mockWorker.Object.OnStop();
+								messagePump.Stop();
 							}).ConfigureAwait(false);
 						}
 					}
 				}
-			});
+			};
 
+			// Start the message pump
+			messagePump.Start();
 
-			mockWorker.Object.OnStart();
-			mockWorker.Object.Run();
-
+			// Display how long it took to process the messages that were in the queue
 			Console.WriteLine("Elapsed Milliseconds: " + sw.Elapsed.ToDurationString());
-
 			Console.WriteLine("");
 			Console.WriteLine("Press any key to exit...");
 			Console.ReadKey();
