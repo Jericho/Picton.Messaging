@@ -1,0 +1,89 @@
+# Notes:
+#   - Minimal appveyor.yml file is an empty file. All sections are optional.
+#   - Indent each level of configuration with 2 spaces. Do not use tabs!
+#   - All section names are case-sensitive.
+#   - Section names should be unique on each level.
+
+#---------------------------------#
+#      general configuration      #
+#---------------------------------#
+
+# version format
+version: 1.0.{build}-{branch}
+
+# Do not build on tags (GitHub only)
+skip_tags: true
+
+
+#---------------------------------#
+#    environment configuration    #
+#---------------------------------#
+ 
+# Operating system (build VM template)
+os: Windows Server 2012 R2
+
+# Automatically register private account and/or project AppVeyor NuGet feeds.
+nuget:
+  account_feed: true
+  project_feed: true
+  disable_publish_on_pr: true     # disable publishing of .nupkg artifacts to
+                                  # account/project feeds for pull request builds
+
+environment:
+  COVERALLS_REPO_TOKEN:
+    secure: ny+E/VcmQMxAYVtrEwAoqhKX2wI7aKJy2Os4YF32KWmvbIs0j9EyjJdEnFpJAMNx
+
+
+#---------------------------------#
+#       build configuration       #
+#---------------------------------#
+ 
+# build platform, i.e. x86, x64, Any CPU.
+platform: Any CPU
+  
+# build Configuration, i.e. Debug, Release, etc.
+configuration: Release
+
+build:
+  parallel: true                  # enable MSBuild parallel builds
+  project: Picton.sln             # path to Visual Studio solution or project
+  publish_nuget: true             # package projects with .nuspec files and push to artifacts
+  verbosity: minimal              # MSBuild verbosity level (quiet|minimal|normal|detailed)
+
+
+#---------------------------------#
+#  assembly versioning patching   #
+#---------------------------------#
+
+assembly_info: 
+  patch: true 
+  file: AssemblyInfo.* 
+  assembly_version: "{version}" 
+  assembly_file_version: "{version}" 
+  assembly_informational_version: "{version}"
+
+
+#---------------------------------#
+#             Scripts             #
+#---------------------------------#
+ 
+before_build:
+- nuget restore
+
+after_test: 
+    - packages\OpenCover.4.6.519\tools\OpenCover.Console.exe -register:user -filter:"+[Picton]* -[Picton]Picton.Models.* -[Picton]Picton.Properties.*" -target:"vstest.console.exe" -targetargs:"""Picton.UnitTests\bin\%configuration%\Picton.UnitTests.dll""" -output:coverage.xml
+    - packages\coveralls.io.1.3.4\tools\coveralls.net.exe --opencover coverage.xml
+
+
+#---------------------------------#
+#          notifications          #
+#---------------------------------#
+
+notifications:
+- provider: Email
+  to:
+  - desautelsj@hotmail.com
+  subject: Picton Build
+  on_build_success: false
+  on_build_failure: true
+  on_build_status_changed: false
