@@ -30,12 +30,7 @@ namespace Picton.IntegrationTests
 			}
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePump(1, 25, TimeSpan.FromMilliseconds(500), 3);
-			messagePump.GetQueue = () =>
-			{
-				sw = Stopwatch.StartNew();
-				return cloudQueue;
-			};
+			var messagePump = new AsyncMessagePump(cloudQueue, 1, 25, TimeSpan.FromMilliseconds(500), 3);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Console.WriteLine(message.AsString);
@@ -43,7 +38,7 @@ namespace Picton.IntegrationTests
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
 				// Stop the message pump when the queue is empty.
-				// However, ensure that we try to stop the role only once (otherwise each concurrent task would try to stop the role)
+				// However, ensure that we try to stop it only once (otherwise each concurrent task would try to stop it)
 				if (!stopping)
 				{
 					lock (lockObject)
@@ -65,6 +60,7 @@ namespace Picton.IntegrationTests
 			};
 
 			// Start the message pump
+			sw = Stopwatch.StartNew();
 			messagePump.Start();
 
 			// Display how long it took to process the messages that were in the queue

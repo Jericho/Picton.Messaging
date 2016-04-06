@@ -12,6 +12,7 @@ namespace Picton
 	{
 		#region FIELDS
 
+		private readonly CloudQueue _cloudQueue;
 		private readonly int _minConcurrentTasks;
 		private readonly int _maxConcurrentTasks;
 		private readonly TimeSpan? _visibilityTimeout;
@@ -22,11 +23,6 @@ namespace Picton
 		#endregion
 
 		#region PROPERTIES
-
-		/// <summary>
-		/// Gets the queue to process.
-		/// </summary>
-		public Func<CloudQueue> GetQueue { get; set; }
 
 		/// <summary>
 		/// Gets or sets the logic to execute when a message is retrieved from the queue.
@@ -72,11 +68,13 @@ namespace Picton
 		/// <param name="maxConcurrentTasks">The maximum number of tasks. The AsyncQueueworker will not scale up above this value.</param>
 		/// <param name="visibilityTimeout">The queue visibility timeout</param>
 		/// <param name="maxDequeuecount">The number of times to retry before giving up</param>
-		public AsyncMessagePump(int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
+		public AsyncMessagePump(CloudQueue cloudQueue, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
 		{
+			if (cloudQueue == null) throw new ArgumentNullException("cloudQueue");
 			if (minConcurrentTasks < 1) throw new ArgumentException("minConcurrentTasks must be greather than zero");
 			if (maxConcurrentTasks < minConcurrentTasks) throw new ArgumentException("maxConcurrentTasks must be greather than or equal to minConcurrentTasks");
 
+			_cloudQueue = cloudQueue;
 			_minConcurrentTasks = minConcurrentTasks;
 			_maxConcurrentTasks = maxConcurrentTasks;
 			_visibilityTimeout = visibilityTimeout;
@@ -86,7 +84,6 @@ namespace Picton
 
 			OnQueueEmpty = cancellationToken => Task.Delay(1000, cancellationToken).Wait();
 			OnError = (message, exception, isPoison) => Trace.TraceError("An error occured: {0}", exception);
-
 		}
 
 		#endregion
@@ -122,12 +119,10 @@ namespace Picton
 
 		private async Task ProcessMessages(TimeSpan? visibilityTimeout = null, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			if (this.GetQueue == null) throw new NotImplementedException("The GetQueue property must be provided");
 			if (this.OnMessage == null) throw new NotImplementedException("The OnMessage property must be provided");
 
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlimEx(_minConcurrentTasks, _minConcurrentTasks, _maxConcurrentTasks);
-			var queue = GetQueue();
 
 			// Define the task pump
 			var pumpTask = Task.Run(async () =>
@@ -138,7 +133,7 @@ namespace Picton
 
 					var runningTask = Task.Run(() =>
 					{
-						var message = queue.GetMessage(visibilityTimeout);
+						var message = _cloudQueue.GetMessage(visibilityTimeout);
 						if (message == null)
 						{
 							try
@@ -162,19 +157,13 @@ namespace Picton
 								if (this.OnMessage != null) OnMessage(message, cancellationToken);
 
 								// Delete the processed message from the queue
-								queue.DeleteMessage(message);
+								_cloudQueue.DeleteMessage(message);
 							}
 							catch (Exception ex)
 							{
-								if (message.DequeueCount > _maxDequeueCount)
-								{
-									OnError(message, ex, true);
-									queue.DeleteMessage(message);
-								}
-								else
-								{
-									OnError(message, ex, false);
-								}
+								var isPoison = (message.DequeueCount > _maxDequeueCount);
+								OnError(message, ex, isPoison);
+								if (isPoison) _cloudQueue.DeleteMessage(message);
 							}
 
 							// True indicates that a message was processed

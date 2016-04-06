@@ -69,18 +69,15 @@ namespace WorkerRole1
 
 		public override bool OnStart()
 		{
+			var storageAccount = CloudStorageAccount.DevelopmentStorageAccount;
+			var cloudQueueClient = storageAccount.CreateCloudQueueClient();
+			cloudQueueClient.DefaultRequestOptions.RetryPolicy = new NoRetry();
+			var cloudQueue = cloudQueueClient.GetQueueReference("myqueue");
+			cloudQueue.CreateIfNotExists();
+
 			// Configure the message pump
-			_messagePump = new AsyncMessagePump(1, 25, TimeSpan.FromMilliseconds(500), 3)
+			_messagePump = new AsyncMessagePump(cloudQueue, 1, 25, TimeSpan.FromMilliseconds(500), 3)
 			{
-				GetQueue = () =>
-				{
-					var storageAccount = CloudStorageAccount.DevelopmentStorageAccount;
-					var cloudQueueClient = storageAccount.CreateCloudQueueClient();
-					cloudQueueClient.DefaultRequestOptions.RetryPolicy = new NoRetry();
-					var cloudQueue = cloudQueueClient.GetQueueReference("myqueue");
-					cloudQueue.CreateIfNotExists();
-					return cloudQueue;
-				},
 				OnMessage = (message, cancellationToken) =>
 				{
 					Debug.WriteLine(message.AsString);
