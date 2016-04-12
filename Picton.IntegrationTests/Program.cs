@@ -30,7 +30,7 @@ namespace Picton.IntegrationTests
 			}
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePump(cloudQueue, 1, 25, TimeSpan.FromMilliseconds(500), 3);
+			var messagePump = new AsyncMessagePump(cloudQueue, 1, 25, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Console.WriteLine(message.AsString);
@@ -46,7 +46,7 @@ namespace Picton.IntegrationTests
 						if (sw.IsRunning) sw.Stop();
 						if (!stopping)
 						{
-							// Indicate that the role is stopping
+							// Indicate that the message pump is stopping
 							stopping = true;
 
 							// Run the 'OnStop' on a different thread so we don't block it
@@ -67,6 +67,11 @@ namespace Picton.IntegrationTests
 			Console.WriteLine("Elapsed Milliseconds: " + sw.Elapsed.ToDurationString());
 			Console.WriteLine("");
 			Console.WriteLine("Press any key to exit...");
+
+			// Flush the console key buffer
+			while (Console.KeyAvailable) Console.ReadKey(true);
+
+			// Wait for user to press a key
 			Console.ReadKey();
 
 		}
