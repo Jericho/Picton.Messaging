@@ -80,8 +80,6 @@ namespace Picton
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
 
-			_cancellationTokenSource = new CancellationTokenSource();
-
 			OnQueueEmpty = cancellationToken => Task.Delay(1000, cancellationToken).Wait();
 			OnError = (message, exception, isPoison) => Trace.TraceError("An error occured: {0}", exception);
 		}
@@ -108,8 +106,8 @@ namespace Picton
 		public void Stop()
 		{
 			Trace.TraceInformation("AsyncMessagePump stopping...");
-			_cancellationTokenSource.Cancel();
-			_safeToExitHandle.WaitOne();
+			if (_cancellationTokenSource != null) _cancellationTokenSource.Cancel();
+			if (_safeToExitHandle != null) _safeToExitHandle.WaitOne();
 			Trace.TraceInformation("AsyncMessagePump stopped, exiting safely");
 		}
 
