@@ -76,7 +76,7 @@ namespace WorkerRole1
 			cloudQueue.CreateIfNotExists();
 
 			// Configure the message pump
-			_messagePump = new AsyncMessagePump(cloudQueue, 1, 25, TimeSpan.FromMilliseconds(500), 3)
+			_messagePump = new AsyncMessagePump(cloudQueue, 1, 25, TimeSpan.FromMinutes(1), 3)
 			{
 				OnMessage = (message, cancellationToken) =>
 				{
