@@ -73,7 +73,6 @@ namespace Picton.IntegrationTests
 
 			// Wait for user to press a key
 			Console.ReadKey();
-
 		}
 	}
 }

@@ -12,13 +12,14 @@ namespace Picton.IntegrationTests
 	/// SDK version. 
 	/// 
 	/// For instance:
-	///		- emulator 2.0 was released with the SDK v2.2, 
-	///		- emulator 3.0 was released with SDK 2.3,
-	///		- emulator 3.3 was released with SDK 2.4,
-	///		- emulator 3.4 was released with SDK 2.5 in November 2014,
-	///		- emulator 4.0 was released with SDK 2.6
-	///		- emulator 4.1 was released with SDK 2.7
-	///		- emulator 4.2 was released with SDK 2.8
+	///		- emulator 2.0 was released with SDK 2.2 in October 2013
+	///		- emulator 3.0 was released with SDK 2.3 in April 2014
+	///		- emulator 3.3 was released with SDK 2.4 in August 2014
+	///		- emulator 3.4 was released with SDK 2.5 in November 2014
+	///		- emulator 4.0 was released with SDK 2.6 in April 2015
+	///		- emulator 4.1 was released with SDK 2.7 (2.7.1 was released in August 2015 but I'm not sure when 2.7 was released)
+	///		- emulator 4.2 was released with SDK 2.8 (2.8.1 was released in November 2015 but I'm not sure when 2.8 was released)
+	///		- emulator 4.3 was released with SDK 2.9 in March 2016
 	/// </summary>
 	public class AzureStorageEmulatorManager
 	{
