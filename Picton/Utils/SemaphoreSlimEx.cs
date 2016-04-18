@@ -43,7 +43,7 @@ namespace Picton.Utils
 							this.AvailableSlotsCount++;
 							increased = true;
 						}
-						if (_lock.IsWriteLockHeld) _lock.ExitWriteLock();
+						_lock.ExitWriteLock();
 					}
 				}
 			}
@@ -77,7 +77,7 @@ namespace Picton.Utils
 							decreased = true;
 						}
 					}
-					if (_lock.IsWriteLockHeld) _lock.ExitWriteLock();
+					_lock.ExitWriteLock();
 				}
 			}
 			return decreased;
