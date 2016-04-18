@@ -108,5 +108,66 @@ namespace Picton.UnitTests
 			Assert.AreEqual(1, messagesProcessed);
 			mockQueue.Verify(q => q.GetMessage(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>()), Times.AtLeast(1));
 		}
+
+		[TestMethod]
+		public void Poison_message_is_rejected()
+		{
+			// Arrange
+			var messagesProcessed = 0;
+			var isRejected = false;
+			var retries = 3;
+			var lockObject = new Object();
+			var cloudMessage = new CloudQueueMessage("Message");
+
+			var mockStorageUri = new Uri("http://bogus/myaccount");
+			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
+			mockQueue.Setup(q => q.GetMessage(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>())).Returns((TimeSpan? visibilityTimeout, QueueRequestOptions options, OperationContext operationContext) =>
+			{
+				lock (lockObject)
+				{
+					if (cloudMessage != null)
+					{
+						var t = cloudMessage.GetType();
+						t.InvokeMember("DequeueCount", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.SetProperty | BindingFlags.Instance, null, cloudMessage, new object[] { cloudMessage.DequeueCount + 1 });
+					}
+
+					return cloudMessage;
+				}
+			});
+			mockQueue.Setup(q => q.DeleteMessage(It.IsAny<CloudQueueMessage>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>())).Callback(() => cloudMessage = null);
+
+			var messagePump = new AsyncMessagePump(mockQueue.Object, 1, 1, TimeSpan.FromMinutes(1), retries);
+			messagePump.OnMessage = (message, cancellationToken) =>
+			{
+				throw new Exception("An error occured when attempting to process the message");
+			};
+			messagePump.OnError = (message, exception, isPoison) =>
+			{
+				if (isPoison)
+				{
+					lock (lockObject)
+					{
+						isRejected = true;
+						cloudMessage = null;
+					}
+				}
+			};
+			messagePump.OnQueueEmpty = cancellationToken =>
+			{
+				// Run the 'OnStop' on a different thread so we don't block it
+				Task.Run(() =>
+				{
+					messagePump.Stop();
+				}).ConfigureAwait(false);
+			};
+
+			// Act
+			messagePump.Start();
+
+			// Assert
+			Assert.AreEqual(0, messagesProcessed);
+			Assert.IsTrue(isRejected);
+			mockQueue.Verify(q => q.GetMessage(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>()), Times.AtLeast(retries));
+		}
 	}
 }
