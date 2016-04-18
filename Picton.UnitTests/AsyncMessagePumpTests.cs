@@ -13,6 +13,31 @@ namespace Picton.UnitTests
 	public class AsyncMessagePumpTests
 	{
 		[TestMethod]
+		[ExpectedException(typeof(ArgumentNullException))]
+		public void Empty_cloudQueue_throws()
+		{
+			var messagePump = new AsyncMessagePump(null, 1, 1, TimeSpan.FromMinutes(1), 3);
+		}
+
+		[TestMethod]
+		[ExpectedException(typeof(ArgumentException))]
+		public void Min_too_small_throws()
+		{
+			var mockStorageUri = new Uri("http://bogus/myaccount");
+			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
+			var messagePump = new AsyncMessagePump(mockQueue.Object, 0, 1, TimeSpan.FromMinutes(1), 3);
+		}
+
+		[TestMethod]
+		[ExpectedException(typeof(ArgumentException))]
+		public void Max_too_small_throws()
+		{
+			var mockStorageUri = new Uri("http://bogus/myaccount");
+			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
+			var messagePump = new AsyncMessagePump(mockQueue.Object, 2, 1, TimeSpan.FromMinutes(1), 3);
+		}
+
+		[TestMethod]
 		public void No_message_processed_when_queue_is_empty()
 		{
 			// Arrange
@@ -168,6 +193,18 @@ namespace Picton.UnitTests
 			Assert.AreEqual(0, messagesProcessed);
 			Assert.IsTrue(isRejected);
 			mockQueue.Verify(q => q.GetMessage(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>()), Times.AtLeast(retries));
+		}
+
+		[TestMethod]
+		public void Stopping_without_starting()
+		{
+			var mockStorageUri = new Uri("http://bogus/myaccount");
+			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
+			var messagePump = new AsyncMessagePump(mockQueue.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			messagePump.Stop();
+
+			// Nothing to assert.
+			// We simply want to make sure that no exception is thrown
 		}
 	}
 }

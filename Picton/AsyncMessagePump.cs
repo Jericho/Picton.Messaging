@@ -179,7 +179,9 @@ namespace Picton
 							var scaleUp = Task.Run(() =>
 							{
 								var increased = semaphore.TryIncrease();
+#if DEBUG
 								if (increased) Debug.WriteLine("Semaphone slots increased: {0}", semaphore.AvailableSlotsCount);
+#endif
 							});
 							runningTasks.TryAdd(scaleUp, scaleUp);
 						}
@@ -189,7 +191,9 @@ namespace Picton
 							var scaleDown = Task.Run(() =>
 							{
 								var decreased = semaphore.TryDecrease();
+#if DEBUG
 								if (decreased) Debug.WriteLine("Semaphone slots decreased: {0}", semaphore.AvailableSlotsCount);
+#endif
 							});
 							runningTasks.TryAdd(scaleDown, scaleDown);
 						}
