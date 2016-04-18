@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Picton.IntegrationTests
 {
@@ -62,17 +64,13 @@ namespace Picton.IntegrationTests
 		{
 			var found = false;
 
-			// Ordering emulators in reverse order is important. 
-			// We want to ensure we start the most recent version, even if an older version is available
+			// Ordering emulators in reverse order is important to ensure we start the most recent version, even if an older version is available
 			foreach (var emulatorVersion in _emulatorVersions.OrderByDescending(x => x.Version))
 			{
 				if (File.Exists(emulatorVersion.ExecutablePath))
 				{
 					var count = 0;
-					foreach (var processName in emulatorVersion.ProcessNames)
-					{
-						count += Process.GetProcessesByName(processName).Length;
-					}
+					Parallel.ForEach(emulatorVersion.ProcessNames, processName => Interlocked.Add(ref count, Process.GetProcessesByName(processName).Length));
 					if (count == 0) ExecuteStorageEmulator(emulatorVersion.Parameters, emulatorVersion.ExecutablePath);
 					found = true;
 					break;
@@ -87,11 +85,11 @@ namespace Picton.IntegrationTests
 
 		public static void StopStorageEmulator()
 		{
-			foreach (var processName in _emulatorVersions.SelectMany(x => x.ProcessNames))
+			Parallel.ForEach(_emulatorVersions.SelectMany(x => x.ProcessNames), processName =>
 			{
 				var process = Process.GetProcessesByName(processName).FirstOrDefault();
 				if (process != null) process.Kill();
-			}
+			});
 		}
 
 		#endregion
