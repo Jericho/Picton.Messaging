@@ -14,7 +14,7 @@ namespace Picton.UnitTests
 	{
 		[TestMethod]
 		[ExpectedException(typeof(ArgumentNullException))]
-		public void Empty_cloudQueue_throws()
+		public void Null_cloudQueue_throws()
 		{
 			var messagePump = new AsyncMessagePump(null, 1, 1, TimeSpan.FromMinutes(1), 3);
 		}
@@ -89,14 +89,16 @@ namespace Picton.UnitTests
 			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
 			mockQueue.Setup(q => q.GetMessage(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>())).Returns((TimeSpan? visibilityTimeout, QueueRequestOptions options, OperationContext operationContext) =>
 			{
+				if (cloudMessage == null) return null;
+
 				lock (lockObject)
 				{
 					if (cloudMessage != null)
 					{
+						// DequeueCount is a private property. Therefore we must use reflection to change its value
 						var t = cloudMessage.GetType();
 						t.InvokeMember("DequeueCount", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.SetProperty | BindingFlags.Instance, null, cloudMessage, new object[] { cloudMessage.DequeueCount + 1 });
 					}
-
 					return cloudMessage;
 				}
 			});
@@ -148,14 +150,16 @@ namespace Picton.UnitTests
 			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
 			mockQueue.Setup(q => q.GetMessage(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>())).Returns((TimeSpan? visibilityTimeout, QueueRequestOptions options, OperationContext operationContext) =>
 			{
+				if (cloudMessage == null) return null;
+
 				lock (lockObject)
 				{
 					if (cloudMessage != null)
 					{
+						// DequeueCount is a private property. Therefore we must use reflection to change its value
 						var t = cloudMessage.GetType();
 						t.InvokeMember("DequeueCount", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.SetProperty | BindingFlags.Instance, null, cloudMessage, new object[] { cloudMessage.DequeueCount + 1 });
 					}
-
 					return cloudMessage;
 				}
 			});
