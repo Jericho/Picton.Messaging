@@ -73,6 +73,7 @@ namespace Picton
 			if (cloudQueue == null) throw new ArgumentNullException("cloudQueue");
 			if (minConcurrentTasks < 1) throw new ArgumentException("minConcurrentTasks must be greather than zero");
 			if (maxConcurrentTasks < minConcurrentTasks) throw new ArgumentException("maxConcurrentTasks must be greather than or equal to minConcurrentTasks");
+			if (maxDequeueCount < 1) throw new ArgumentException("maxDequeueCount must be greather than zero");
 
 			_cloudQueue = cloudQueue;
 			_minConcurrentTasks = minConcurrentTasks;
