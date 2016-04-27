@@ -17,7 +17,7 @@
   <copyright>Copyright 2016</copyright>
   <tags>Picton</tags>
   <dependencies>
-    <dependency id="WindowsAzure.Storage" version="6.2.0" />
+    <dependency id="WindowsAzure.Storage" version="7.0.0" />
   </dependencies>
   </metadata>
 </package>
