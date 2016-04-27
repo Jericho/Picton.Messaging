@@ -9,7 +9,7 @@
 #---------------------------------#
 
 # version format
-version: 1.0.{build}-{branch}
+version: 1.0.0-{branch}
 
 # Do not build on tags (GitHub only)
 skip_tags: true
@@ -19,8 +19,8 @@ skip_tags: true
 #    environment configuration    #
 #---------------------------------#
  
-# Operating system (build VM template)
-os: Windows Server 2012 R2
+# VM image
+image: Visual Studio 2015
 
 # Automatically register private account and/or project AppVeyor NuGet feeds.
 nuget:
