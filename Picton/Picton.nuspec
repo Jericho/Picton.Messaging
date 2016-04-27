@@ -1,23 +1,23 @@
 <?xml version="1.0"?>
 <package >
   <metadata>
-	<id>$id$</id>
-	<version>$version$</version>
-	<title>$title$</title>
-	<authors>$author$</authors>
-	<owners>$author$</owners>
-	<licenseUrl>http://jericho.mit-license.org</licenseUrl>
-	<projectUrl>https://github.com/Jericho/Picton</projectUrl>
-	<iconUrl>https://github.com/identicons/jericho.png</iconUrl>
-	<requireLicenseAcceptance>false</requireLicenseAcceptance>
-	<description>$description$</description>
-	<releaseNotes>
-		- Initial release.
-	</releaseNotes>
-	<copyright>Copyright 2016</copyright>
-	<tags>Picton</tags>
-	<dependencies>
-	  <dependency id="WindowsAzure.Storage" version="6.2.0" />
-	</dependencies>
+  <id>$id$</id>
+  <version>1.0.0-alph03</version>
+  <title>$title$</title>
+  <authors>$author$</authors>
+  <owners>$author$</owners>
+  <licenseUrl>http://jericho.mit-license.org</licenseUrl>
+  <projectUrl>https://github.com/Jericho/Picton</projectUrl>
+  <iconUrl>https://github.com/identicons/jericho.png</iconUrl>
+  <requireLicenseAcceptance>false</requireLicenseAcceptance>
+  <description>$description$</description>
+  <releaseNotes>
+    - Initial release.
+  </releaseNotes>
+  <copyright>Copyright 2016</copyright>
+  <tags>Picton</tags>
+  <dependencies>
+    <dependency id="WindowsAzure.Storage" version="6.2.0" />
+  </dependencies>
   </metadata>
 </package>
