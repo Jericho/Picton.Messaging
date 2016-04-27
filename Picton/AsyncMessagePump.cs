@@ -174,35 +174,36 @@ namespace Picton
 
 					runningTask.ContinueWith(t =>
 					{
-						if (t.Result)
+						// Decide if we need to scale up or down
+						if (!cancellationToken.IsCancellationRequested)
 						{
-							// The queue is not empty, therefore increase the number of concurrent tasks
-							var scaleUp = Task.Run(() =>
+							if (t.Result)
 							{
-								var increased = semaphore.TryIncrease();
+								// The queue is not empty, therefore increase the number of concurrent tasks
+								var scaleUp = Task.Run(() =>
+								{
+									var increased = semaphore.TryIncrease();
 #if DEBUG
 								if (increased) Debug.WriteLine("Semaphone slots increased: {0}", semaphore.AvailableSlotsCount);
 #endif
 							});
-							runningTasks.TryAdd(scaleUp, scaleUp);
-						}
-						else
-						{
-							// The queue is empty, therefore reduce the number of concurrent tasks
-							var scaleDown = Task.Run(() =>
+								runningTasks.TryAdd(scaleUp, scaleUp);
+							}
+							else
 							{
-								var decreased = semaphore.TryDecrease();
+								// The queue is empty, therefore reduce the number of concurrent tasks
+								var scaleDown = Task.Run(() =>
+								{
+									var decreased = semaphore.TryDecrease();
 #if DEBUG
 								if (decreased) Debug.WriteLine("Semaphone slots decreased: {0}", semaphore.AvailableSlotsCount);
 #endif
 							});
-							runningTasks.TryAdd(scaleDown, scaleDown);
+								runningTasks.TryAdd(scaleDown, scaleDown);
+							}
 						}
-					}, TaskContinuationOptions.ExecuteSynchronously)
-					.IgnoreAwait();
 
-					runningTask.ContinueWith(t =>
-					{
+						// Complete the task
 						semaphore.Release();
 						Task taskToBeRemoved;
 						runningTasks.TryRemove(t, out taskToBeRemoved);
