@@ -106,6 +106,10 @@ namespace Picton
 
 		public void Stop()
 		{
+			// Don't attempt to stop the message pump if it's already in the process of stopping
+			if (_cancellationTokenSource != null && _cancellationTokenSource.IsCancellationRequested) return;
+
+			// Stop the message pump
 			Trace.TraceInformation("AsyncMessagePump stopping...");
 			if (_cancellationTokenSource != null) _cancellationTokenSource.Cancel();
 			if (_safeToExitHandle != null) _safeToExitHandle.WaitOne();
@@ -132,6 +136,8 @@ namespace Picton
 
 					var runningTask = Task.Run(() =>
 					{
+						if (cancellationToken.IsCancellationRequested) return false;
+
 						var message = _cloudQueue.GetMessage(visibilityTimeout);
 						if (message == null)
 						{
@@ -184,9 +190,9 @@ namespace Picton
 								{
 									var increased = semaphore.TryIncrease();
 #if DEBUG
-								if (increased) Debug.WriteLine("Semaphone slots increased: {0}", semaphore.AvailableSlotsCount);
+									if (increased) Debug.WriteLine("Semaphone slots increased: {0}", semaphore.AvailableSlotsCount);
 #endif
-							});
+								});
 								runningTasks.TryAdd(scaleUp, scaleUp);
 							}
 							else
@@ -196,9 +202,9 @@ namespace Picton
 								{
 									var decreased = semaphore.TryDecrease();
 #if DEBUG
-								if (decreased) Debug.WriteLine("Semaphone slots decreased: {0}", semaphore.AvailableSlotsCount);
+									if (decreased) Debug.WriteLine("Semaphone slots decreased: {0}", semaphore.AvailableSlotsCount);
 #endif
-							});
+								});
 								runningTasks.TryAdd(scaleDown, scaleDown);
 							}
 						}
