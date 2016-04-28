@@ -91,6 +91,8 @@ namespace Picton
 
 		public void Start()
 		{
+			if (this.OnMessage == null) throw new NotImplementedException("The OnMessage property must be provided");
+
 			Trace.TraceInformation("AsyncMessagePump starting...");
 
 			_cancellationTokenSource = new CancellationTokenSource();
@@ -122,8 +124,6 @@ namespace Picton
 
 		private async Task ProcessMessages(TimeSpan? visibilityTimeout = null, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			if (this.OnMessage == null) throw new NotImplementedException("The OnMessage property must be provided");
-
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlimEx(_minConcurrentTasks, _minConcurrentTasks, _maxConcurrentTasks);
 

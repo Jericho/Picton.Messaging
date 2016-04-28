@@ -85,6 +85,7 @@
   </Choose>
   <ItemGroup>
     <Compile Include="SemaphoreSlimExTests.cs" />
+    <Compile Include="ExtensionsTests.cs" />
     <Compile Include="AsyncMessagePumpTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
