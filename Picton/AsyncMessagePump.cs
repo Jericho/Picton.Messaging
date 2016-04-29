@@ -186,26 +186,14 @@ namespace Picton
 							if (t.Result)
 							{
 								// The queue is not empty, therefore increase the number of concurrent tasks
-								var scaleUp = Task.Run(() =>
-								{
-									var increased = semaphore.TryIncrease();
-#if DEBUG
-									if (increased) Debug.WriteLine("Semaphone slots increased: {0}", semaphore.AvailableSlotsCount);
-#endif
-								});
-								runningTasks.TryAdd(scaleUp, scaleUp);
+								var increased = semaphore.TryIncrease();
+								if (increased) Debug.WriteLine("Semaphone slots increased: {0}", semaphore.AvailableSlotsCount);
 							}
 							else
 							{
 								// The queue is empty, therefore reduce the number of concurrent tasks
-								var scaleDown = Task.Run(() =>
-								{
-									var decreased = semaphore.TryDecrease();
-#if DEBUG
-									if (decreased) Debug.WriteLine("Semaphone slots decreased: {0}", semaphore.AvailableSlotsCount);
-#endif
-								});
-								runningTasks.TryAdd(scaleDown, scaleDown);
+								var decreased = semaphore.TryDecrease();
+								if (decreased) Debug.WriteLine("Semaphone slots decreased: {0}", semaphore.AvailableSlotsCount);
 							}
 						}
 

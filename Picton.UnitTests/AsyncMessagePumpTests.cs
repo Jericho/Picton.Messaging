@@ -106,8 +106,8 @@ namespace Picton.UnitTests
 			// However we can't be more precise because we stop the message pump on another thread and 'GetMessage' may be invoked
 			// a few times while we wait for the message pump to stop.
 			//
-			// What this means is that there is no way to precisely assert the number of times the method will invoked. The only
-			// thing we know for sure, is that 'GetMessage' will be invoked at least once
+			// What this means is that there is no way to precisely assert the number of times the method has been invoked. The only
+			// thing we know for sure, is that 'GetMessage' has been invoked at least once
 			mockQueue.Verify(q => q.GetMessage(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>()), Times.AtLeast(1));
 		}
 
