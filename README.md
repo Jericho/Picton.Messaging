@@ -57,13 +57,13 @@ using System.Diagnostics;
 
 namespace WorkerRole1
 {
-	public class WorkerRole : RoleEntryPoint
+	public class MyWorkerRole : RoleEntryPoint
 	{
 		private AsyncMessagePump _messagePump;
 
 		public override void Run()
 		{
-			Trace.TraceInformation("WorkerRole1 is running");
+			Trace.TraceInformation("MyWorkerRole is running");
 			_messagePump.Start();
 		}
 
@@ -92,17 +92,17 @@ namespace WorkerRole1
 				}
 			};
 
-			Trace.TraceInformation("MyQueueWorker started");
+			Trace.TraceInformation("MyWorkerRole started");
 
 			return base.OnStart();
 		}
 
 		public override void OnStop()
 		{
-			Trace.TraceInformation("WorkerRole1 is stopping");
+			Trace.TraceInformation("MyWorkerRole is stopping");
 			_messagePump.Stop();
 			base.OnStop();
-			Trace.TraceInformation("WorkerRole1 has stopped");
+			Trace.TraceInformation("MyWorkerRole has stopped");
 		}
 	}
 }
