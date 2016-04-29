@@ -30,7 +30,7 @@ namespace Picton
 		public static string ToDurationString(this TimeSpan timeSpan)
 		{
 			// In case the TimeSpan is extremely short
-			if (timeSpan.TotalMilliseconds <= 1) return "1 millisecond";
+			if (timeSpan.TotalMilliseconds < 1) return "1 millisecond";
 
 			var result = new StringBuilder();
 

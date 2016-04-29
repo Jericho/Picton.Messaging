@@ -91,6 +91,8 @@ namespace Picton
 
 		public void Start()
 		{
+			if (this.OnMessage == null) throw new NotImplementedException("The OnMessage property must be provided");
+
 			Trace.TraceInformation("AsyncMessagePump starting...");
 
 			_cancellationTokenSource = new CancellationTokenSource();
@@ -106,6 +108,10 @@ namespace Picton
 
 		public void Stop()
 		{
+			// Don't attempt to stop the message pump if it's already in the process of stopping
+			if (_cancellationTokenSource != null && _cancellationTokenSource.IsCancellationRequested) return;
+
+			// Stop the message pump
 			Trace.TraceInformation("AsyncMessagePump stopping...");
 			if (_cancellationTokenSource != null) _cancellationTokenSource.Cancel();
 			if (_safeToExitHandle != null) _safeToExitHandle.WaitOne();
@@ -118,8 +124,6 @@ namespace Picton
 
 		private async Task ProcessMessages(TimeSpan? visibilityTimeout = null, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			if (this.OnMessage == null) throw new NotImplementedException("The OnMessage property must be provided");
-
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlimEx(_minConcurrentTasks, _minConcurrentTasks, _maxConcurrentTasks);
 
@@ -132,6 +136,8 @@ namespace Picton
 
 					var runningTask = Task.Run(() =>
 					{
+						if (cancellationToken.IsCancellationRequested) return false;
+
 						var message = _cloudQueue.GetMessage(visibilityTimeout);
 						if (message == null)
 						{
@@ -174,35 +180,36 @@ namespace Picton
 
 					runningTask.ContinueWith(t =>
 					{
-						if (t.Result)
+						// Decide if we need to scale up or down
+						if (!cancellationToken.IsCancellationRequested)
 						{
-							// The queue is not empty, therefore increase the number of concurrent tasks
-							var scaleUp = Task.Run(() =>
+							if (t.Result)
 							{
-								var increased = semaphore.TryIncrease();
+								// The queue is not empty, therefore increase the number of concurrent tasks
+								var scaleUp = Task.Run(() =>
+								{
+									var increased = semaphore.TryIncrease();
 #if DEBUG
-								if (increased) Debug.WriteLine("Semaphone slots increased: {0}", semaphore.AvailableSlotsCount);
+									if (increased) Debug.WriteLine("Semaphone slots increased: {0}", semaphore.AvailableSlotsCount);
 #endif
-							});
-							runningTasks.TryAdd(scaleUp, scaleUp);
-						}
-						else
-						{
-							// The queue is empty, therefore reduce the number of concurrent tasks
-							var scaleDown = Task.Run(() =>
+								});
+								runningTasks.TryAdd(scaleUp, scaleUp);
+							}
+							else
 							{
-								var decreased = semaphore.TryDecrease();
+								// The queue is empty, therefore reduce the number of concurrent tasks
+								var scaleDown = Task.Run(() =>
+								{
+									var decreased = semaphore.TryDecrease();
 #if DEBUG
-								if (decreased) Debug.WriteLine("Semaphone slots decreased: {0}", semaphore.AvailableSlotsCount);
+									if (decreased) Debug.WriteLine("Semaphone slots decreased: {0}", semaphore.AvailableSlotsCount);
 #endif
-							});
-							runningTasks.TryAdd(scaleDown, scaleDown);
+								});
+								runningTasks.TryAdd(scaleDown, scaleDown);
+							}
 						}
-					}, TaskContinuationOptions.ExecuteSynchronously)
-					.IgnoreAwait();
 
-					runningTask.ContinueWith(t =>
-					{
+						// Complete the task
 						semaphore.Release();
 						Task taskToBeRemoved;
 						runningTasks.TryRemove(t, out taskToBeRemoved);
