@@ -22,9 +22,9 @@ namespace Picton.Utils
 
 		}
 
-		public bool TryIncrease(int timeout = 500)
+		public bool TryIncrease(int millisecondsTimeout = 500)
 		{
-			return TryIncrease(TimeSpan.FromMilliseconds(timeout));
+			return TryIncrease(TimeSpan.FromMilliseconds(millisecondsTimeout));
 		}
 
 		public bool TryIncrease(TimeSpan timeout)
@@ -55,9 +55,9 @@ namespace Picton.Utils
 			return increased;
 		}
 
-		public bool TryDecrease(int timeout = 500)
+		public bool TryDecrease(int millisecondsTimeout = 500)
 		{
-			return TryDecrease(TimeSpan.FromMilliseconds(timeout));
+			return TryDecrease(TimeSpan.FromMilliseconds(millisecondsTimeout));
 		}
 
 		public bool TryDecrease(TimeSpan timeout)
