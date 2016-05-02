@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("Picton")]
-[assembly: AssemblyDescription("High performance Azure worker role")]
+[assembly: AssemblyDescription("High performance async message pump for Azure")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Jeremie Desautels")]
 [assembly: AssemblyProduct("Picton")]
