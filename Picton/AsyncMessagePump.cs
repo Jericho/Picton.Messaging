@@ -141,7 +141,16 @@ namespace Picton
 					{
 						if (cancellationToken.IsCancellationRequested) return false;
 
-						var message = await _cloudQueue.GetMessageAsync(visibilityTimeout, null, null, cancellationToken);
+						CloudQueueMessage message = null;
+						try
+						{
+							message = await _cloudQueue.GetMessageAsync(visibilityTimeout, null, null, cancellationToken);
+						}
+						catch (Exception e)
+						{
+							_logger.ErrorException("An error occured when attempting to get a message from the queue", e);
+						}
+
 						if (message == null)
 						{
 							try
