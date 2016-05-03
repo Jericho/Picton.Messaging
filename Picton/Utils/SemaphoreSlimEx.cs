@@ -8,7 +8,7 @@ namespace Picton.Utils
 	{
 		#region FIELDS
 
-		private ReaderWriterLockSlim _lock;
+		private readonly ReaderWriterLockSlim _lock;
 		private static readonly ILog _logger = LogProvider.GetCurrentClassLogger();
 
 		#endregion
@@ -54,7 +54,7 @@ namespace Picton.Utils
 					{
 						if (this.AvailableSlotsCount < this.MaximumSlotsCount)
 						{
-							base.Release();
+							Release();
 							this.AvailableSlotsCount++;
 							increased = true;
 							_logger.Trace($"Semaphore slots increased: {this.AvailableSlotsCount}");
@@ -87,7 +87,7 @@ namespace Picton.Utils
 				{
 					if (this.AvailableSlotsCount > this.MinimumSlotsCount)
 					{
-						if (base.Wait(timeout))
+						if (Wait(timeout))
 						{
 							this.AvailableSlotsCount--;
 							decreased = true;

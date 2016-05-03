@@ -14,7 +14,7 @@
 			{LogLevel.Warn, ConsoleColor.Magenta},
 			{LogLevel.Info, ConsoleColor.White},
 			{LogLevel.Debug, ConsoleColor.Gray},
-			{LogLevel.Trace, ConsoleColor.DarkGray},
+			{LogLevel.Trace, ConsoleColor.DarkGray}
 		};
 		private LogLevel _minLevel = LogLevel.Trace;
 

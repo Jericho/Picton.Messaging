@@ -120,14 +120,14 @@ namespace Picton.Logging
 		Fatal
 	}
 
-	[ExcludeFromCodeCoverage()]
+	[ExcludeFromCodeCoverage]
 #if !LIBLOG_PROVIDERS_ONLY
 #if LIBLOG_PUBLIC
 	public
 #else
 	internal
 #endif
-	static partial class LogExtensions
+	static class LogExtensions
 	{
 		public static bool IsDebugEnabled(this ILog logger)
 		{
@@ -357,7 +357,7 @@ namespace Picton.Logging
 		{
 			if (logger == null)
 			{
-				throw new ArgumentNullException("logger");
+				throw new ArgumentNullException(nameof(logger));
 			}
 		}
 
@@ -415,7 +415,7 @@ namespace Picton.Logging
 	/// <summary>
 	/// Provides a mechanism to create instances of <see cref="ILog" /> objects.
 	/// </summary>
-	[ExcludeFromCodeCoverage()]
+	[ExcludeFromCodeCoverage]
 #if LIBLOG_PROVIDERS_ONLY
 	internal
 #else
@@ -616,7 +616,7 @@ namespace Picton.Logging
 			new Tuple<IsLoggerAvailable, CreateLogProvider>(NLogLogProvider.IsLoggerAvailable, () => new NLogLogProvider()),
 			new Tuple<IsLoggerAvailable, CreateLogProvider>(Log4NetLogProvider.IsLoggerAvailable, () => new Log4NetLogProvider()),
 			new Tuple<IsLoggerAvailable, CreateLogProvider>(EntLibLogProvider.IsLoggerAvailable, () => new EntLibLogProvider()),
-			new Tuple<IsLoggerAvailable, CreateLogProvider>(LoupeLogProvider.IsLoggerAvailable, () => new LoupeLogProvider()),
+			new Tuple<IsLoggerAvailable, CreateLogProvider>(LoupeLogProvider.IsLoggerAvailable, () => new LoupeLogProvider())
 		};
 
 #if !LIBLOG_PROVIDERS_ONLY
@@ -658,7 +658,7 @@ namespace Picton.Logging
 		}
 
 #if !LIBLOG_PROVIDERS_ONLY
-		[ExcludeFromCodeCoverage()]
+		[ExcludeFromCodeCoverage]
 		internal class NoOpLogger : ILog
 		{
 			internal static readonly NoOpLogger Instance = new NoOpLogger();
@@ -672,7 +672,7 @@ namespace Picton.Logging
 	}
 
 #if !LIBLOG_PROVIDERS_ONLY
-	[ExcludeFromCodeCoverage()]
+	[ExcludeFromCodeCoverage]
 	internal class LoggerExecutionWrapper : ILog
 	{
 		private readonly Logger _logger;
@@ -750,7 +750,7 @@ namespace Picton.Logging.LogProviders
 #endif
 	using System.Text.RegularExpressions;
 
-	[ExcludeFromCodeCoverage()]
+	[ExcludeFromCodeCoverage]
 	internal abstract class LogProviderBase : ILogProvider
 	{
 		protected delegate IDisposable OpenNdc(string message);
@@ -762,10 +762,10 @@ namespace Picton.Logging.LogProviders
 
 		protected LogProviderBase()
 		{
-			_lazyOpenNdcMethod 
-				= new Lazy<OpenNdc>(GetOpenNdcMethod);
-			_lazyOpenMdcMethod
-			   = new Lazy<OpenMdc>(GetOpenMdcMethod);
+#pragma warning disable RECS0021 // Warns about calls to virtual member functions occuring in the constructor
+			_lazyOpenNdcMethod = new Lazy<OpenNdc>(GetOpenNdcMethod);
+			_lazyOpenMdcMethod = new Lazy<OpenMdc>(GetOpenMdcMethod);
+#pragma warning restore RECS0021 // Warns about calls to virtual member functions occuring in the constructor
 		}
 
 		public abstract Logger GetLogger(string name);
@@ -791,7 +791,7 @@ namespace Picton.Logging.LogProviders
 		}
 	}
 
-	[ExcludeFromCodeCoverage()]
+	[ExcludeFromCodeCoverage]
 	internal class NLogLogProvider : LogProviderBase
 	{
 		private readonly Func<string, object> _getLoggerByNameDelegate;
@@ -873,7 +873,7 @@ namespace Picton.Logging.LogProviders
 			return Expression.Lambda<Func<string, object>>(methodCall, nameParam).Compile();
 		}
 
-		[ExcludeFromCodeCoverage()]
+		[ExcludeFromCodeCoverage]
 		internal class NLogLogger
 		{
 			private readonly dynamic _logger;
@@ -1016,7 +1016,7 @@ namespace Picton.Logging.LogProviders
 		}
 	}
 
-	[ExcludeFromCodeCoverage()]
+	[ExcludeFromCodeCoverage]
 	internal class Log4NetLogProvider : LogProviderBase
 	{
 		private readonly Func<string, object> _getLoggerByNameDelegate;
@@ -1125,7 +1125,7 @@ namespace Picton.Logging.LogProviders
 			return Expression.Lambda<Func<string, object>>(methodCall, nameParam).Compile();
 		}
 
-		[ExcludeFromCodeCoverage()]
+		[ExcludeFromCodeCoverage]
 		internal class Log4NetLogger
 		{
 			private readonly dynamic _logger;
@@ -1218,7 +1218,7 @@ namespace Picton.Logging.LogProviders
 					lock (CallerStackBoundaryTypeSync)
 					{
 #if !LIBLOG_PORTABLE
-						StackTrace stack = new StackTrace();
+						var stack = new StackTrace();
 						Type thisType = GetType();
 						s_callerStackBoundaryType = Type.GetType("LoggerExecutionWrapper");
 						for (var i = 1; i < stack.FrameCount; i++)
@@ -1275,13 +1275,13 @@ namespace Picton.Logging.LogProviders
 					case LogLevel.Fatal:
 						return _levelFatal;
 					default:
-						throw new ArgumentOutOfRangeException("logLevel", logLevel, null);
+						throw new ArgumentOutOfRangeException(nameof(logLevel), logLevel, null);
 				}
 			}
 		}
 	}
 
-	[ExcludeFromCodeCoverage()]
+	[ExcludeFromCodeCoverage]
 	internal class EntLibLogProvider : LogProviderBase
 	{
 		private const string TypeTemplate = "Microsoft.Practices.EnterpriseLibrary.Logging.{0}, Microsoft.Practices.EnterpriseLibrary.Logging";
@@ -1398,7 +1398,7 @@ namespace Picton.Logging.LogProviders
 			return memberInit;
 		}
 
-		[ExcludeFromCodeCoverage()]
+		[ExcludeFromCodeCoverage]
 		internal class EntLibLogger
 		{
 			private readonly string _loggerName;
@@ -1457,7 +1457,7 @@ namespace Picton.Logging.LogProviders
 		}
 	}
 
-	[ExcludeFromCodeCoverage()]
+	[ExcludeFromCodeCoverage]
 	internal class SerilogLogProvider : LogProviderBase
 	{
 		private readonly Func<string, object> _getLoggerByNameDelegate;
@@ -1550,7 +1550,7 @@ namespace Picton.Logging.LogProviders
 			return name => func("SourceContext", name, false);
 		}
 
-		[ExcludeFromCodeCoverage()]
+		[ExcludeFromCodeCoverage]
 		internal class SerilogLogger
 		{
 			private readonly object _logger;
@@ -1701,7 +1701,7 @@ namespace Picton.Logging.LogProviders
 		}
 	}
 
-	[ExcludeFromCodeCoverage()]
+	[ExcludeFromCodeCoverage]
 	internal class LoupeLogProvider : LogProviderBase
 	{
 		/// <summary>
@@ -1776,7 +1776,7 @@ namespace Picton.Logging.LogProviders
 			return callDelegate;
 		}
 
-		[ExcludeFromCodeCoverage()]
+		[ExcludeFromCodeCoverage]
 		internal class LoupeLogger
 		{
 			private const string LogSystem = "LibLog";
@@ -1829,13 +1829,13 @@ namespace Picton.Logging.LogProviders
 					case LogLevel.Fatal:
 						return TraceEventTypeValues.Critical;
 					default:
-						throw new ArgumentOutOfRangeException("logLevel");
+						throw new ArgumentOutOfRangeException(nameof(logLevel));
 				}
 			}
 		}
 	}
 
-	[ExcludeFromCodeCoverage()]
+	[ExcludeFromCodeCoverage]
 	internal static class TraceEventTypeValues
 	{
 		internal static readonly Type Type;
@@ -1863,7 +1863,7 @@ namespace Picton.Logging.LogProviders
 		}
 	}
 
-	[ExcludeFromCodeCoverage()]
+	[ExcludeFromCodeCoverage]
 	internal static class LogMessageFormatter
 	{
 		private static readonly Regex Pattern = new Regex(@"\{@?\w{1,}\}");
@@ -1920,7 +1920,7 @@ namespace Picton.Logging.LogProviders
 		}
 	}
 
-	[ExcludeFromCodeCoverage()]
+	[ExcludeFromCodeCoverage]
 	internal static class TypeExtensions
 	{
 		internal static MethodInfo GetMethodPortable(this Type type, string name)
@@ -1997,7 +1997,7 @@ namespace Picton.Logging.LogProviders
 		}
 	}
 
-	[ExcludeFromCodeCoverage()]
+	[ExcludeFromCodeCoverage]
 	internal class DisposableAction : IDisposable
 	{
 		private readonly Action _onDispose;

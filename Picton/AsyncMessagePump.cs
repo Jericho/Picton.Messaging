@@ -70,7 +70,7 @@ namespace Picton
 		/// <param name="minConcurrentTasks">The minimum number of concurrent tasks. The message pump will not scale down below this value</param>
 		/// <param name="maxConcurrentTasks">The maximum number of concurrent tasks. The message pump will not scale up above this value</param>
 		/// <param name="visibilityTimeout">The queue visibility timeout</param>
-		/// <param name="maxDequeuecount">The number of times to try processing a given message before giving up</param>
+		/// <param name="maxDequeueCount">The number of times to try processing a given message before giving up</param>
 		public AsyncMessagePump(CloudQueue cloudQueue, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
 		{
 			if (cloudQueue == null) throw new ArgumentNullException(nameof(cloudQueue));
@@ -94,7 +94,7 @@ namespace Picton
 
 		public void Start()
 		{
-			if (OnMessage == null) throw new NotImplementedException($"The {nameof(OnMessage)} handler must be provided");
+			if (OnMessage == null) throw new ArgumentNullException(nameof(OnMessage));
 
 			_logger.Trace($"{nameof(AsyncMessagePump)} starting...");
 
@@ -149,7 +149,9 @@ namespace Picton
 								// The queue is empty
 								OnQueueEmpty?.Invoke(cancellationToken);
 							}
+#pragma warning disable RECS0022 // A catch clause that catches System.Exception and has an empty body
 							catch
+#pragma warning restore RECS0022 // A catch clause that catches System.Exception and has an empty body
 							{
 								// Intentionally left empty. We ignore errors from OnQueueEmpty.
 							}
