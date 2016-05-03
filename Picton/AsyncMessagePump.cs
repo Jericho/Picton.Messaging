@@ -73,10 +73,10 @@ namespace Picton
 		/// <param name="maxDequeuecount">The number of times to retry before giving up</param>
 		public AsyncMessagePump(CloudQueue cloudQueue, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
 		{
-			if (cloudQueue == null) throw new ArgumentNullException("cloudQueue");
-			if (minConcurrentTasks < 1) throw new ArgumentException("minConcurrentTasks must be greather than zero");
-			if (maxConcurrentTasks < minConcurrentTasks) throw new ArgumentException("maxConcurrentTasks must be greather than or equal to minConcurrentTasks");
-			if (maxDequeueCount < 1) throw new ArgumentException("maxDequeueCount must be greather than zero");
+			if (cloudQueue == null) throw new ArgumentNullException(nameof(cloudQueue));
+			if (minConcurrentTasks < 1) throw new ArgumentException("Minimum number of concurrent tasks must be greather than zero", nameof(minConcurrentTasks));
+			if (maxConcurrentTasks < minConcurrentTasks) throw new ArgumentException("Maximum number of concurrent tasks must be greather than or equal to the minimum", nameof(maxConcurrentTasks));
+			if (maxDequeueCount < 1) throw new ArgumentException("Number of retries must be greather than zero", nameof(maxDequeueCount));
 
 			_cloudQueue = cloudQueue;
 			_minConcurrentTasks = minConcurrentTasks;
@@ -94,9 +94,9 @@ namespace Picton
 
 		public void Start()
 		{
-			if (this.OnMessage == null) throw new NotImplementedException("The OnMessage handler must be provided");
+			if (this.OnMessage == null) throw new NotImplementedException(string.Format("The {0} handler must be provided", nameof(OnMessage)));
 
-			_logger.Trace("AsyncMessagePump starting...");
+			_logger.Trace(string.Format("{0} starting...", nameof(AsyncMessagePump)));
 
 			_cancellationTokenSource = new CancellationTokenSource();
 			_safeToExitHandle = new ManualResetEvent(false);
@@ -105,7 +105,7 @@ namespace Picton
 
 			_cancellationTokenSource.Dispose();
 
-			_logger.Trace("AsyncMessagePump ready to exit");
+			_logger.Trace(string.Format("{0} ready to exit", nameof(AsyncMessagePump)));
 			_safeToExitHandle.Set();
 		}
 
@@ -115,10 +115,10 @@ namespace Picton
 			if (_cancellationTokenSource != null && _cancellationTokenSource.IsCancellationRequested) return;
 
 			// Stop the message pump
-			_logger.Trace("AsyncMessagePump stopping...");
+			_logger.Trace(string.Format("{0} stopping...", nameof(AsyncMessagePump)));
 			if (_cancellationTokenSource != null) _cancellationTokenSource.Cancel();
 			if (_safeToExitHandle != null) _safeToExitHandle.WaitOne();
-			_logger.Trace("AsyncMessagePump stopped, exiting safely");
+			_logger.Trace(string.Format("{0} stopped, exiting safely", nameof(AsyncMessagePump)));
 		}
 
 		#endregion
