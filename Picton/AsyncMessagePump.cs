@@ -94,9 +94,9 @@ namespace Picton
 
 		public void Start()
 		{
-			if (OnMessage == null) throw new NotImplementedException(string.Format("The {0} handler must be provided", nameof(OnMessage)));
+			if (OnMessage == null) throw new NotImplementedException($"The {nameof(OnMessage)} handler must be provided");
 
-			_logger.Trace(string.Format("{0} starting...", nameof(AsyncMessagePump)));
+			_logger.Trace($"{nameof(AsyncMessagePump)} starting...");
 
 			_cancellationTokenSource = new CancellationTokenSource();
 			_safeToExitHandle = new ManualResetEvent(false);
@@ -105,7 +105,7 @@ namespace Picton
 
 			_cancellationTokenSource.Dispose();
 
-			_logger.Trace(string.Format("{0} ready to exit", nameof(AsyncMessagePump)));
+			_logger.Trace($"{nameof(AsyncMessagePump)} ready to exit");
 			_safeToExitHandle.Set();
 		}
 
@@ -115,10 +115,10 @@ namespace Picton
 			if (_cancellationTokenSource?.IsCancellationRequested ?? false) return;
 
 			// Stop the message pump
-			_logger.Trace(string.Format("{0} stopping...", nameof(AsyncMessagePump)));
+			_logger.Trace($"{nameof(AsyncMessagePump)} stopping...");
 			if (_cancellationTokenSource != null) _cancellationTokenSource.Cancel();
 			if (_safeToExitHandle != null) _safeToExitHandle.WaitOne();
-			_logger.Trace(string.Format("{0} stopped, exiting safely", nameof(AsyncMessagePump)));
+			_logger.Trace($"{nameof(AsyncMessagePump)} stopped, exiting safely");
 		}
 
 		#endregion

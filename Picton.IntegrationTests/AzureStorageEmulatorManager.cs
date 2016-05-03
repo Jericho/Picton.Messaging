@@ -108,11 +108,7 @@ namespace Picton.IntegrationTests
 			var exitCode = ExecuteProcess(start);
 			if (exitCode != 0)
 			{
-				var message = string.Format(
-					"Error {0} executing {1} {2}",
-					exitCode,
-					start.FileName,
-					start.Arguments);
+				var message = $"Error {exitCode} executing {start.FileName} {start.Arguments}";
 				throw new InvalidOperationException(message);
 			}
 		}

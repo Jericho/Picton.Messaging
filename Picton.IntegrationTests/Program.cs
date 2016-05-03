@@ -40,7 +40,7 @@ namespace Picton.IntegrationTests
 			// Add messages to our testing queue
 			for (var i = 0; i < 50; i++)
 			{
-				cloudQueue.AddMessage(new CloudQueueMessage(string.Format("Hello world {0}", i)));
+				cloudQueue.AddMessage(new CloudQueueMessage($"Hello world {i}"));
 			}
 
 			// Configure the message pump

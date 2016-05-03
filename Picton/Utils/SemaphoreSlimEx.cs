@@ -31,7 +31,6 @@ namespace Picton.Utils
 			this.MinimumSlotsCount = minCount;
 			this.AvailableSlotsCount = initialCount;
 			this.MaximumSlotsCount = maxCount;
-
 		}
 
 		#endregion
@@ -58,7 +57,7 @@ namespace Picton.Utils
 							base.Release();
 							this.AvailableSlotsCount++;
 							increased = true;
-							_logger.Trace(string.Format("Semaphore slots increased: {0}", this.AvailableSlotsCount));
+							_logger.Trace($"Semaphore slots increased: {this.AvailableSlotsCount}");
 						}
 						_lock.ExitWriteLock();
 					}
@@ -92,7 +91,7 @@ namespace Picton.Utils
 						{
 							this.AvailableSlotsCount--;
 							decreased = true;
-							_logger.Trace(string.Format("Semaphore slots decreased: {0}", this.AvailableSlotsCount));
+							_logger.Trace($"Semaphore slots decreased: {this.AvailableSlotsCount}");
 						}
 					}
 					_lock.ExitWriteLock();
