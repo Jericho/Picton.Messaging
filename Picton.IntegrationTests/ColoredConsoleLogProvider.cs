@@ -27,16 +27,14 @@
 		{
 			return (logLevel, messageFunc, exception, formatParameters) =>
 			{
-				if (messageFunc == null)
-				{
-					return true; // All log levels are enabled
-				}
+				// messageFunc is null when checking if logLevel is enabled
+				if (messageFunc == null) return (logLevel >= _minLevel);
 
-				if (logLevel < _minLevel) return false;
-
-				ConsoleColor consoleColor;
+				// Please note: locking is important to ensure that multiple threads 
+				// don't attempt to change the foreground color at the same time
 				lock (this)
 				{
+					ConsoleColor consoleColor;
 					if (Colors.TryGetValue(logLevel, out consoleColor))
 					{
 						var originalForground = Console.ForegroundColor;
