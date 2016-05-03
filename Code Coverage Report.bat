@@ -7,6 +7,7 @@ mkdir "CodeCoverageReport"
 
 
 packages\OpenCover.4.6.519\tools\OpenCover.Console.exe^
+ -returntargetcode^
  -register:user^
  -target:"C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe"^
  -targetargs:"""Picton.UnitTests\bin\Debug\Picton.UnitTests.dll"""^
