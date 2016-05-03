@@ -85,7 +85,7 @@ namespace Picton
 			_maxDequeueCount = maxDequeueCount;
 
 			OnQueueEmpty = cancellationToken => Task.Delay(1000, cancellationToken).Wait();
-			OnError = (message, exception, isPoison) => Trace.TraceError("An error occured: {0}", exception);
+			OnError = (message, exception, isPoison) => _logger.ErrorException("An error occured when processing a message", exception);
 		}
 
 		#endregion
@@ -94,7 +94,7 @@ namespace Picton
 
 		public void Start()
 		{
-			if (this.OnMessage == null) throw new NotImplementedException("The OnMessage property must be provided");
+			if (this.OnMessage == null) throw new NotImplementedException("The OnMessage handler must be provided");
 
 			_logger.Trace("AsyncMessagePump starting...");
 
