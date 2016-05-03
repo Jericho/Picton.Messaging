@@ -64,13 +64,13 @@ namespace Picton
 
 		/// <summary>
 		/// High performance message processor (also known as a message "pump") for Azure storage queues. Designed to monitor an Azure storage queue and process the message as quickly and efficiently as possible.
-		/// When messages are present in the queue, this worker will increase the number of tasks that can concurrently process messages.
-		/// Conversly, this worker will reduce the number of tasks that can concurrently process messages when the queue is empty.
+		/// When messages are present in the queue, this message pump will increase the number of tasks that can concurrently process messages.
+		/// Conversly, this message pump will reduce the number of tasks that can concurrently process messages when the queue is empty.
 		/// </summary>
-		/// <param name="minConcurrentTasks">The minimum number of tasks. The AsyncQueueworker will not scale down below this value.</param>
-		/// <param name="maxConcurrentTasks">The maximum number of tasks. The AsyncQueueworker will not scale up above this value.</param>
+		/// <param name="minConcurrentTasks">The minimum number of concurrent tasks. The message pump will not scale down below this value</param>
+		/// <param name="maxConcurrentTasks">The maximum number of concurrent tasks. The message pump will not scale up above this value</param>
 		/// <param name="visibilityTimeout">The queue visibility timeout</param>
-		/// <param name="maxDequeuecount">The number of times to retry before giving up</param>
+		/// <param name="maxDequeuecount">The number of times to try processing a given message before giving up</param>
 		public AsyncMessagePump(CloudQueue cloudQueue, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
 		{
 			if (cloudQueue == null) throw new ArgumentNullException(nameof(cloudQueue));
@@ -94,7 +94,7 @@ namespace Picton
 
 		public void Start()
 		{
-			if (this.OnMessage == null) throw new NotImplementedException(string.Format("The {0} handler must be provided", nameof(OnMessage)));
+			if (OnMessage == null) throw new NotImplementedException(string.Format("The {0} handler must be provided", nameof(OnMessage)));
 
 			_logger.Trace(string.Format("{0} starting...", nameof(AsyncMessagePump)));
 
