@@ -58,7 +58,7 @@ namespace Picton.Utils
 							base.Release();
 							this.AvailableSlotsCount++;
 							increased = true;
-							_logger.Trace(string.Format("Semaphone slots increased: {0}", this.AvailableSlotsCount));
+							_logger.Trace(string.Format("Semaphore slots increased: {0}", this.AvailableSlotsCount));
 						}
 						_lock.ExitWriteLock();
 					}
@@ -92,7 +92,7 @@ namespace Picton.Utils
 						{
 							this.AvailableSlotsCount--;
 							decreased = true;
-							_logger.Trace(string.Format("Semaphone slots decreased: {0}", this.AvailableSlotsCount));
+							_logger.Trace(string.Format("Semaphore slots decreased: {0}", this.AvailableSlotsCount));
 						}
 					}
 					_lock.ExitWriteLock();
