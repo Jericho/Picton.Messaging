@@ -137,11 +137,11 @@ namespace Picton
 				{
 					await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-					var runningTask = Task.Run(() =>
+					var runningTask = Task.Run(async () =>
 					{
 						if (cancellationToken.IsCancellationRequested) return false;
 
-						var message = _cloudQueue.GetMessage(visibilityTimeout);
+						var message = await _cloudQueue.GetMessageAsync(visibilityTimeout, null, null, cancellationToken);
 						if (message == null)
 						{
 							try
@@ -165,13 +165,13 @@ namespace Picton
 								OnMessage?.Invoke(message, cancellationToken);
 
 								// Delete the processed message from the queue
-								_cloudQueue.DeleteMessage(message);
+								await _cloudQueue.DeleteMessageAsync(message);
 							}
 							catch (Exception ex)
 							{
 								var isPoison = (message.DequeueCount > _maxDequeueCount);
 								OnError?.Invoke(message, ex, isPoison);
-								if (isPoison) _cloudQueue.DeleteMessage(message);
+								if (isPoison) await _cloudQueue.DeleteMessageAsync(message);
 							}
 
 							// True indicates that a message was processed
@@ -181,12 +181,12 @@ namespace Picton
 
 					runningTasks.TryAdd(runningTask, runningTask);
 
-					runningTask.ContinueWith(t =>
+					runningTask.ContinueWith(async t =>
 					{
 						// Decide if we need to scale up or down
 						if (!cancellationToken.IsCancellationRequested)
 						{
-							if (t.Result)
+							if (await t)
 							{
 								// The queue is not empty, therefore increase the number of concurrent tasks
 								semaphore.TryIncrease();
