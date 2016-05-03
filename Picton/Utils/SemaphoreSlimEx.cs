@@ -1,15 +1,27 @@
-﻿using System;
+﻿using Picton.Logging;
+using System;
 using System.Threading;
 
 namespace Picton.Utils
 {
 	public class SemaphoreSlimEx : SemaphoreSlim
 	{
+		#region FIELDS
+
 		private ReaderWriterLockSlim _lock;
+		private static readonly ILog _logger = LogProvider.GetCurrentClassLogger();
+
+		#endregion
+
+		#region PROPERTIES
 
 		public int MinimumSlotsCount { get; private set; }
 		public int AvailableSlotsCount { get; private set; }
 		public int MaximumSlotsCount { get; private set; }
+
+		#endregion
+
+		#region CONSTRUCTOR
 
 		public SemaphoreSlimEx(int minCount, int initialCount, int maxCount)
 			: base(initialCount, maxCount)
@@ -21,6 +33,10 @@ namespace Picton.Utils
 			this.MaximumSlotsCount = maxCount;
 
 		}
+
+		#endregion
+
+		#region PUBLIC METHODS
 
 		public bool TryIncrease(int millisecondsTimeout = 500)
 		{
@@ -42,6 +58,7 @@ namespace Picton.Utils
 							base.Release();
 							this.AvailableSlotsCount++;
 							increased = true;
+							_logger.Trace(string.Format("Semaphone slots increased: {0}", this.AvailableSlotsCount));
 						}
 						_lock.ExitWriteLock();
 					}
@@ -75,6 +92,7 @@ namespace Picton.Utils
 						{
 							this.AvailableSlotsCount--;
 							decreased = true;
+							_logger.Trace(string.Format("Semaphone slots decreased: {0}", this.AvailableSlotsCount));
 						}
 					}
 					_lock.ExitWriteLock();
@@ -82,5 +100,7 @@ namespace Picton.Utils
 			}
 			return decreased;
 		}
+
+		#endregion	
 	}
 }

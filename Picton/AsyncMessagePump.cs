@@ -1,4 +1,5 @@
 ﻿using Microsoft.WindowsAzure.Storage.Queue;
+using Picton.Logging;
 using Picton.Utils;
 using System;
 using System.Collections.Concurrent;
@@ -19,6 +20,8 @@ namespace Picton
 		private readonly int _maxDequeueCount;
 		private CancellationTokenSource _cancellationTokenSource;
 		private ManualResetEvent _safeToExitHandle;
+
+		private static readonly ILog _logger = LogProvider.GetCurrentClassLogger();
 
 		#endregion
 
@@ -93,7 +96,7 @@ namespace Picton
 		{
 			if (this.OnMessage == null) throw new NotImplementedException("The OnMessage property must be provided");
 
-			Trace.TraceInformation("AsyncMessagePump starting...");
+			_logger.Trace("AsyncMessagePump starting...");
 
 			_cancellationTokenSource = new CancellationTokenSource();
 			_safeToExitHandle = new ManualResetEvent(false);
@@ -102,7 +105,7 @@ namespace Picton
 
 			_cancellationTokenSource.Dispose();
 
-			Trace.TraceInformation("AsyncMessagePump ready to exit");
+			_logger.Trace("AsyncMessagePump ready to exit");
 			_safeToExitHandle.Set();
 		}
 
@@ -112,10 +115,10 @@ namespace Picton
 			if (_cancellationTokenSource != null && _cancellationTokenSource.IsCancellationRequested) return;
 
 			// Stop the message pump
-			Trace.TraceInformation("AsyncMessagePump stopping...");
+			_logger.Trace("AsyncMessagePump stopping...");
 			if (_cancellationTokenSource != null) _cancellationTokenSource.Cancel();
 			if (_safeToExitHandle != null) _safeToExitHandle.WaitOne();
-			Trace.TraceInformation("AsyncMessagePump stopped, exiting safely");
+			_logger.Trace("AsyncMessagePump stopped, exiting safely");
 		}
 
 		#endregion
@@ -186,14 +189,12 @@ namespace Picton
 							if (t.Result)
 							{
 								// The queue is not empty, therefore increase the number of concurrent tasks
-								var increased = semaphore.TryIncrease();
-								if (increased) Debug.WriteLine("Semaphone slots increased: {0}", semaphore.AvailableSlotsCount);
+								semaphore.TryIncrease();
 							}
 							else
 							{
 								// The queue is empty, therefore reduce the number of concurrent tasks
-								var decreased = semaphore.TryDecrease();
-								if (decreased) Debug.WriteLine("Semaphone slots decreased: {0}", semaphore.AvailableSlotsCount);
+								semaphore.TryDecrease();
 							}
 						}
 

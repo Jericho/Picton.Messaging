@@ -1,6 +1,7 @@
 ﻿using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
+using Picton.Logging;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -11,8 +12,21 @@ namespace Picton.IntegrationTests
 	{
 		static void Main(string[] args)
 		{
+			// Ensure the storage emulator is running
 			AzureStorageEmulatorManager.StartStorageEmulator();
 
+			// If you want to see tracing from the Picton libary, change the LogLevel to 'Trace'
+			var minLogLevel = Logging.LogLevel.Debug;
+
+			// Configure logging to the console
+			var logProvider = new ColoredConsoleLogProvider(minLogLevel);
+			var logger = logProvider.GetLogger("IntegrationTests");
+			LogProvider.SetCurrentLogProvider(logProvider);
+
+			// Ensure the Console is tall enough
+			Console.WindowHeight = 60;
+
+			// Setup the message queue in Azure storage emulator
 			var storageAccount = CloudStorageAccount.DevelopmentStorageAccount;
 			var cloudQueueClient = storageAccount.CreateCloudQueueClient();
 			cloudQueueClient.DefaultRequestOptions.RetryPolicy = new NoRetry();
@@ -24,7 +38,7 @@ namespace Picton.IntegrationTests
 			Stopwatch sw = null;
 
 			// Add messages to our testing queue
-			for (var i = 0; i < 100; i++)
+			for (var i = 0; i < 50; i++)
 			{
 				cloudQueue.AddMessage(new CloudQueueMessage(string.Format("Hello world {0}", i)));
 			}
@@ -33,7 +47,7 @@ namespace Picton.IntegrationTests
 			var messagePump = new AsyncMessagePump(cloudQueue, 1, 25, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
-				Console.WriteLine(message.AsString);
+				logger(Logging.LogLevel.Debug, () => message.AsString);
 			};
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
@@ -49,10 +63,14 @@ namespace Picton.IntegrationTests
 							// Indicate that the message pump is stopping
 							stopping = true;
 
+							// Log to console
+							logger(Logging.LogLevel.Debug, () => "Asking the message pump to stop");
+
 							// Run the 'OnStop' on a different thread so we don't block it
 							Task.Run(() =>
 							{
 								messagePump.Stop();
+								logger(Logging.LogLevel.Debug, () => "Message pump has been stopped");
 							}).ConfigureAwait(false);
 						}
 					}
@@ -61,12 +79,12 @@ namespace Picton.IntegrationTests
 
 			// Start the message pump
 			sw = Stopwatch.StartNew();
+			logger(Logging.LogLevel.Debug, () => "Message pump is starting");
 			messagePump.Start();
 
-			// Display how long it took to process the messages that were in the queue
-			Console.WriteLine("Elapsed Milliseconds: " + sw.Elapsed.ToDurationString());
-			Console.WriteLine("");
-			Console.WriteLine("Press any key to exit...");
+			// Display summary
+			logger(Logging.LogLevel.Info, () => "Elapsed Milliseconds: " + sw.Elapsed.ToDurationString());
+			logger(Logging.LogLevel.Info, () => "Press any key to exit...");
 
 			// Flush the console key buffer
 			while (Console.KeyAvailable) Console.ReadKey(true);
