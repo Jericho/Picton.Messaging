@@ -64,19 +64,19 @@ namespace Picton
 
 		/// <summary>
 		/// High performance message processor (also known as a message "pump") for Azure storage queues. Designed to monitor an Azure storage queue and process the message as quickly and efficiently as possible.
-		/// When messages are present in the queue, this worker will increase the number of tasks that can concurrently process messages.
-		/// Conversly, this worker will reduce the number of tasks that can concurrently process messages when the queue is empty.
+		/// When messages are present in the queue, this message pump will increase the number of tasks that can concurrently process messages.
+		/// Conversly, this message pump will reduce the number of tasks that can concurrently process messages when the queue is empty.
 		/// </summary>
-		/// <param name="minConcurrentTasks">The minimum number of tasks. The AsyncQueueworker will not scale down below this value.</param>
-		/// <param name="maxConcurrentTasks">The maximum number of tasks. The AsyncQueueworker will not scale up above this value.</param>
+		/// <param name="minConcurrentTasks">The minimum number of concurrent tasks. The message pump will not scale down below this value</param>
+		/// <param name="maxConcurrentTasks">The maximum number of concurrent tasks. The message pump will not scale up above this value</param>
 		/// <param name="visibilityTimeout">The queue visibility timeout</param>
-		/// <param name="maxDequeuecount">The number of times to retry before giving up</param>
+		/// <param name="maxDequeueCount">The number of times to try processing a given message before giving up</param>
 		public AsyncMessagePump(CloudQueue cloudQueue, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
 		{
-			if (cloudQueue == null) throw new ArgumentNullException("cloudQueue");
-			if (minConcurrentTasks < 1) throw new ArgumentException("minConcurrentTasks must be greather than zero");
-			if (maxConcurrentTasks < minConcurrentTasks) throw new ArgumentException("maxConcurrentTasks must be greather than or equal to minConcurrentTasks");
-			if (maxDequeueCount < 1) throw new ArgumentException("maxDequeueCount must be greather than zero");
+			if (cloudQueue == null) throw new ArgumentNullException(nameof(cloudQueue));
+			if (minConcurrentTasks < 1) throw new ArgumentException("Minimum number of concurrent tasks must be greather than zero", nameof(minConcurrentTasks));
+			if (maxConcurrentTasks < minConcurrentTasks) throw new ArgumentException("Maximum number of concurrent tasks must be greather than or equal to the minimum", nameof(maxConcurrentTasks));
+			if (maxDequeueCount < 1) throw new ArgumentException("Number of retries must be greather than zero", nameof(maxDequeueCount));
 
 			_cloudQueue = cloudQueue;
 			_minConcurrentTasks = minConcurrentTasks;
@@ -94,9 +94,9 @@ namespace Picton
 
 		public void Start()
 		{
-			if (this.OnMessage == null) throw new NotImplementedException("The OnMessage handler must be provided");
+			if (OnMessage == null) throw new ArgumentNullException(nameof(OnMessage));
 
-			_logger.Trace("AsyncMessagePump starting...");
+			_logger.Trace($"{nameof(AsyncMessagePump)} starting...");
 
 			_cancellationTokenSource = new CancellationTokenSource();
 			_safeToExitHandle = new ManualResetEvent(false);
@@ -105,20 +105,20 @@ namespace Picton
 
 			_cancellationTokenSource.Dispose();
 
-			_logger.Trace("AsyncMessagePump ready to exit");
+			_logger.Trace($"{nameof(AsyncMessagePump)} ready to exit");
 			_safeToExitHandle.Set();
 		}
 
 		public void Stop()
 		{
 			// Don't attempt to stop the message pump if it's already in the process of stopping
-			if (_cancellationTokenSource != null && _cancellationTokenSource.IsCancellationRequested) return;
+			if (_cancellationTokenSource?.IsCancellationRequested ?? false) return;
 
 			// Stop the message pump
-			_logger.Trace("AsyncMessagePump stopping...");
+			_logger.Trace($"{nameof(AsyncMessagePump)} stopping...");
 			if (_cancellationTokenSource != null) _cancellationTokenSource.Cancel();
 			if (_safeToExitHandle != null) _safeToExitHandle.WaitOne();
-			_logger.Trace("AsyncMessagePump stopped, exiting safely");
+			_logger.Trace($"{nameof(AsyncMessagePump)} stopped, exiting safely");
 		}
 
 		#endregion
@@ -137,19 +137,30 @@ namespace Picton
 				{
 					await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-					var runningTask = Task.Run(() =>
+					var runningTask = Task.Run(async () =>
 					{
 						if (cancellationToken.IsCancellationRequested) return false;
 
-						var message = _cloudQueue.GetMessage(visibilityTimeout);
+						CloudQueueMessage message = null;
+						try
+						{
+							message = await _cloudQueue.GetMessageAsync(visibilityTimeout, null, null, cancellationToken);
+						}
+						catch (Exception e)
+						{
+							_logger.ErrorException("An error occured when attempting to get a message from the queue", e);
+						}
+
 						if (message == null)
 						{
 							try
 							{
 								// The queue is empty
-								if (this.OnQueueEmpty != null) OnQueueEmpty(cancellationToken);
+								OnQueueEmpty?.Invoke(cancellationToken);
 							}
+#pragma warning disable RECS0022 // A catch clause that catches System.Exception and has an empty body
 							catch
+#pragma warning restore RECS0022 // A catch clause that catches System.Exception and has an empty body
 							{
 								// Intentionally left empty. We ignore errors from OnQueueEmpty.
 							}
@@ -162,16 +173,16 @@ namespace Picton
 							try
 							{
 								// Process the message
-								if (this.OnMessage != null) OnMessage(message, cancellationToken);
+								OnMessage?.Invoke(message, cancellationToken);
 
 								// Delete the processed message from the queue
-								_cloudQueue.DeleteMessage(message);
+								await _cloudQueue.DeleteMessageAsync(message);
 							}
 							catch (Exception ex)
 							{
 								var isPoison = (message.DequeueCount > _maxDequeueCount);
-								OnError(message, ex, isPoison);
-								if (isPoison) _cloudQueue.DeleteMessage(message);
+								OnError?.Invoke(message, ex, isPoison);
+								if (isPoison) await _cloudQueue.DeleteMessageAsync(message);
 							}
 
 							// True indicates that a message was processed
@@ -181,12 +192,12 @@ namespace Picton
 
 					runningTasks.TryAdd(runningTask, runningTask);
 
-					runningTask.ContinueWith(t =>
+					runningTask.ContinueWith(async t =>
 					{
 						// Decide if we need to scale up or down
 						if (!cancellationToken.IsCancellationRequested)
 						{
-							if (t.Result)
+							if (await t)
 							{
 								// The queue is not empty, therefore increase the number of concurrent tasks
 								semaphore.TryIncrease();

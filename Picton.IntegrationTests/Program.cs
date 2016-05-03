@@ -10,7 +10,9 @@ namespace Picton.IntegrationTests
 {
 	class Program
 	{
+#pragma warning disable RECS0154 // Parameter is never used
 		static void Main(string[] args)
+#pragma warning restore RECS0154 // Parameter is never used
 		{
 			// Ensure the storage emulator is running
 			AzureStorageEmulatorManager.StartStorageEmulator();
@@ -40,7 +42,7 @@ namespace Picton.IntegrationTests
 			// Add messages to our testing queue
 			for (var i = 0; i < 50; i++)
 			{
-				cloudQueue.AddMessage(new CloudQueueMessage(string.Format("Hello world {0}", i)));
+				cloudQueue.AddMessage(new CloudQueueMessage($"Hello world {i}"));
 			}
 
 			// Configure the message pump

@@ -23,7 +23,7 @@ namespace Picton.IntegrationTests
 	///		- emulator 4.2 was released with SDK 2.8 (2.8.1 was released in November 2015 but I'm not sure when 2.8 was released)
 	///		- emulator 4.3 was released with SDK 2.9 in March 2016
 	/// </summary>
-	public class AzureStorageEmulatorManager
+	public static class AzureStorageEmulatorManager
 	{
 		private class EmulatorVersionInfo
 		{
@@ -108,11 +108,7 @@ namespace Picton.IntegrationTests
 			var exitCode = ExecuteProcess(start);
 			if (exitCode != 0)
 			{
-				var message = string.Format(
-					"Error {0} executing {1} {2}",
-					exitCode,
-					start.FileName,
-					start.Arguments);
+				var message = $"Error {exitCode} executing {start.FileName} {start.Arguments}";
 				throw new InvalidOperationException(message);
 			}
 		}

@@ -8,7 +8,9 @@ namespace Picton
 	{
 		#region PUBLIC EXTENSION METHODS
 
+#pragma warning disable RECS0154 // Parameter is never used
 		public static void IgnoreAwait(this Task task)
+#pragma warning restore RECS0154 // Parameter is never used
 		{
 			// Intentionaly left blank. The purpose of this extension method is
 			// avoid a Visual Studio warning about async calls that are not awaited
