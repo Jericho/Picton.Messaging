@@ -36,10 +36,10 @@
     - provider: Email
       to:
         - desautelsj@hotmail.com
-          subject: Picton Build
-          on_build_success: false
-          on_build_failure: false
-          on_build_status_changed: true
+        subject: Picton Build
+        on_build_success: false
+        on_build_failure: false
+        on_build_status_changed: true
   deploy:
     provider: NuGet
     api_key:
@@ -84,7 +84,7 @@
     - provider: Email
       to:
         - desautelsj@hotmail.com
-          subject: Picton Build
-          on_build_success: false
-          on_build_failure: false
-          on_build_status_changed: true
+        subject: Picton Build
+        on_build_success: false
+        on_build_failure: false
+        on_build_status_changed: true
