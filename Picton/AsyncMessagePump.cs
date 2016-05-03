@@ -112,7 +112,7 @@ namespace Picton
 		public void Stop()
 		{
 			// Don't attempt to stop the message pump if it's already in the process of stopping
-			if (_cancellationTokenSource != null && _cancellationTokenSource.IsCancellationRequested) return;
+			if (_cancellationTokenSource?.IsCancellationRequested ?? false) return;
 
 			// Stop the message pump
 			_logger.Trace(string.Format("{0} stopping...", nameof(AsyncMessagePump)));
@@ -147,7 +147,7 @@ namespace Picton
 							try
 							{
 								// The queue is empty
-								if (this.OnQueueEmpty != null) OnQueueEmpty(cancellationToken);
+								OnQueueEmpty?.Invoke(cancellationToken);
 							}
 							catch
 							{
@@ -162,7 +162,7 @@ namespace Picton
 							try
 							{
 								// Process the message
-								if (this.OnMessage != null) OnMessage(message, cancellationToken);
+								OnMessage?.Invoke(message, cancellationToken);
 
 								// Delete the processed message from the queue
 								_cloudQueue.DeleteMessage(message);
@@ -170,7 +170,7 @@ namespace Picton
 							catch (Exception ex)
 							{
 								var isPoison = (message.DequeueCount > _maxDequeueCount);
-								OnError(message, ex, isPoison);
+								OnError?.Invoke(message, ex, isPoison);
 								if (isPoison) _cloudQueue.DeleteMessage(message);
 							}
 
