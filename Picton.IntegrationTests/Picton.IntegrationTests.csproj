@@ -87,6 +87,8 @@
   <ItemGroup>
     <Compile Include="AzureStorageEmulatorManager.cs" />
     <Compile Include="ColoredConsoleLogProvider.cs" />
+    <Compile Include="MyMessageHandler.cs" />
+    <Compile Include="MyMessage.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
