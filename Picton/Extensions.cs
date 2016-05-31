@@ -1,4 +1,8 @@
-﻿using System;
+﻿using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Queue;
+using Newtonsoft.Json;
+using Picton.Utils;
+using System;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -52,6 +56,14 @@ namespace Picton
 			else if (timeSpan.Milliseconds > 1) result.AppendFormat(" {0} milliseconds", timeSpan.Milliseconds);
 
 			return result.ToString().Trim();
+		}
+
+		public static void AddMessage<T>(this CloudQueue cloudQueue, T message, TimeSpan? timeToLive = default(TimeSpan?), TimeSpan? initialVisibilityDelay = default(TimeSpan?), QueueRequestOptions options = null, OperationContext operationContext = null)
+		{
+			var envelope = CloudMessageEnvelope.FromObject(message);
+			var envelopeAsJson = JsonConvert.SerializeObject(envelope);
+			var cloudQueueMessage = new CloudQueueMessage(envelopeAsJson);
+			cloudQueue.AddMessage(cloudQueueMessage, timeToLive, initialVisibilityDelay, options, operationContext);
 		}
 
 		#endregion
