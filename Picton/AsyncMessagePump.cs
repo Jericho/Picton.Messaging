@@ -3,7 +3,6 @@ using Picton.Logging;
 using Picton.Utils;
 using System;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -146,6 +145,11 @@ namespace Picton
 						{
 							message = await _cloudQueue.GetMessageAsync(visibilityTimeout, null, null, cancellationToken);
 						}
+						catch (TaskCanceledException)
+						{
+							// GetMessageAsync was aborted because the message pump is stopping. 
+							// This is normal and can safely be ignored.
+						}
 						catch (Exception e)
 						{
 							_logger.ErrorException("An error occured when attempting to get a message from the queue", e);
@@ -158,11 +162,9 @@ namespace Picton
 								// The queue is empty
 								OnQueueEmpty?.Invoke(cancellationToken);
 							}
-#pragma warning disable RECS0022 // A catch clause that catches System.Exception and has an empty body
-							catch
-#pragma warning restore RECS0022 // A catch clause that catches System.Exception and has an empty body
+							catch (Exception e)
 							{
-								// Intentionally left empty. We ignore errors from OnQueueEmpty.
+								_logger.InfoException("An error occured when handling an empty queue. The error was caught and ignored.", e);
 							}
 
 							// False indicates that no message was processed
