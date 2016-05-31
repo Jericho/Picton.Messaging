@@ -18,11 +18,11 @@ namespace Picton.IntegrationTests
 			AzureStorageEmulatorManager.StartStorageEmulator();
 
 			// If you want to see tracing from the Picton libary, change the LogLevel to 'Trace'
-			var minLogLevel = Logging.LogLevel.Info;
+			var minLogLevel = Logging.LogLevel.Debug;
 
 			// Configure logging to the console
 			var logProvider = new ColoredConsoleLogProvider(minLogLevel);
-			var logger = logProvider.GetLogger("IntegrationTests.Main");
+			var logger = logProvider.GetLogger("Main");
 			LogProvider.SetCurrentLogProvider(logProvider);
 
 			// Ensure the Console is tall enough
@@ -37,7 +37,7 @@ namespace Picton.IntegrationTests
 
 			// Proces some mesages
 			logger(Logging.LogLevel.Info, () => "Begin integration tests...");
-			//ProcessSimpleMessages(cloudQueue, logProvider);
+			ProcessSimpleMessages(cloudQueue, logProvider);
 			ProcessMessagesWithHandlers(cloudQueue, logProvider);
 
 			// Flush the console key buffer
@@ -50,7 +50,7 @@ namespace Picton.IntegrationTests
 
 		public static void ProcessSimpleMessages(CloudQueue cloudQueue, ILogProvider logProvider)
 		{
-			var logger = logProvider.GetLogger("IntegrationTests.ProcessSimpleMessages");
+			var logger = logProvider.GetLogger("ProcessSimpleMessages");
 
 			var lockObject = new Object();
 			var stopping = false;
@@ -83,13 +83,13 @@ namespace Picton.IntegrationTests
 							stopping = true;
 
 							// Log to console
-							logger(Logging.LogLevel.Debug, () => "Asking the message pump to stop");
+							logger(Logging.LogLevel.Debug, () => "Asking the 'simple' message pump to stop");
 
 							// Run the 'OnStop' on a different thread so we don't block it
 							Task.Run(() =>
 							{
 								messagePump.Stop();
-								logger(Logging.LogLevel.Debug, () => "Message pump has been stopped");
+								logger(Logging.LogLevel.Debug, () => "The 'simple' message pump has been stopped");
 							}).ConfigureAwait(false);
 						}
 					}
@@ -98,7 +98,7 @@ namespace Picton.IntegrationTests
 
 			// Start the message pump
 			sw = Stopwatch.StartNew();
-			logger(Logging.LogLevel.Debug, () => "Message pump is starting");
+			logger(Logging.LogLevel.Debug, () => "The 'simple message pump is starting");
 			messagePump.Start();
 
 			// Display summary
@@ -107,7 +107,7 @@ namespace Picton.IntegrationTests
 
 		public static void ProcessMessagesWithHandlers(CloudQueue cloudQueue, ILogProvider logProvider)
 		{
-			var logger = logProvider.GetLogger("IntegrationTests.ProcessMessagesWithHandlers");
+			var logger = logProvider.GetLogger("ProcessMessagesWithHandlers");
 
 			var lockObject = new Object();
 			var stopping = false;
@@ -136,13 +136,13 @@ namespace Picton.IntegrationTests
 							stopping = true;
 
 							// Log to console
-							logger(Logging.LogLevel.Debug, () => "Asking the message pump to stop");
+							logger(Logging.LogLevel.Debug, () => "Asking the message pump with handlers to stop");
 
 							// Run the 'OnStop' on a different thread so we don't block it
 							Task.Run(() =>
 							{
 								messagePump.Stop();
-								logger(Logging.LogLevel.Debug, () => "Message pump has been stopped");
+								logger(Logging.LogLevel.Debug, () => "The message pump with handlers has been stopped");
 							}).ConfigureAwait(false);
 						}
 					}
@@ -151,7 +151,7 @@ namespace Picton.IntegrationTests
 
 			// Start the message pump
 			sw = Stopwatch.StartNew();
-			logger(Logging.LogLevel.Debug, () => "Message pump is starting");
+			logger(Logging.LogLevel.Debug, () => "The message pump with handlers is starting");
 			messagePump.Start();
 
 			// Display summary
