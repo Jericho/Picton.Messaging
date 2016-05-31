@@ -34,23 +34,26 @@
 				// don't attempt to change the foreground color at the same time
 				lock (this)
 				{
-					ConsoleColor consoleColor;
-					if (Colors.TryGetValue(logLevel, out consoleColor))
+					if (logLevel >= _minLevel)
 					{
-						var originalForground = Console.ForegroundColor;
-						try
+						ConsoleColor consoleColor;
+						if (Colors.TryGetValue(logLevel, out consoleColor))
 						{
-							Console.ForegroundColor = consoleColor;
+							var originalForground = Console.ForegroundColor;
+							try
+							{
+								Console.ForegroundColor = consoleColor;
+								WriteMessage(logLevel, name, messageFunc, formatParameters, exception);
+							}
+							finally
+							{
+								Console.ForegroundColor = originalForground;
+							}
+						}
+						else
+						{
 							WriteMessage(logLevel, name, messageFunc, formatParameters, exception);
 						}
-						finally
-						{
-							Console.ForegroundColor = originalForground;
-						}
-					}
-					else
-					{
-						WriteMessage(logLevel, name, messageFunc, formatParameters, exception);
 					}
 				}
 				return true;
@@ -64,7 +67,8 @@
 			object[] formatParameters,
 			Exception exception)
 		{
-			var message = string.Format(CultureInfo.InvariantCulture, messageFunc(), formatParameters);
+			var message = messageFunc();
+			if (formatParameters?.Length > 0) message = string.Format(CultureInfo.InvariantCulture, message, formatParameters);
 			if (exception != null)
 			{
 				message = message + "|" + exception;
