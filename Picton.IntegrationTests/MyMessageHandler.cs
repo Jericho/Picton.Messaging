@@ -14,7 +14,7 @@ namespace Picton.IntegrationTests
 		}
 		public void Handle(MyMessage message)
 		{
-			_logger(Logging.LogLevel.Info, () => "aaa");
+			_logger(Logging.LogLevel.Info, () => message.MessageContent);
 		}
 	}
 }

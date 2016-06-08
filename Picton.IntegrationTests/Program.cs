@@ -26,7 +26,7 @@ namespace Picton.IntegrationTests
 			LogProvider.SetCurrentLogProvider(logProvider);
 
 			// Ensure the Console is tall enough
-			Console.WindowHeight = 60;
+			Console.WindowHeight = Math.Min(60, Console.LargestWindowHeight);
 
 			// Setup the message queue in Azure storage emulator
 			var storageAccount = CloudStorageAccount.DevelopmentStorageAccount;
@@ -98,7 +98,7 @@ namespace Picton.IntegrationTests
 
 			// Start the message pump
 			sw = Stopwatch.StartNew();
-			logger(Logging.LogLevel.Debug, () => "The 'simple message pump is starting");
+			logger(Logging.LogLevel.Debug, () => "The 'simple' message pump is starting");
 			messagePump.Start();
 
 			// Display summary
