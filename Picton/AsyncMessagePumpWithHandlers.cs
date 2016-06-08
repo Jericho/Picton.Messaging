@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using Wire;
 
 namespace Picton
 {
@@ -72,15 +73,15 @@ namespace Picton
 			_messagePump = new AsyncMessagePump(cloudQueue, minConcurrentTasks, maxConcurrentTasks, visibilityTimeout, maxDequeueCount);
 			_messagePump.OnMessage = (message, cancellationToken) =>
 			{
-				var envelope = CloudMessageEnvelope.FromCloudQueueMessage(message);
+				var serializer = new Serializer();
+				var typedMessage = serializer.Deserialize(message.AsBytes);
+				var messageType = typedMessage.GetType();
 
 				Type[] handlers = null;
-				if (!_messageHandlers.TryGetValue(envelope.MessageType, out handlers))
+				if (!_messageHandlers.TryGetValue(messageType, out handlers))
 				{
-					throw new Exception($"Received a message of type {envelope.MessageType.FullName} but could not find a class implementing IMessageHandler<{envelope.MessageType.FullName}>");
+					throw new Exception($"Received a message of type {messageType.FullName} but could not find a class implementing IMessageHandler<{messageType.FullName}>");
 				}
-
-				var typedMessage = JsonConvert.DeserializeObject(envelope.Payload, envelope.MessageType);
 
 				foreach (var handlerType in handlers)
 				{
@@ -108,108 +109,6 @@ namespace Picton
 		#endregion
 
 		#region PRIVATE METHODS
-
-		//private async Task ProcessMessages(TimeSpan? visibilityTimeout = null, CancellationToken cancellationToken = default(CancellationToken))
-		//{
-		//	var runningTasks = new ConcurrentDictionary<Task, Task>();
-		//	var semaphore = new SemaphoreSlimEx(_minConcurrentTasks, _minConcurrentTasks, _maxConcurrentTasks);
-
-		//	// Define the task pump
-		//	var pumpTask = Task.Run(async () =>
-		//	{
-		//		while (!cancellationToken.IsCancellationRequested)
-		//		{
-		//			await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-		//			var runningTask = Task.Run(async () =>
-		//			{
-		//				if (cancellationToken.IsCancellationRequested) return false;
-
-		//				CloudQueueMessage message = null;
-		//				try
-		//				{
-		//					message = await _cloudQueue.GetMessageAsync(visibilityTimeout, null, null, cancellationToken);
-		//				}
-		//				catch (TaskCanceledException tce)
-		//				{
-		//					_logger.InfoException("GetMessageAsync was aborted because the message pump is stopping. This is normal and can safely be ignored.", tce);
-		//				}
-		//				catch (Exception e)
-		//				{
-		//					_logger.ErrorException("An error occured when attempting to get a message from the queue", e);
-		//				}
-
-		//				if (message == null)
-		//				{
-		//					try
-		//					{
-		//						// The queue is empty
-		//						OnQueueEmpty?.Invoke(cancellationToken);
-		//					}
-		//					catch (Exception e)
-		//					{
-		//						_logger.InfoException("An error occured when handling an empty queue. The error was caught and ignored.", e);
-		//					}
-
-		//					// False indicates that no message was processed
-		//					return false;
-		//				}
-		//				else
-		//				{
-		//					try
-		//					{
-		//						// Process the message
-		//						OnMessage?.Invoke(message, cancellationToken);
-
-		//						// Delete the processed message from the queue
-		//						await _cloudQueue.DeleteMessageAsync(message);
-		//					}
-		//					catch (Exception ex)
-		//					{
-		//						var isPoison = (message.DequeueCount > _maxDequeueCount);
-		//						OnError?.Invoke(message, ex, isPoison);
-		//						if (isPoison) await _cloudQueue.DeleteMessageAsync(message);
-		//					}
-
-		//					// True indicates that a message was processed
-		//					return true;
-		//				}
-		//			}, CancellationToken.None);
-
-		//			runningTasks.TryAdd(runningTask, runningTask);
-
-		//			runningTask.ContinueWith(async t =>
-		//			{
-		//				// Decide if we need to scale up or down
-		//				if (!cancellationToken.IsCancellationRequested)
-		//				{
-		//					if (await t)
-		//					{
-		//						// The queue is not empty, therefore increase the number of concurrent tasks
-		//						semaphore.TryIncrease();
-		//					}
-		//					else
-		//					{
-		//						// The queue is empty, therefore reduce the number of concurrent tasks
-		//						semaphore.TryDecrease();
-		//					}
-		//				}
-
-		//				// Complete the task
-		//				semaphore.Release();
-		//				Task taskToBeRemoved;
-		//				runningTasks.TryRemove(t, out taskToBeRemoved);
-		//			}, TaskContinuationOptions.ExecuteSynchronously)
-		//			.IgnoreAwait();
-		//		}
-		//	});
-
-		//	// Run the task pump until canceled
-		//	await pumpTask.UntilCancelled().ConfigureAwait(false);
-
-		//	// Task pump has been canceled, wait for the currently running tasks to complete
-		//	await Task.WhenAll(runningTasks.Values).UntilCancelled().ConfigureAwait(false);
-		//}
 
 		private static IDictionary<Type, Type[]> GetMessageHandlers()
 		{
