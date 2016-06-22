@@ -1,7 +1,6 @@
 ﻿using Microsoft.WindowsAzure.Storage.Queue;
-using Newtonsoft.Json;
 using Picton.Logging;
-using Picton.Utils;
+using Picton.Messages;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -86,7 +85,7 @@ namespace Picton
 				foreach (var handlerType in handlers)
 				{
 					var handler = Activator.CreateInstance(handlerType);
-					MethodInfo handlerMethod = handlerType.GetMethod("Handle");
+					var handlerMethod = handlerType.GetMethod("Handle", new[] { messageType });
 					handlerMethod.Invoke(handler, new[] { typedMessage });
 				}
 			};
@@ -114,23 +113,30 @@ namespace Picton
 		{
 			var assemblies = GetLocalAssemblies();
 
-			var typesWithMessageHandlerInterface = assemblies
+			var typesWithMessageHandlerInterfaces = assemblies
 				.SelectMany(x => x.GetTypes())
 				.Where(t => !t.IsInterface)
 				.Select(type => new
 				{
 					Type = type,
-					MessageType = type
+					MessageTypes = type
 									.GetInterfaces()
 										.Where(i => i.IsGenericType)
 										.Where(t => t.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
 										.SelectMany(i => i.GetGenericArguments())
-										.FirstOrDefault()
 				})
-				.Where(t => t.MessageType != null)
+				.Where(t => t.MessageTypes != null && t.MessageTypes.Any())
 				.ToArray();
 
-			var messageHandlers = typesWithMessageHandlerInterface
+			var oneTypePerMessageHandler = typesWithMessageHandlerInterfaces
+				.SelectMany(t => t.MessageTypes, (t, messageType) =>
+				new
+				{
+					Type = t.Type,
+					MessageType = messageType
+				}).ToArray();
+
+			var messageHandlers = oneTypePerMessageHandler
 				.GroupBy(h => h.MessageType)
 				.ToDictionary(group => group.Key, group => group.Select(t => t.Type).ToArray());
 			return messageHandlers;
