@@ -100,6 +100,6 @@ namespace Picton.Utils
 			return decreased;
 		}
 
-		#endregion	
+		#endregion
 	}
 }

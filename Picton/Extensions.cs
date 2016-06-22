@@ -1,7 +1,5 @@
 ﻿using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
-using Newtonsoft.Json;
-using Picton.Utils;
 using System;
 using System.IO;
 using System.Text;
