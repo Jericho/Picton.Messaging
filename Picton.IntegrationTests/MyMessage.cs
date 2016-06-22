@@ -1,6 +1,8 @@
-﻿namespace Picton.IntegrationTests
+﻿using Picton.Messages;
+
+namespace Picton.IntegrationTests
 {
-	public class MyMessage
+	public class MyMessage : IMessage
 	{
 		public string MessageContent { get; set; }
 	}

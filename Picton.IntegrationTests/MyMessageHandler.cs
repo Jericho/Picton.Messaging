@@ -1,5 +1,5 @@
 ﻿using Picton.Logging;
-using Picton.Utils;
+using Picton.Messages;
 
 namespace Picton.IntegrationTests
 {
