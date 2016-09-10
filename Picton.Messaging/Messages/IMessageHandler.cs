@@ -1,4 +1,4 @@
-﻿namespace Picton.Messages
+﻿namespace Picton.Messaging.Messages
 {
 	public interface IMessageHandler<T> where T : IMessage
 	{

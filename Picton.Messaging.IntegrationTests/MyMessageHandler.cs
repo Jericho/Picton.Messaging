@@ -1,7 +1,7 @@
-﻿using Picton.Logging;
-using Picton.Messages;
+﻿using Picton.Messaging.Logging;
+using Picton.Messaging.Messages;
 
-namespace Picton.IntegrationTests
+namespace Picton.Messaging.IntegrationTests
 {
 	public class MyMessageHandler : IMessageHandler<MyMessage>
 	{

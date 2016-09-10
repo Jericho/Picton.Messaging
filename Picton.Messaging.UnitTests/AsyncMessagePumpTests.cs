@@ -9,7 +9,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Picton.UnitTests
+namespace Picton.Messaging.UnitTests
 {
 	[TestClass]
 	public class AsyncMessagePumpTests

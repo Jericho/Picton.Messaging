@@ -1,13 +1,13 @@
 ﻿using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Picton.Interfaces;
-using Picton.Logging;
 using Picton.Managers;
+using Picton.Messaging.Logging;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 
-namespace Picton.IntegrationTests
+namespace Picton.Messaging.IntegrationTests
 {
 	class Program
 	{

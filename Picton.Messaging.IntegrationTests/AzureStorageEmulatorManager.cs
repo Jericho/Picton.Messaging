@@ -6,7 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Picton.IntegrationTests
+namespace Picton.Messaging.IntegrationTests
 {
 	/// <summary>
 	/// This class attempts to detect which version of the Azure emulator is installed on your machine.

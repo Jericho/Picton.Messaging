@@ -101,7 +101,7 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Picton\Picton.Messaging.csproj">
+    <ProjectReference Include="..\Picton.Messaging\Picton.Messaging.csproj">
       <Project>{4b13c2fa-965c-484d-ba29-9db26a029e99}</Project>
       <Name>Picton.Messaging</Name>
     </ProjectReference>

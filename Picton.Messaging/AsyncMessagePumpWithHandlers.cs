@@ -1,7 +1,7 @@
 ﻿using Microsoft.WindowsAzure.Storage;
 using Picton.Interfaces;
-using Picton.Logging;
-using Picton.Messages;
+using Picton.Messaging.Logging;
+using Picton.Messaging.Messages;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,7 +9,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 
-namespace Picton
+namespace Picton.Messaging
 {
 	public class AsyncMessagePumpWithHandlers
 	{

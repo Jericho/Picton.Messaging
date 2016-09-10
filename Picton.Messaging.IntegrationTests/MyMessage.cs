@@ -1,6 +1,6 @@
-﻿using Picton.Messages;
+﻿using Picton.Messaging.Messages;
 
-namespace Picton.IntegrationTests
+namespace Picton.Messaging.IntegrationTests
 {
 	public class MyMessage : IMessage
 	{

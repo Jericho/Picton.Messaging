@@ -4,11 +4,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("Picton")]
-[assembly: AssemblyDescription("High performance async message pump for Azure")]
+[assembly: AssemblyTitle("Picton.Messaging.IntegrationTests")]
+[assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Jeremie Desautels")]
-[assembly: AssemblyProduct("Picton")]
+[assembly: AssemblyCompany("")]
+[assembly: AssemblyProduct("Picton.Messaging.IntegrationTests")]
 [assembly: AssemblyCopyright("Copyright © Jeremie Desautels 2016")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -19,7 +19,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("11e6d36d-2ff2-4ad6-92ed-c86b0e04c6c2")]
+[assembly: Guid("1f9417e4-8cac-41ee-bfc3-f8e68f6e0e21")]
 
 // Version information for an assembly consists of the following four values:
 //
@@ -33,4 +33,3 @@ using System.Runtime.InteropServices;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
-[assembly: AssemblyInformationalVersionAttribute("1.0")]

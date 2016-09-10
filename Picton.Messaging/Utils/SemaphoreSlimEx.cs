@@ -1,8 +1,8 @@
-﻿using Picton.Logging;
+﻿using Picton.Messaging.Logging;
 using System;
 using System.Threading;
 
-namespace Picton.Utils
+namespace Picton.Messaging.Utils
 {
 	public class SemaphoreSlimEx : SemaphoreSlim
 	{

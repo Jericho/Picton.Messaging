@@ -1,14 +1,14 @@
 ﻿using Microsoft.WindowsAzure.Storage;
 using Picton.Interfaces;
-using Picton.Logging;
 using Picton.Managers;
-using Picton.Utils;
+using Picton.Messaging.Logging;
+using Picton.Messaging.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Picton
+namespace Picton.Messaging
 {
 	public class AsyncMessagePump
 	{

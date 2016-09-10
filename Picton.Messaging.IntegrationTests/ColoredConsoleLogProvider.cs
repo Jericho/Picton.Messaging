@@ -1,4 +1,4 @@
-﻿namespace Picton.IntegrationTests
+﻿namespace Picton.Messaging.IntegrationTests
 {
 	using Logging;
 	using System;

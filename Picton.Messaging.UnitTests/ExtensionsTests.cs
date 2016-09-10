@@ -1,14 +1,7 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Queue;
-using Moq;
-using Picton.Utils;
 using System;
-using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace Picton.UnitTests
+namespace Picton.Messaging.UnitTests
 {
 	[TestClass]
 	public class ExtensionsTests

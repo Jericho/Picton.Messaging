@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Picton.Messaging", "Picton\Picton.Messaging.csproj", "{4B13C2FA-965C-484D-BA29-9DB26A029E99}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Picton.Messaging", "Picton.Messaging\Picton.Messaging.csproj", "{4B13C2FA-965C-484D-BA29-9DB26A029E99}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Picton.Messaging.IntegrationTests", "Picton.IntegrationTests\Picton.Messaging.IntegrationTests.csproj", "{8FF04307-399B-4CFA-925E-86C4A05F347E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Picton.Messaging.IntegrationTests", "Picton.Messaging.IntegrationTests\Picton.Messaging.IntegrationTests.csproj", "{8FF04307-399B-4CFA-925E-86C4A05F347E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Picton.Messaging.UnitTests", "Picton.UnitTests\Picton.Messaging.UnitTests.csproj", "{D6F6B993-4BBE-42F3-BD4B-1F0414C92E08}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Picton.Messaging.UnitTests", "Picton.Messaging.UnitTests\Picton.Messaging.UnitTests.csproj", "{D6F6B993-4BBE-42F3-BD4B-1F0414C92E08}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{53D250B0-3F11-4CD4-AF30-5F636B405D87}"
 	ProjectSection(SolutionItems) = preProject

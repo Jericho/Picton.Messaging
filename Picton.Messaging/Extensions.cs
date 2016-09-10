@@ -2,7 +2,7 @@
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Picton
+namespace Picton.Messaging
 {
 	public static class Extensions
 	{
