@@ -1,7 +1,9 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Blob;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Moq;
+using Picton.Interfaces;
 using System;
 using System.Reflection;
 using System.Threading;
@@ -12,38 +14,38 @@ namespace Picton.UnitTests
 	[TestClass]
 	public class AsyncMessagePumpTests
 	{
+		private static readonly string QUEUE_STORAGE_URL = "http://bogus:10001/devstoreaccount1/";
+		private static readonly string BLOB_STORAGE_URL = "http://bogus:10002/devstoreaccount1/";
+
 		[TestMethod]
 		[ExpectedException(typeof(ArgumentNullException))]
 		public void Null_cloudQueue_throws()
 		{
-			var messagePump = new AsyncMessagePump(null, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", (IStorageAccount)null, 1, 1, TimeSpan.FromMinutes(1), 3);
 		}
 
 		[TestMethod]
 		[ExpectedException(typeof(ArgumentException))]
 		public void Min_too_small_throws()
 		{
-			var mockStorageUri = new Uri("http://bogus/myaccount");
-			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
-			var messagePump = new AsyncMessagePump(mockQueue.Object, 0, 1, TimeSpan.FromMinutes(1), 3);
+			var mockStorageAccount = new Mock<IStorageAccount>(MockBehavior.Strict);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 0, 1, TimeSpan.FromMinutes(1), 3);
 		}
 
 		[TestMethod]
 		[ExpectedException(typeof(ArgumentException))]
 		public void Max_too_small_throws()
 		{
-			var mockStorageUri = new Uri("http://bogus/myaccount");
-			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
-			var messagePump = new AsyncMessagePump(mockQueue.Object, 2, 1, TimeSpan.FromMinutes(1), 3);
+			var mockStorageAccount = new Mock<IStorageAccount>(MockBehavior.Strict);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 2, 1, TimeSpan.FromMinutes(1), 3);
 		}
 
 		[TestMethod]
 		[ExpectedException(typeof(ArgumentException))]
 		public void DequeueCount_too_small_throws()
 		{
-			var mockStorageUri = new Uri("http://bogus/myaccount");
-			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
-			var messagePump = new AsyncMessagePump(mockQueue.Object, 1, 1, TimeSpan.FromMinutes(1), 0);
+			var mockStorageAccount = new Mock<IStorageAccount>(MockBehavior.Strict);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 0);
 		}
 
 		[TestMethod]
@@ -51,9 +53,14 @@ namespace Picton.UnitTests
 		public void Start_without_OnMessage_throws()
 		{
 			// Arrange
-			var mockStorageUri = new Uri("http://bogus/myaccount");
-			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
-			var messagePump = new AsyncMessagePump(mockQueue.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var queueName = "myqueue";
+			var mockQueue = GetMockQueue(queueName);
+			var mockQueueClient = GetMockQueueClient(mockQueue);
+			var mockBlobContainer = GetMockBlobContainer();
+			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
+			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
+
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
 
 			// Act
 			messagePump.Start();
@@ -62,9 +69,17 @@ namespace Picton.UnitTests
 		[TestMethod]
 		public void Stopping_without_starting()
 		{
-			var mockStorageUri = new Uri("http://bogus/myaccount");
-			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
-			var messagePump = new AsyncMessagePump(mockQueue.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			// Arrange
+			var queueName = "myqueue";
+			var mockQueue = GetMockQueue(queueName);
+			var mockQueueClient = GetMockQueueClient(mockQueue);
+			var mockBlobContainer = GetMockBlobContainer();
+			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
+			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
+
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+
+			// Act
 			messagePump.Stop();
 
 			// Nothing to assert.
@@ -79,11 +94,16 @@ namespace Picton.UnitTests
 			var onQueueEmptyInvokeCount = 0;
 			var onErrorInvokeCount = 0;
 
-			var mockStorageUri = new Uri("http://bogus/myaccount");
-			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
+			var queueName = "myqueue";
+			var mockQueue = GetMockQueue(queueName);
+			var mockQueueClient = GetMockQueueClient(mockQueue);
+			var mockBlobContainer = GetMockBlobContainer();
+			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
+			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
+
 			mockQueue.Setup(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns<CloudQueueMessage>(null);
 
-			var messagePump = new AsyncMessagePump(mockQueue.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Interlocked.Increment(ref onMessageInvokeCount);
@@ -132,8 +152,13 @@ namespace Picton.UnitTests
 			var lockObject = new Object();
 			var cloudMessage = new CloudQueueMessage("Message");
 
-			var mockStorageUri = new Uri("http://bogus/myaccount");
-			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
+			var queueName = "myqueue";
+			var mockQueue = GetMockQueue(queueName);
+			var mockQueueClient = GetMockQueueClient(mockQueue);
+			var mockBlobContainer = GetMockBlobContainer();
+			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
+			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
+
 			mockQueue.Setup(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns((TimeSpan? visibilityTimeout, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
 			{
 				if (cloudMessage == null) return null;
@@ -149,7 +174,7 @@ namespace Picton.UnitTests
 					return Task.FromResult(cloudMessage);
 				}
 			});
-			mockQueue.Setup(q => q.DeleteMessageAsync(It.IsAny<CloudQueueMessage>())).Returns((CloudQueueMessage message) =>
+			mockQueue.Setup(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns((string messageId, string popReceipt, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
 			{
 				lock (lockObject)
 				{
@@ -158,7 +183,7 @@ namespace Picton.UnitTests
 				return Task.FromResult(true);
 			});
 
-			var messagePump = new AsyncMessagePump(mockQueue.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Interlocked.Increment(ref onMessageInvokeCount);
@@ -193,7 +218,7 @@ namespace Picton.UnitTests
 			Assert.IsTrue(onQueueEmptyInvokeCount > 0);
 			Assert.AreEqual(0, onErrorInvokeCount);
 			mockQueue.Verify(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.AtLeast(1));
-			mockQueue.Verify(q => q.DeleteMessageAsync(It.IsAny<CloudQueueMessage>()), Times.Exactly(1));
+			mockQueue.Verify(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.Exactly(1));
 		}
 
 		[TestMethod]
@@ -209,8 +234,13 @@ namespace Picton.UnitTests
 			var lockObject = new Object();
 			var cloudMessage = new CloudQueueMessage("Message");
 
-			var mockStorageUri = new Uri("http://bogus/myaccount");
-			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
+			var queueName = "myqueue";
+			var mockQueue = GetMockQueue(queueName);
+			var mockQueueClient = GetMockQueueClient(mockQueue);
+			var mockBlobContainer = GetMockBlobContainer();
+			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
+			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
+
 			mockQueue.Setup(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns((TimeSpan? visibilityTimeout, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
 			{
 				if (cloudMessage == null) return null;
@@ -226,7 +256,7 @@ namespace Picton.UnitTests
 					return Task.FromResult(cloudMessage);
 				}
 			});
-			mockQueue.Setup(q => q.DeleteMessageAsync(It.IsAny<CloudQueueMessage>())).Returns((CloudQueueMessage message) =>
+			mockQueue.Setup(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns((string messageId, string popReceipt, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
 			{
 				lock (lockObject)
 				{
@@ -235,7 +265,7 @@ namespace Picton.UnitTests
 				return Task.FromResult(true);
 			});
 
-			var messagePump = new AsyncMessagePump(mockQueue.Object, 1, 1, TimeSpan.FromMinutes(1), retries);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), retries);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Interlocked.Increment(ref onMessageInvokeCount);
@@ -286,11 +316,16 @@ namespace Picton.UnitTests
 			var exceptionSimulated = false;
 			var lockObject = new Object();
 
-			var mockStorageUri = new Uri("http://bogus/myaccount");
-			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, mockStorageUri);
+			var queueName = "myqueue";
+			var mockQueue = GetMockQueue(queueName);
+			var mockQueueClient = GetMockQueueClient(mockQueue);
+			var mockBlobContainer = GetMockBlobContainer();
+			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
+			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
+
 			mockQueue.Setup(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns<CloudQueueMessage>(null);
 
-			var messagePump = new AsyncMessagePump(mockQueue.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Interlocked.Increment(ref onMessageInvokeCount);
@@ -328,6 +363,62 @@ namespace Picton.UnitTests
 			Assert.IsTrue(onQueueEmptyInvokeCount > 0);
 			Assert.AreEqual(0, onErrorInvokeCount);
 			mockQueue.Verify(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.AtLeast(1));
+		}
+
+		private static Mock<CloudBlobContainer> GetMockBlobContainer(string containerName = "mycontainer")
+		{
+			var mockContainerUri = new Uri(BLOB_STORAGE_URL + containerName);
+			var mockBlobContainer = new Mock<CloudBlobContainer>(MockBehavior.Strict, mockContainerUri);
+			mockBlobContainer
+				.Setup(c => c.CreateIfNotExistsAsync(It.IsAny<BlobContainerPublicAccessType>(), It.IsAny<BlobRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()))
+				.ReturnsAsync(true)
+				.Verifiable();
+			return mockBlobContainer;
+		}
+
+		private static Mock<IBlobClient> GetMockBlobClient(Mock<CloudBlobContainer> mockBlobContainer)
+		{
+			var mockBlobClient = new Mock<IBlobClient>(MockBehavior.Strict);
+			mockBlobClient
+				.Setup(c => c.GetContainerReference(It.IsAny<string>()))
+				.Returns(mockBlobContainer.Object)
+				.Verifiable();
+			return mockBlobClient;
+		}
+
+		private static Mock<CloudQueue> GetMockQueue(string queueName)
+		{
+			var queueAddres = new Uri(QUEUE_STORAGE_URL + queueName);
+			var mockQueue = new Mock<CloudQueue>(MockBehavior.Strict, queueAddres);
+			mockQueue
+				.Setup(c => c.CreateIfNotExistsAsync(It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()))
+				.ReturnsAsync(false)
+				.Verifiable();
+			return mockQueue;
+		}
+
+		private static Mock<IQueueClient> GetMockQueueClient(Mock<CloudQueue> mockQueue)
+		{
+			var mockQueueClient = new Mock<IQueueClient>(MockBehavior.Strict);
+			mockQueueClient
+				.Setup(c => c.GetQueueReference(mockQueue.Object.Name))
+				.Returns(mockQueue.Object)
+				.Verifiable();
+			return mockQueueClient;
+		}
+
+		private static Mock<IStorageAccount> GetMockStorageAccount(Mock<IBlobClient> mockBlobClient, Mock<IQueueClient> mockQueueClient)
+		{
+			var storageAccount = new Mock<IStorageAccount>(MockBehavior.Strict);
+			storageAccount
+				.Setup(s => s.CreateCloudBlobClient())
+				.Returns(mockBlobClient.Object)
+				.Verifiable();
+			storageAccount
+				.Setup(s => s.CreateCloudQueueClient())
+				.Returns(mockQueueClient.Object)
+				.Verifiable();
+			return storageAccount;
 		}
 	}
 }

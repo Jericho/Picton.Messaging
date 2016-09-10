@@ -22,13 +22,14 @@ namespace Picton.IntegrationTests
 	///		- emulator 4.1 was released with SDK 2.7 (2.7.1 was released in August 2015 but I'm not sure when 2.7 was released)
 	///		- emulator 4.2 was released with SDK 2.8 (2.8.1 was released in November 2015 but I'm not sure when 2.8 was released)
 	///		- emulator 4.3 was released with SDK 2.9 in March 2016
+	///		- emulator 4.4 was released with SDK 2.9.1 in May 2016
 	/// </summary>
 	public static class AzureStorageEmulatorManager
 	{
 		private class EmulatorVersionInfo
 		{
 			public int Version { get; private set; }
-			public string[] ProcessNames { get; private set; }	// the process name is not always the same on different platforms. For instance, "WAStorageEmulator" is named "WASTOR~1" on Windows 8.
+			public string[] ProcessNames { get; private set; }  // the process name is not always the same on different platforms. For instance, "WAStorageEmulator" is named "WASTOR~1" on Windows 8.
 			public string ExecutablePath { get; private set; }
 			public string Parameters { get; private set; }
 

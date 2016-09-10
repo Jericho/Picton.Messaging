@@ -1,7 +1,8 @@
 ﻿using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
-using Microsoft.WindowsAzure.Storage.RetryPolicies;
+using Picton.Interfaces;
 using Picton.Logging;
+using Picton.Managers;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -29,16 +30,13 @@ namespace Picton.IntegrationTests
 			Console.WindowHeight = Math.Min(60, Console.LargestWindowHeight);
 
 			// Setup the message queue in Azure storage emulator
-			var storageAccount = CloudStorageAccount.DevelopmentStorageAccount;
-			var cloudQueueClient = storageAccount.CreateCloudQueueClient();
-			cloudQueueClient.DefaultRequestOptions.RetryPolicy = new NoRetry();
-			var cloudQueue = cloudQueueClient.GetQueueReference("myqueue");
-			cloudQueue.CreateIfNotExists();
+			var storageAccount = StorageAccount.FromCloudStorageAccount(CloudStorageAccount.DevelopmentStorageAccount);
+			var queueName = "myqueue";
 
 			// Proces some mesages
 			logger(Logging.LogLevel.Info, () => "Begin integration tests...");
-			ProcessSimpleMessages(cloudQueue, logProvider);
-			ProcessMessagesWithHandlers(cloudQueue, logProvider);
+			ProcessSimpleMessages(queueName, storageAccount, logProvider);
+			ProcessMessagesWithHandlers(queueName, storageAccount, logProvider);
 
 			// Flush the console key buffer
 			while (Console.KeyAvailable) Console.ReadKey(true);
@@ -48,7 +46,7 @@ namespace Picton.IntegrationTests
 			Console.ReadKey();
 		}
 
-		public static void ProcessSimpleMessages(CloudQueue cloudQueue, ILogProvider logProvider)
+		public static void ProcessSimpleMessages(string queueName, IStorageAccount storageAccount, ILogProvider logProvider)
 		{
 			var logger = logProvider.GetLogger("ProcessSimpleMessages");
 
@@ -57,16 +55,19 @@ namespace Picton.IntegrationTests
 			Stopwatch sw = null;
 
 			// Add messages to our testing queue
+			var cloudQueueClient = storageAccount.CreateCloudQueueClient();
+			var cloudQueue = cloudQueueClient.GetQueueReference(queueName);
+			cloudQueue.CreateIfNotExists();
 			for (var i = 0; i < 5; i++)
 			{
 				cloudQueue.AddMessage(new CloudQueueMessage($"Hello world {i}"));
 			}
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePump(cloudQueue, 1, 25, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump(queueName, storageAccount, 1, 25, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
-				logger(Logging.LogLevel.Debug, () => message.AsString);
+				logger(Logging.LogLevel.Debug, () => message.Content.ToString());
 			};
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
@@ -105,7 +106,7 @@ namespace Picton.IntegrationTests
 			logger(Logging.LogLevel.Info, () => "Elapsed Milliseconds: " + sw.Elapsed.ToDurationString());
 		}
 
-		public static void ProcessMessagesWithHandlers(CloudQueue cloudQueue, ILogProvider logProvider)
+		public static void ProcessMessagesWithHandlers(string queueName, IStorageAccount storageAccount, ILogProvider logProvider)
 		{
 			var logger = logProvider.GetLogger("ProcessMessagesWithHandlers");
 
@@ -114,13 +115,14 @@ namespace Picton.IntegrationTests
 			Stopwatch sw = null;
 
 			// Add messages to our testing queue
+			var queueManager = new QueueManager(queueName, storageAccount);
 			for (var i = 0; i < 5; i++)
 			{
-				cloudQueue.AddMessage(new MyMessage { MessageContent = $"Hello world {i}" });
+				queueManager.AddMessageAsync(new MyMessage { MessageContent = $"Hello world {i}" });
 			}
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePumpWithHandlers(cloudQueue, 1, 25, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePumpWithHandlers(queueName, storageAccount, 1, 25, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
 				// Stop the message pump when the queue is empty.
