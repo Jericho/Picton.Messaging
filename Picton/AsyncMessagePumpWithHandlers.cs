@@ -1,4 +1,5 @@
-﻿using Microsoft.WindowsAzure.Storage.Queue;
+﻿using Microsoft.WindowsAzure.Storage;
+using Picton.Interfaces;
 using Picton.Logging;
 using Picton.Messages;
 using System;
@@ -7,7 +8,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
-using Wire;
 
 namespace Picton
 {
@@ -32,7 +32,7 @@ namespace Picton
 		/// <remarks>
 		/// When isPoison is set to true, you should copy this message to a poison queue because it will be deleted from the original queue.
 		/// </remarks>
-		public Action<CloudQueueMessage, Exception, bool> OnError
+		public Action<CloudMessage, Exception, bool> OnError
 		{
 			get { return _messagePump.OnError; }
 			set { _messagePump.OnError = value; }
@@ -58,6 +58,11 @@ namespace Picton
 
 		#region CONSTRUCTOR
 
+		public AsyncMessagePumpWithHandlers(string queueName, CloudStorageAccount cloudStorageAccount, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3) :
+			this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), minConcurrentTasks, maxConcurrentTasks, visibilityTimeout, maxDequeueCount)
+		{
+		}
+
 		/// <summary>
 		/// High performance message processor (also known as a message "pump") for Azure storage queues. Designed to monitor an Azure storage queue and process the message as quickly and efficiently as possible.
 		/// When messages are present in the queue, this message pump will increase the number of tasks that can concurrently process messages.
@@ -67,26 +72,22 @@ namespace Picton
 		/// <param name="maxConcurrentTasks">The maximum number of concurrent tasks. The message pump will not scale up above this value</param>
 		/// <param name="visibilityTimeout">The queue visibility timeout</param>
 		/// <param name="maxDequeueCount">The number of times to try processing a given message before giving up</param>
-		public AsyncMessagePumpWithHandlers(CloudQueue cloudQueue, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
+		public AsyncMessagePumpWithHandlers(string queueName, IStorageAccount storageAccount, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
 		{
-			_messagePump = new AsyncMessagePump(cloudQueue, minConcurrentTasks, maxConcurrentTasks, visibilityTimeout, maxDequeueCount);
+			_messagePump = new AsyncMessagePump(queueName, storageAccount, minConcurrentTasks, maxConcurrentTasks, visibilityTimeout, maxDequeueCount);
 			_messagePump.OnMessage = (message, cancellationToken) =>
 			{
-				var serializer = new Serializer();
-				var typedMessage = serializer.Deserialize(message.AsBytes);
-				var messageType = typedMessage.GetType();
-
 				Type[] handlers = null;
-				if (!_messageHandlers.TryGetValue(messageType, out handlers))
+				if (!_messageHandlers.TryGetValue(message.ContentType, out handlers))
 				{
-					throw new Exception($"Received a message of type {messageType.FullName} but could not find a class implementing IMessageHandler<{messageType.FullName}>");
+					throw new Exception($"Received a message of type {message.ContentType.FullName} but could not find a class implementing IMessageHandler<{message.ContentType.FullName}>");
 				}
 
 				foreach (var handlerType in handlers)
 				{
 					var handler = Activator.CreateInstance(handlerType);
-					var handlerMethod = handlerType.GetMethod("Handle", new[] { messageType });
-					handlerMethod.Invoke(handler, new[] { typedMessage });
+					var handlerMethod = handlerType.GetMethod("Handle", new[] { message.ContentType });
+					handlerMethod.Invoke(handler, new[] { message.Content });
 				}
 			};
 		}
@@ -132,7 +133,7 @@ namespace Picton
 				.SelectMany(t => t.MessageTypes, (t, messageType) =>
 				new
 				{
-					Type = t.Type,
+					t.Type,
 					MessageType = messageType
 				}).ToArray();
 
@@ -144,8 +145,8 @@ namespace Picton
 
 		private static IEnumerable<Assembly> GetLocalAssemblies()
 		{
-			Assembly callingAssembly = Assembly.GetCallingAssembly();
-			string path = new Uri(Path.GetDirectoryName(callingAssembly.CodeBase)).AbsolutePath;
+			var callingAssembly = Assembly.GetCallingAssembly();
+			var path = new Uri(Path.GetDirectoryName(callingAssembly.CodeBase)).AbsolutePath;
 
 			return AppDomain.CurrentDomain.GetAssemblies()
 				.Where(x => !x.IsDynamic && new Uri(x.CodeBase).AbsolutePath.Contains(path)).ToList();

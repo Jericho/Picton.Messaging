@@ -1,5 +1,7 @@
-﻿using Microsoft.WindowsAzure.Storage.Queue;
+﻿using Microsoft.WindowsAzure.Storage;
+using Picton.Interfaces;
 using Picton.Logging;
+using Picton.Managers;
 using Picton.Utils;
 using System;
 using System.Collections.Concurrent;
@@ -12,7 +14,7 @@ namespace Picton
 	{
 		#region FIELDS
 
-		private readonly CloudQueue _cloudQueue;
+		private readonly IQueueManager _queueManager;
 		private readonly int _minConcurrentTasks;
 		private readonly int _maxConcurrentTasks;
 		private readonly TimeSpan? _visibilityTimeout;
@@ -32,7 +34,7 @@ namespace Picton
 		/// <remarks>
 		/// If exception is thrown when calling OnMessage, it will regard this queue message as failed.
 		/// </remarks>
-		public Action<CloudQueueMessage, CancellationToken> OnMessage { get; set; }
+		public Action<CloudMessage, CancellationToken> OnMessage { get; set; }
 
 		/// <summary>
 		/// Gets or sets the logic to execute when an error occurs.
@@ -43,7 +45,7 @@ namespace Picton
 		/// <remarks>
 		/// When isPoison is set to true, you should copy this message to a poison queue because it will be deleted from the original queue.
 		/// </remarks>
-		public Action<CloudQueueMessage, Exception, bool> OnError { get; set; }
+		public Action<CloudMessage, Exception, bool> OnError { get; set; }
 
 		/// <summary>
 		/// Gets or sets the logic to execute when queue is empty.
@@ -61,6 +63,12 @@ namespace Picton
 
 		#region CONSTRUCTOR
 
+		public AsyncMessagePump(string queueName, CloudStorageAccount cloudStorageAccount, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3) :
+			this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), minConcurrentTasks, maxConcurrentTasks, visibilityTimeout, maxDequeueCount)
+		{
+
+		}
+
 		/// <summary>
 		/// High performance message processor (also known as a message "pump") for Azure storage queues. Designed to monitor an Azure storage queue and process the message as quickly and efficiently as possible.
 		/// When messages are present in the queue, this message pump will increase the number of tasks that can concurrently process messages.
@@ -70,14 +78,13 @@ namespace Picton
 		/// <param name="maxConcurrentTasks">The maximum number of concurrent tasks. The message pump will not scale up above this value</param>
 		/// <param name="visibilityTimeout">The queue visibility timeout</param>
 		/// <param name="maxDequeueCount">The number of times to try processing a given message before giving up</param>
-		public AsyncMessagePump(CloudQueue cloudQueue, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
+		public AsyncMessagePump(string queueName, IStorageAccount storageAccount, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
 		{
-			if (cloudQueue == null) throw new ArgumentNullException(nameof(cloudQueue));
 			if (minConcurrentTasks < 1) throw new ArgumentException("Minimum number of concurrent tasks must be greather than zero", nameof(minConcurrentTasks));
 			if (maxConcurrentTasks < minConcurrentTasks) throw new ArgumentException("Maximum number of concurrent tasks must be greather than or equal to the minimum", nameof(maxConcurrentTasks));
 			if (maxDequeueCount < 1) throw new ArgumentException("Number of retries must be greather than zero", nameof(maxDequeueCount));
 
-			_cloudQueue = cloudQueue;
+			_queueManager = new QueueManager(queueName, storageAccount);
 			_minConcurrentTasks = minConcurrentTasks;
 			_maxConcurrentTasks = maxConcurrentTasks;
 			_visibilityTimeout = visibilityTimeout;
@@ -140,10 +147,10 @@ namespace Picton
 					{
 						if (cancellationToken.IsCancellationRequested) return false;
 
-						CloudQueueMessage message = null;
+						CloudMessage message = null;
 						try
 						{
-							message = await _cloudQueue.GetMessageAsync(visibilityTimeout, null, null, cancellationToken);
+							message = await _queueManager.GetMessageAsync(visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
 						}
 						catch (TaskCanceledException)
 						{
@@ -178,13 +185,13 @@ namespace Picton
 								OnMessage?.Invoke(message, cancellationToken);
 
 								// Delete the processed message from the queue
-								await _cloudQueue.DeleteMessageAsync(message);
+								await _queueManager.DeleteMessageAsync(message).ConfigureAwait(false);
 							}
 							catch (Exception ex)
 							{
 								var isPoison = (message.DequeueCount > _maxDequeueCount);
 								OnError?.Invoke(message, ex, isPoison);
-								if (isPoison) await _cloudQueue.DeleteMessageAsync(message);
+								if (isPoison) await _queueManager.DeleteMessageAsync(message).ConfigureAwait(false);
 							}
 
 							// True indicates that a message was processed

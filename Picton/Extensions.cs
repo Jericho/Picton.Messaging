@@ -1,10 +1,6 @@
-﻿using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Queue;
-using System;
-using System.IO;
+﻿using System;
 using System.Text;
 using System.Threading.Tasks;
-using Wire;
 
 namespace Picton
 {
@@ -56,33 +52,6 @@ namespace Picton
 			else if (timeSpan.Milliseconds > 1) result.AppendFormat(" {0} milliseconds", timeSpan.Milliseconds);
 
 			return result.ToString().Trim();
-		}
-
-		public static void AddMessage<T>(this CloudQueue cloudQueue, T message, TimeSpan? timeToLive = default(TimeSpan?), TimeSpan? initialVisibilityDelay = default(TimeSpan?), QueueRequestOptions options = null, OperationContext operationContext = null)
-		{
-			var serializer = new Serializer();
-			var serializedContent = serializer.Serialize(message);
-			var cloudQueueMessage = new CloudQueueMessage(serializedContent);
-			cloudQueue.AddMessage(cloudQueueMessage, timeToLive, initialVisibilityDelay, options, operationContext);
-		}
-
-		public static byte[] Serialize<T>(this Serializer serializer, T obj)
-		{
-			using (var ms = new MemoryStream())
-			{
-				serializer.Serialize(obj, ms);
-				return ms.ToArray();
-			}
-		}
-
-		public static object Deserialize(this Serializer serializer, byte[] buffer)
-		{
-			using (var ms = new MemoryStream())
-			{
-				ms.Write(buffer, 0, buffer.Length);
-				ms.Position = 0;
-				return serializer.Deserialize(ms);
-			}
 		}
 
 		#endregion
