@@ -16,7 +16,7 @@ namespace Picton.Messaging.IntegrationTests
 #pragma warning restore RECS0154 // Parameter is never used
 		{
 			// Ensure the storage emulator is running
-			AzureStorageEmulatorManager.StartStorageEmulator();
+			AzureEmulatorManager.EnsureStorageEmulatorIsStarted();
 
 			// If you want to see tracing from the Picton libary, change the LogLevel to 'Trace'
 			var minLogLevel = Logging.LogLevel.Debug;
