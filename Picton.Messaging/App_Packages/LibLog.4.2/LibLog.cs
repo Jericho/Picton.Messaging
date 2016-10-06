@@ -40,8 +40,8 @@
 
 using System.Diagnostics.CodeAnalysis;
 
-[assembly: SuppressMessage("Microsoft.Design", "CA1020:AvoidNamespacesWithFewTypes", Scope = "namespace", Target = "Picton.Logging")]
-[assembly: SuppressMessage("Microsoft.Design", "CA1026:DefaultParametersShouldNotBeUsed", Scope = "member", Target = "Picton.Logging.Logger.#Invoke(Picton.Logging.LogLevel,System.Func`1<System.String>,System.Exception,System.Object[])")]
+[assembly: SuppressMessage("Microsoft.Design", "CA1020:AvoidNamespacesWithFewTypes", Scope = "namespace", Target = "Picton.Messaging.Logging")]
+[assembly: SuppressMessage("Microsoft.Design", "CA1026:DefaultParametersShouldNotBeUsed", Scope = "member", Target = "Picton.Messaging.Logging.Logger.#Invoke(Picton.Messaging.Logging.LogLevel,System.Func`1<System.String>,System.Exception,System.Object[])")]
 
 // If you copied this file manually, you need to change all "YourRootNameSpace" so not to clash with other libraries
 // that use LibLog
@@ -127,7 +127,7 @@ namespace Picton.Messaging.Logging
 #else
 	internal
 #endif
-	static class LogExtensions
+	static partial class LogExtensions
 	{
 		public static bool IsDebugEnabled(this ILog logger)
 		{
@@ -428,7 +428,7 @@ namespace Picton.Messaging.Logging
 		/// The disable logging environment variable. If the environment variable is set to 'true', then logging
 		/// will be disabled.
 		/// </summary>
-		public const string DisableLoggingEnvironmentVariable = "Picton_LIBLOG_DISABLE";
+		public const string DisableLoggingEnvironmentVariable = "Picton.Messaging_LIBLOG_DISABLE";
 		private const string NullLogProvider = "Current Log Provider is not set. Call SetCurrentLogProvider " +
 											   "with a non-null value first.";
 		private static dynamic s_currentLogProvider;
