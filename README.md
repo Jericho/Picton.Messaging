@@ -1,14 +1,14 @@
 # Picton
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://jericho.mit-license.org/)
-[![Build status](https://ci.appveyor.com/api/projects/status/2tl8wuancvf3awap?svg=true)](https://ci.appveyor.com/project/Jericho/picton)
-[![Coverage Status](https://coveralls.io/repos/github/Jericho/Picton/badge.svg?branch=master)](https://coveralls.io/github/Jericho/Picton?branch=master)
+[![Build status](https://ci.appveyor.com/api/projects/status/2tl8wuancvf3awap?svg=true)](https://ci.appveyor.com/project/Jericho/picton.messaging)
+[![Coverage Status](https://coveralls.io/repos/github/Jericho/Picton.Messaging/badge.svg?branch=master)](https://coveralls.io/github/Jericho/Picton.Messaging?branch=master)
 
 ## About
 
-Picton is a C# library client containing a high performance message processor (also known as a message "pump") designed to process messages from an Azure storage queue as efficiently as possible.
+Picton.Messaging is a C# library containing a high performance message processor (also known as a message "pump") designed to process messages from an Azure storage queue as efficiently as possible.
 
-I created Picton because I needed a way to process a large volume of messages from Azure storge queues as quickly and efficiently as possible. I searched for a long time, but I could never find a solution that met all my requirements.
+I created Picton.Mesaging because I needed a way to process a large volume of messages from Azure storage queues as quickly and efficiently as possible. I searched for a long time, but I could never find a solution that met all my requirements.
 
 In March 2016 I attended three webinars by [Daniel Marbach](https://github.com/danielmarbach) on "Async/Await & Task Parallel Library" ([part 1](https://github.com/danielmarbach/02-25-2016-AsyncWebinar), [part 2](https://github.com/danielmarbach/03-03-2016-AsyncWebinar) and [part 3](https://github.com/danielmarbach/03-10-2016-AsyncWebinar)).
 Part 2 was particularly interresting to me because Daniel presented a generic message pump that met most (but not all) of my requirements. Specifically, Daniel's message pump meets the following criteria:
@@ -26,32 +26,26 @@ The sample code that Daniel shared during his webinars was very generic and not 
 
 ## Nuget
 
-Picton is available as a Nuget package.
+Picton.Messaging is available as a Nuget package.
 
-[![NuGet Version](http://img.shields.io/nuget/v/Picton.svg)](https://www.nuget.org/packages/Picton/)
-
-
-## Release Notes
-
-+ **1.0**
-	- Initial release
+[![NuGet Version](http://img.shields.io/nuget/v/Picton.Messaging.svg)](https://www.nuget.org/packages/Picton.Messaging/)
 
 
 ## Installation
 
-The easiest way to include Picton in your C# project is by grabing the nuget package:
+The easiest way to include Picton.Messaging in your C# project is by grabing the nuget package:
 
 ```
-PM> Install-Package Picton
+PM> Install-Package Picton.Messaging
 ```
 
-Once you have the Picton library properly referenced in your project, modify your RoleEntryPoint like this example:
+Once you have the Picton.Messaging library properly referenced in your project, modify your RoleEntryPoint like this example:
 
 ```csharp
 using Microsoft.WindowsAzure.ServiceRuntime;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
-using Picton;
+using Picton.Messaging;
 using System;
 using System.Diagnostics;
 
