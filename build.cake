@@ -158,6 +158,7 @@ Task("Restore-NuGet-Packages")
 });
 
 Task("Update-Asembly-Version")
+	.WithCriteria(() => !isLocalBuild)
 	.Does(() =>
 {
 	GitVersion(new GitVersionSettings()

@@ -146,7 +146,7 @@ namespace Picton.Messaging
 		private static IEnumerable<Assembly> GetLocalAssemblies()
 		{
 			var callingAssembly = Assembly.GetCallingAssembly();
-			var path = new Uri(Path.GetDirectoryName(callingAssembly.CodeBase)).AbsolutePath;
+			var path = new Uri(Path.GetDirectoryName(callingAssembly.Location)).AbsolutePath;
 
 			return AppDomain.CurrentDomain.GetAssemblies()
 				.Where(x => !x.IsDynamic && new Uri(x.CodeBase).AbsolutePath.Contains(path)).ToList();
