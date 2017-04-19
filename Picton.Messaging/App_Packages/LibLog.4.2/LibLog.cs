@@ -127,7 +127,7 @@ namespace Picton.Messaging.Logging
 #else
 	internal
 #endif
-	static partial class LogExtensions
+	static class LogExtensions
 	{
 		public static bool IsDebugEnabled(this ILog logger)
 		{
@@ -911,7 +911,9 @@ namespace Picton.Messaging.Logging.LogProviders
 					_logEventInfoFact = Expression.Lambda<Func<string, object, string, Exception, object>>(createLogEventInfoMethodCall,
 						loggerNameParam, levelParam, messageParam, exceptionParam).Compile();
 				}
+#pragma warning disable RECS0022 // A catch clause that catches System.Exception and has an empty body
 				catch { }
+#pragma warning restore RECS0022 // A catch clause that catches System.Exception and has an empty body
 			}
 
 			internal NLogLogger(dynamic logger)
@@ -1117,7 +1119,7 @@ namespace Picton.Messaging.Logging.LogProviders
 					case LogLevel.Fatal:
 						return _levelFatal;
 					default:
-						throw new ArgumentOutOfRangeException("logLevel", logLevel, null);
+						throw new ArgumentOutOfRangeException(nameof(logLevel), logLevel, null);
 				}
 			}
 		}
@@ -2051,7 +2053,7 @@ namespace Picton.Messaging.Logging.LogProviders
 					case LogLevel.Fatal:
 						return TraceEventTypeValues.Critical;
 					default:
-						throw new ArgumentOutOfRangeException("logLevel");
+						throw new ArgumentOutOfRangeException(nameof(logLevel));
 				}
 			}
 		}
