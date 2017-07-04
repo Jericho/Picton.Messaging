@@ -1,4 +1,4 @@
-# Build script
+# Before Build
 init:
   - git config --global core.autocrlf true
 
@@ -20,5 +20,5 @@ branches:
 
 # Build cache
 cache:
-- Source\packages -> Source\**\packages.config
-- tools -> build.cake
+  - '%USERPROFILE%\.nuget\packages -> Source\**\project.json'  # Note the use of single quotes around the entire line, when environment variables are used.
+  - tools -> build.cake, tools\packages.config

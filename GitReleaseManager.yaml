@@ -1,5 +1,5 @@
 create:
-  include-footer: true
+  include-footer: false
   footer-heading: Where to get it
   footer-content: You can download this release from [nuget.org](https://www.nuget.org/packages/Picton/{milestone})
   footer-includes-milestone: true
@@ -11,7 +11,7 @@ export:
   regex-text: '### Where to get it(\r\n)*You can .*\)'
   multiline-regex: true
 issue-labels-include:
-- Breaking change
+- Breaking Change
 - Bug
 - New Feature
 - Improvement
