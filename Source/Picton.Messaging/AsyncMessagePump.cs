@@ -1,4 +1,5 @@
-﻿using Microsoft.WindowsAzure.Storage;
+﻿using Metrics;
+using Microsoft.WindowsAzure.Storage;
 using Picton.Interfaces;
 using Picton.Managers;
 using Picton.Messaging.Logging;
@@ -19,6 +20,12 @@ namespace Picton.Messaging
 		private readonly int _maxConcurrentTasks;
 		private readonly TimeSpan? _visibilityTimeout;
 		private readonly int _maxDequeueCount;
+
+		private readonly Metrics.Counter _poisonMessagesCounter = Metric.Context("Picton").Counter("queue.poisonmessages", Unit.Items);
+		private readonly Metrics.Timer _retrieveMessageTimer = Metric.Context("Picton").Timer("queue.retrievemessage", Unit.Requests);
+		private readonly Metrics.Timer _processMessageTimer = Metric.Context("Picton").Timer("queue.processmessage", Unit.Requests);
+		private readonly Metrics.Timer _deleteMessageTimer = Metric.Context("Picton").Timer("queue.deletemessage", Unit.Requests);
+
 		private CancellationTokenSource _cancellationTokenSource;
 		private ManualResetEvent _safeToExitHandle;
 
@@ -143,6 +150,7 @@ namespace Picton.Messaging
 				{
 					await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
+					// Retrieved the next message from the queue and process it
 					var runningTask = Task.Run(async () =>
 					{
 						if (cancellationToken.IsCancellationRequested) return false;
@@ -150,7 +158,10 @@ namespace Picton.Messaging
 						CloudMessage message = null;
 						try
 						{
-							message = await _queueManager.GetMessageAsync(visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
+							using (var context = _retrieveMessageTimer.NewContext())
+							{
+								message = await _queueManager.GetMessageAsync(visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
+							}
 						}
 						catch (TaskCanceledException)
 						{
@@ -182,16 +193,29 @@ namespace Picton.Messaging
 							try
 							{
 								// Process the message
-								OnMessage?.Invoke(message, cancellationToken);
+								using (var context = _processMessageTimer.NewContext())
+								{
+									OnMessage?.Invoke(message, cancellationToken);
+								}
 
 								// Delete the processed message from the queue
-								await _queueManager.DeleteMessageAsync(message).ConfigureAwait(false);
+								using (var context = _deleteMessageTimer.NewContext())
+								{
+									await _queueManager.DeleteMessageAsync(message).ConfigureAwait(false);
+								}
 							}
 							catch (Exception ex)
 							{
 								var isPoison = (message.DequeueCount > _maxDequeueCount);
 								OnError?.Invoke(message, ex, isPoison);
-								if (isPoison) await _queueManager.DeleteMessageAsync(message).ConfigureAwait(false);
+								if (isPoison)
+								{
+									using (var context = _deleteMessageTimer.NewContext())
+									{
+										await _queueManager.DeleteMessageAsync(message).ConfigureAwait(false);
+									}
+									_poisonMessagesCounter.Increment();
+								}
 							}
 
 							// True indicates that a message was processed
@@ -199,8 +223,10 @@ namespace Picton.Messaging
 						}
 					}, CancellationToken.None);
 
+					// Add the task to the dictionary of tasks (allows us to keep track of the running tasks)
 					runningTasks.TryAdd(runningTask, runningTask);
 
+					// Increase or decrease the number of tasks running concurently
 					runningTask.ContinueWith(async t =>
 					{
 						// Decide if we need to scale up or down

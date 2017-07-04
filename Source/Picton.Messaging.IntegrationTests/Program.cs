@@ -1,4 +1,5 @@
-﻿using Microsoft.WindowsAzure.Storage;
+﻿using Metrics;
+using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Picton.Interfaces;
 using Picton.Managers;
@@ -15,6 +16,11 @@ namespace Picton.Messaging.IntegrationTests
 		{
 			// Ensure the storage emulator is running
 			AzureEmulatorManager.EnsureStorageEmulatorIsStarted();
+
+			// Configure the metrics visualization
+			Metric.Config
+				.WithHttpEndpoint("http://localhost:1234/")
+				.WithAllCounters();
 
 			// If you want to see tracing from the Picton libary, change the LogLevel to 'Trace'
 			var minLogLevel = Logging.LogLevel.Debug;
@@ -56,7 +62,7 @@ namespace Picton.Messaging.IntegrationTests
 			var cloudQueueClient = storageAccount.CreateCloudQueueClient();
 			var cloudQueue = cloudQueueClient.GetQueueReference(queueName);
 			cloudQueue.CreateIfNotExists();
-			for (var i = 0; i < 5; i++)
+			for (var i = 0; i < 1000; i++)
 			{
 				cloudQueue.AddMessage(new CloudQueueMessage($"Hello world {i}"));
 			}
