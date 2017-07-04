@@ -1,23 +1,36 @@
-<?xml version="1.0"?>
-<package >
-  <metadata>
-  <id>$id$</id>
-  <version>$version$</version>
-  <title>$title$</title>
-  <authors>$author$</authors>
-  <owners>$author$</owners>
-  <licenseUrl>http://jericho.mit-license.org</licenseUrl>
-  <projectUrl>https://github.com/Jericho/Picton</projectUrl>
-  <iconUrl>https://github.com/identicons/jericho.png</iconUrl>
-  <requireLicenseAcceptance>false</requireLicenseAcceptance>
-  <description>$description$</description>
-  <releaseNotes>
-    - Initial release.
-  </releaseNotes>
-  <copyright>Copyright 2016</copyright>
-  <tags>Picton</tags>
-  <dependencies>
-    <dependency id="WindowsAzure.Storage" version="7.0.0" />
-  </dependencies>
-  </metadata>
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<metadata xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+		<id>Picton</id>
+		<title>Picton</title>
+		<version>0.0.0</version>
+		<authors>Jeremie Desautels</authors>
+		<owners>Jeremie Desautels</owners>
+		<description>The Picton.Messaging library for Azure</description>
+		<summary>High performance message processor (also known as a message "pump") designed to process messages from an Azure storage queue as efficiently as possible</summary>
+		<licenseUrl>http://jericho.mit-license.org</licenseUrl>
+		<projectUrl>https://github.com/Jericho/Picton.Messaging</projectUrl>
+		<iconUrl>https://github.com/identicons/jericho.png</iconUrl>
+		<requireLicenseAcceptance>false</requireLicenseAcceptance>
+		<copyright>Copyright (c) Jeremie Desautels and contributors</copyright>
+		<language>en-US</language>
+		<tags>Picton Picton.Messaging Azure messaging</tags>
+		<releaseNotes></releaseNotes>
+		<dependencies>
+			<group targetFramework="net452">
+				<dependency id="Picton" version="2.0.0" />
+			</group>
+			<group targetFramework=".NETStandard1.6">
+				<dependency id="Picton" version="2.0.0" />
+			</group>
+		</dependencies>
+	</metadata>
+	<files>
+		<file src="Picton.Messaging/bin/Release/net452/Picton.Messaging.dll" target="lib/net452" />
+		<file src="Picton.Messaging/bin/Release/net452/Picton.Messaging.pdb" target="lib/net452" />
+		<file src="Picton.Messaging/bin/Release/net452/Picton.Messaging.xml" target="lib/net452" />
+		<file src="Picton.Messaging/bin/Release/netstandard1.6/Picton.Messaging.dll" target="lib/netstandard1.6" />
+		<file src="Picton.Messaging/bin/Release/netstandard1.6/Picton.Messaging.pdb" target="lib/netstandard1.6" />
+		<file src="Picton.Messaging/bin/Release/netstandard1.6/Picton.Messaging.xml" target="lib/netstandard1.6" />
+	</files>
 </package>
