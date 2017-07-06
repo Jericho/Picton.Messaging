@@ -7,6 +7,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+#if NETSTANDARD
+using System.Runtime.Loader;
+#endif
 using System.Threading;
 
 namespace Picton.Messaging
@@ -16,7 +19,7 @@ namespace Picton.Messaging
 		#region FIELDS
 
 		private readonly AsyncMessagePump _messagePump;
-		private static readonly ILog _logger = LogProvider.GetCurrentClassLogger();
+		private static readonly ILog _logger = LogProvider.GetLogger(typeof(AsyncMessagePumpWithHandlers));
 		private static readonly IDictionary<Type, Type[]> _messageHandlers = GetMessageHandlers();
 
 		#endregion
@@ -78,15 +81,17 @@ namespace Picton.Messaging
 			_messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Type[] handlers = null;
-				if (!_messageHandlers.TryGetValue(message.ContentType, out handlers))
+				var contentType = message.Content.GetType();
+
+				if (!_messageHandlers.TryGetValue(contentType, out handlers))
 				{
-					throw new Exception($"Received a message of type {message.ContentType.FullName} but could not find a class implementing IMessageHandler<{message.ContentType.FullName}>");
+					throw new Exception($"Received a message of type {contentType.FullName} but could not find a class implementing IMessageHandler<{contentType.FullName}>");
 				}
 
 				foreach (var handlerType in handlers)
 				{
 					var handler = Activator.CreateInstance(handlerType);
-					var handlerMethod = handlerType.GetMethod("Handle", new[] { message.ContentType });
+					var handlerMethod = handlerType.GetMethod("Handle", new[] { contentType });
 					handlerMethod.Invoke(handler, new[] { message.Content });
 				}
 			};
@@ -110,6 +115,7 @@ namespace Picton.Messaging
 
 		#region PRIVATE METHODS
 
+#if NETFULL
 		private static IDictionary<Type, Type[]> GetMessageHandlers()
 		{
 			var assemblies = GetLocalAssemblies();
@@ -151,6 +157,66 @@ namespace Picton.Messaging
 			return AppDomain.CurrentDomain.GetAssemblies()
 				.Where(x => !x.IsDynamic && new Uri(x.CodeBase).AbsolutePath.Contains(path)).ToList();
 		}
+#endif
+
+#if NETSTANDARD
+		private static IDictionary<Type, Type[]> GetMessageHandlers()
+		{
+			var assemblies = GetLocalAssemblies();
+
+			var typesWithMessageHandlerInterfaces = assemblies
+				.SelectMany(x => x.GetTypes())
+				.Where(t => !t.GetTypeInfo().IsInterface)
+				.Select(type => new
+				{
+					Type = type,
+					MessageTypes = type.GetTypeInfo()
+									.GetInterfaces()
+										.Where(i => i.GetTypeInfo().IsGenericType)
+										.Where(t => t.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
+										.SelectMany(i => i.GetTypeInfo().GetGenericArguments())
+				})
+				.Where(t => t.MessageTypes != null && t.MessageTypes.Any())
+				.ToArray();
+
+			var oneTypePerMessageHandler = typesWithMessageHandlerInterfaces
+				.SelectMany(t => t.MessageTypes, (t, messageType) =>
+				new
+				{
+					t.Type,
+					MessageType = messageType
+				}).ToArray();
+
+			var messageHandlers = oneTypePerMessageHandler
+				.GroupBy(h => h.MessageType)
+				.ToDictionary(group => group.Key, group => group.Select(t => t.Type).ToArray());
+			return messageHandlers;
+		}
+
+		private static IEnumerable<Assembly> GetLocalAssemblies()
+		{
+			var assemblies = new List<Assembly>();
+			var path = new Uri(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location)).AbsolutePath;
+
+			foreach (string extensionPath in Directory.EnumerateFiles(path, "*.dll"))
+			{
+				var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(extensionPath);
+
+				if (IsCandidateAssembly(assembly))
+				{
+					assemblies.Add(assembly);
+				}
+			}
+
+			return assemblies;
+		}
+
+		private static bool IsCandidateAssembly(Assembly assembly)
+		{
+			return !assembly.FullName.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase) &&
+				!assembly.FullName.StartsWith("System.", StringComparison.OrdinalIgnoreCase);
+		}
+#endif
 
 		#endregion
 	}

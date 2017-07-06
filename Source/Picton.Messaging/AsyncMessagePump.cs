@@ -1,5 +1,4 @@
-﻿using Metrics;
-using Microsoft.WindowsAzure.Storage;
+﻿using Microsoft.WindowsAzure.Storage;
 using Picton.Interfaces;
 using Picton.Managers;
 using Picton.Messaging.Logging;
@@ -21,15 +20,10 @@ namespace Picton.Messaging
 		private readonly TimeSpan? _visibilityTimeout;
 		private readonly int _maxDequeueCount;
 
-		private readonly Metrics.Counter _poisonMessagesCounter = Metric.Context("Picton").Counter("queue.poisonmessages", Unit.Items);
-		private readonly Metrics.Timer _retrieveMessageTimer = Metric.Context("Picton").Timer("queue.retrievemessage", Unit.Requests);
-		private readonly Metrics.Timer _processMessageTimer = Metric.Context("Picton").Timer("queue.processmessage", Unit.Requests);
-		private readonly Metrics.Timer _deleteMessageTimer = Metric.Context("Picton").Timer("queue.deletemessage", Unit.Requests);
-
 		private CancellationTokenSource _cancellationTokenSource;
 		private ManualResetEvent _safeToExitHandle;
 
-		private static readonly ILog _logger = LogProvider.GetCurrentClassLogger();
+		private static readonly ILog _logger = LogProvider.GetLogger(typeof(AsyncMessagePump));
 
 		#endregion
 
@@ -158,10 +152,7 @@ namespace Picton.Messaging
 						CloudMessage message = null;
 						try
 						{
-							using (var context = _retrieveMessageTimer.NewContext())
-							{
-								message = await _queueManager.GetMessageAsync(visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
-							}
+							message = await _queueManager.GetMessageAsync(visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
 						}
 						catch (TaskCanceledException)
 						{
@@ -193,16 +184,10 @@ namespace Picton.Messaging
 							try
 							{
 								// Process the message
-								using (var context = _processMessageTimer.NewContext())
-								{
-									OnMessage?.Invoke(message, cancellationToken);
-								}
+								OnMessage?.Invoke(message, cancellationToken);
 
 								// Delete the processed message from the queue
-								using (var context = _deleteMessageTimer.NewContext())
-								{
-									await _queueManager.DeleteMessageAsync(message).ConfigureAwait(false);
-								}
+								await _queueManager.DeleteMessageAsync(message).ConfigureAwait(false);
 							}
 							catch (Exception ex)
 							{
@@ -210,11 +195,7 @@ namespace Picton.Messaging
 								OnError?.Invoke(message, ex, isPoison);
 								if (isPoison)
 								{
-									using (var context = _deleteMessageTimer.NewContext())
-									{
-										await _queueManager.DeleteMessageAsync(message).ConfigureAwait(false);
-									}
-									_poisonMessagesCounter.Increment();
+									await _queueManager.DeleteMessageAsync(message).ConfigureAwait(false);
 								}
 							}
 

@@ -1,5 +1,4 @@
-﻿using Metrics;
-using Picton.Messaging.Logging;
+﻿using Picton.Messaging.Logging;
 using System;
 using System.Threading;
 
@@ -10,8 +9,7 @@ namespace Picton.Messaging.Utils
 		#region FIELDS
 
 		private readonly ReaderWriterLockSlim _lock;
-		private readonly Histogram _semaphoreSlotsHistogram = Metric.Context("Picton").Histogram("semaphore.availableslots", Unit.Items);
-		private static readonly ILog _logger = LogProvider.GetCurrentClassLogger();
+		private static readonly ILog _logger = LogProvider.GetLogger(typeof(SemaphoreSlimEx));
 
 		#endregion
 
@@ -33,8 +31,6 @@ namespace Picton.Messaging.Utils
 			this.MinimumSlotsCount = minCount;
 			this.AvailableSlotsCount = initialCount;
 			this.MaximumSlotsCount = maxCount;
-
-			_semaphoreSlotsHistogram.Update(this.AvailableSlotsCount);
 		}
 
 		#endregion
@@ -64,7 +60,6 @@ namespace Picton.Messaging.Utils
 							_logger.Trace($"Semaphore slots increased: {this.AvailableSlotsCount}");
 						}
 						_lock.ExitWriteLock();
-						_semaphoreSlotsHistogram.Update(this.AvailableSlotsCount);
 					}
 				}
 			}
@@ -100,7 +95,6 @@ namespace Picton.Messaging.Utils
 						}
 					}
 					_lock.ExitWriteLock();
-					_semaphoreSlotsHistogram.Update(this.AvailableSlotsCount);
 				}
 			}
 			return decreased;
