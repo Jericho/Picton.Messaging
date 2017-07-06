@@ -154,14 +154,17 @@ namespace Picton.Messaging
 						{
 							message = await _queueManager.GetMessageAsync(visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
 						}
-						catch (TaskCanceledException)
-						{
-							// GetMessageAsync was aborted because the message pump is stopping. 
-							// This is normal and can safely be ignored.
-						}
 						catch (Exception e)
 						{
-							_logger.ErrorException("An error occured when attempting to get a message from the queue", e);
+							if (IsCancellationRequested(e))
+							{
+								// GetMessageAsync was aborted because the message pump is stopping. 
+								// This is normal and can be safely ignored.
+							}
+							else
+							{
+								_logger.ErrorException("An error occured when attempting to get a message from the queue", e.InnerException ?? e);
+							}
 						}
 
 						if (message == null)
@@ -173,7 +176,7 @@ namespace Picton.Messaging
 							}
 							catch (Exception e)
 							{
-								_logger.InfoException("An error occured when handling an empty queue. The error was caught and ignored.", e);
+								_logger.InfoException("An error occured when handling an empty queue. The error was caught and ignored.", e.InnerException ?? e);
 							}
 
 							// False indicates that no message was processed
@@ -239,6 +242,16 @@ namespace Picton.Messaging
 
 			// Task pump has been canceled, wait for the currently running tasks to complete
 			await Task.WhenAll(runningTasks.Values).UntilCancelled().ConfigureAwait(false);
+		}
+
+		private bool IsCancellationRequested(Exception e)
+		{
+			if (e == null) return false;
+
+			var tce = e as TaskCanceledException;
+			if (tce != null) return true;
+
+			return IsCancellationRequested(e.InnerException);
 		}
 
 		#endregion

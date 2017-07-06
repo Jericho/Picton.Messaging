@@ -1,4 +1,5 @@
-﻿using Microsoft.WindowsAzure.Storage;
+﻿using Microsoft.Extensions.DependencyModel;
+using Microsoft.WindowsAzure.Storage;
 using Picton.Interfaces;
 using Picton.Messaging.Logging;
 using Picton.Messaging.Messages;
@@ -115,11 +116,11 @@ namespace Picton.Messaging
 
 		#region PRIVATE METHODS
 
-#if NETFULL
 		private static IDictionary<Type, Type[]> GetMessageHandlers()
 		{
 			var assemblies = GetLocalAssemblies();
 
+#if NETFULL
 			var typesWithMessageHandlerInterfaces = assemblies
 				.SelectMany(x => x.GetTypes())
 				.Where(t => !t.IsInterface)
@@ -127,13 +128,29 @@ namespace Picton.Messaging
 				{
 					Type = type,
 					MessageTypes = type
-									.GetInterfaces()
-										.Where(i => i.IsGenericType)
-										.Where(t => t.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
-										.SelectMany(i => i.GetGenericArguments())
+						.GetInterfaces()
+							.Where(i => i.IsGenericType)
+							.Where(t => t.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
+							.SelectMany(i => i.GetGenericArguments())
 				})
 				.Where(t => t.MessageTypes != null && t.MessageTypes.Any())
 				.ToArray();
+#else
+			var typesWithMessageHandlerInterfaces = assemblies
+				.SelectMany(x => x.GetTypes())
+				.Where(t => !t.GetTypeInfo().IsInterface)
+				.Select(type => new
+				{
+					Type = type,
+					MessageTypes = type
+						.GetInterfaces()
+							.Where(i => i.GetTypeInfo().IsGenericType)
+							.Where(t => t.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
+							.SelectMany(i => i.GetGenericArguments())
+				})
+				.Where(t => t.MessageTypes != null && t.MessageTypes.Any())
+				.ToArray();
+#endif
 
 			var oneTypePerMessageHandler = typesWithMessageHandlerInterfaces
 				.SelectMany(t => t.MessageTypes, (t, messageType) =>
@@ -149,6 +166,7 @@ namespace Picton.Messaging
 			return messageHandlers;
 		}
 
+#if NETFULL
 		private static IEnumerable<Assembly> GetLocalAssemblies()
 		{
 			var callingAssembly = Assembly.GetCallingAssembly();
@@ -157,53 +175,17 @@ namespace Picton.Messaging
 			return AppDomain.CurrentDomain.GetAssemblies()
 				.Where(x => !x.IsDynamic && new Uri(x.CodeBase).AbsolutePath.Contains(path)).ToList();
 		}
-#endif
-
-#if NETSTANDARD
-		private static IDictionary<Type, Type[]> GetMessageHandlers()
-		{
-			var assemblies = GetLocalAssemblies();
-
-			var typesWithMessageHandlerInterfaces = assemblies
-				.SelectMany(x => x.GetTypes())
-				.Where(t => !t.GetTypeInfo().IsInterface)
-				.Select(type => new
-				{
-					Type = type,
-					MessageTypes = type.GetTypeInfo()
-									.GetInterfaces()
-										.Where(i => i.GetTypeInfo().IsGenericType)
-										.Where(t => t.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
-										.SelectMany(i => i.GetTypeInfo().GetGenericArguments())
-				})
-				.Where(t => t.MessageTypes != null && t.MessageTypes.Any())
-				.ToArray();
-
-			var oneTypePerMessageHandler = typesWithMessageHandlerInterfaces
-				.SelectMany(t => t.MessageTypes, (t, messageType) =>
-				new
-				{
-					t.Type,
-					MessageType = messageType
-				}).ToArray();
-
-			var messageHandlers = oneTypePerMessageHandler
-				.GroupBy(h => h.MessageType)
-				.ToDictionary(group => group.Key, group => group.Select(t => t.Type).ToArray());
-			return messageHandlers;
-		}
-
+#else
 		private static IEnumerable<Assembly> GetLocalAssemblies()
 		{
+			var dependencies = DependencyContext.Default.RuntimeLibraries;
+
 			var assemblies = new List<Assembly>();
-			var path = new Uri(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location)).AbsolutePath;
-
-			foreach (string extensionPath in Directory.EnumerateFiles(path, "*.dll"))
+			foreach (var library in dependencies)
 			{
-				var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(extensionPath);
-
-				if (IsCandidateAssembly(assembly))
+				if (IsCandidateLibrary(library))
 				{
+					var assembly = Assembly.Load(new AssemblyName(library.Name));
 					assemblies.Add(assembly);
 				}
 			}
@@ -211,10 +193,13 @@ namespace Picton.Messaging
 			return assemblies;
 		}
 
-		private static bool IsCandidateAssembly(Assembly assembly)
+		private static bool IsCandidateLibrary(RuntimeLibrary library)
 		{
-			return !assembly.FullName.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase) &&
-				!assembly.FullName.StartsWith("System.", StringComparison.OrdinalIgnoreCase);
+			return !library.Name.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase) &&
+				!library.Name.StartsWith("System.", StringComparison.OrdinalIgnoreCase) &&
+				!library.Name.StartsWith("NetStandard.", StringComparison.OrdinalIgnoreCase) &&
+				!string.Equals(library.Type, "package", StringComparison.OrdinalIgnoreCase) &&
+				!string.Equals(library.Type, "referenceassembly", StringComparison.OrdinalIgnoreCase);
 		}
 #endif
 
