@@ -1,12 +1,12 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Picton.Messaging.Utils;
+﻿using Picton.Messaging.Utils;
+using Shouldly;
+using Xunit;
 
 namespace Picton.Messaging.UnitTests
 {
-	[TestClass]
 	public class SemaphoreSlimExTests
 	{
-		[TestMethod]
+		[Fact]
 		public void Increase_allowed()
 		{
 			// Arrange
@@ -16,11 +16,11 @@ namespace Picton.Messaging.UnitTests
 			var increased = semaphore.TryIncrease();
 
 			// Assert
-			Assert.IsTrue(increased);
-			Assert.AreEqual(2, semaphore.AvailableSlotsCount);
+			increased.ShouldBeTrue();
+			semaphore.AvailableSlotsCount.ShouldBe(2);
 		}
 
-		[TestMethod]
+		[Fact]
 		public void Increase_disallowed()
 		{
 			// Arrange
@@ -30,11 +30,11 @@ namespace Picton.Messaging.UnitTests
 			var increased = semaphore.TryIncrease();
 
 			// Assert
-			Assert.IsFalse(increased);
-			Assert.AreEqual(2, semaphore.AvailableSlotsCount);
+			increased.ShouldBeFalse();
+			semaphore.AvailableSlotsCount.ShouldBe(2);
 		}
 
-		[TestMethod]
+		[Fact]
 		public void Decrease_allowed()
 		{
 			// Arrange
@@ -44,11 +44,11 @@ namespace Picton.Messaging.UnitTests
 			var decreased = semaphore.TryDecrease();
 
 			// Assert
-			Assert.IsTrue(decreased);
-			Assert.AreEqual(1, semaphore.AvailableSlotsCount);
+			decreased.ShouldBeTrue();
+			semaphore.AvailableSlotsCount.ShouldBe(1);
 		}
 
-		[TestMethod]
+		[Fact]
 		public void Decrease_disallowed()
 		{
 			// Arrange
@@ -58,8 +58,8 @@ namespace Picton.Messaging.UnitTests
 			var decreased = semaphore.TryDecrease();
 
 			// Assert
-			Assert.IsFalse(decreased);
-			Assert.AreEqual(1, semaphore.AvailableSlotsCount);
+			decreased.ShouldBeFalse();
+			semaphore.AvailableSlotsCount.ShouldBe(1);
 		}
 	}
 }

@@ -1,12 +1,12 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Shouldly;
 using System;
+using Xunit;
 
 namespace Picton.Messaging.UnitTests
 {
-	[TestClass]
 	public class ExtensionsTests
 	{
-		[TestMethod]
+		[Fact]
 		public void ToDurationString_less_than_one_millisecond()
 		{
 			// Arrange
@@ -16,10 +16,10 @@ namespace Picton.Messaging.UnitTests
 			var durationString = duration.ToDurationString();
 
 			// Assert
-			Assert.AreEqual("1 millisecond", durationString);
+			durationString.ShouldBe("1 millisecond");
 		}
 
-		[TestMethod]
+		[Fact]
 		public void ToDurationString_one_day()
 		{
 			// Arrange
@@ -29,10 +29,10 @@ namespace Picton.Messaging.UnitTests
 			var durationString = duration.ToDurationString();
 
 			// Assert
-			Assert.AreEqual("1 day", durationString);
+			durationString.ShouldBe("1 day");
 		}
 
-		[TestMethod]
+		[Fact]
 		public void ToDurationString_multiple_days()
 		{
 			// Arrange
@@ -42,10 +42,10 @@ namespace Picton.Messaging.UnitTests
 			var durationString = duration.ToDurationString();
 
 			// Assert
-			Assert.AreEqual("2 days", durationString);
+			durationString.ShouldBe("2 days");
 		}
 
-		[TestMethod]
+		[Fact]
 		public void ToDurationString_one_hour()
 		{
 			// Arrange
@@ -55,10 +55,10 @@ namespace Picton.Messaging.UnitTests
 			var durationString = duration.ToDurationString();
 
 			// Assert
-			Assert.AreEqual("1 hour", durationString);
+			durationString.ShouldBe("1 hour");
 		}
 
-		[TestMethod]
+		[Fact]
 		public void ToDurationString_multiple_hours()
 		{
 			// Arrange
@@ -68,10 +68,10 @@ namespace Picton.Messaging.UnitTests
 			var durationString = duration.ToDurationString();
 
 			// Assert
-			Assert.AreEqual("2 hours", durationString);
+			durationString.ShouldBe("2 hours");
 		}
 
-		[TestMethod]
+		[Fact]
 		public void ToDurationString_one_minute()
 		{
 			// Arrange
@@ -81,10 +81,10 @@ namespace Picton.Messaging.UnitTests
 			var durationString = duration.ToDurationString();
 
 			// Assert
-			Assert.AreEqual("1 minute", durationString);
+			durationString.ShouldBe("1 minute");
 		}
 
-		[TestMethod]
+		[Fact]
 		public void ToDurationString_multiple_minutes()
 		{
 			// Arrange
@@ -94,10 +94,10 @@ namespace Picton.Messaging.UnitTests
 			var durationString = duration.ToDurationString();
 
 			// Assert
-			Assert.AreEqual("2 minutes", durationString);
+			durationString.ShouldBe("2 minutes");
 		}
 
-		[TestMethod]
+		[Fact]
 		public void ToDurationString_one_second()
 		{
 			// Arrange
@@ -107,10 +107,10 @@ namespace Picton.Messaging.UnitTests
 			var durationString = duration.ToDurationString();
 
 			// Assert
-			Assert.AreEqual("1 second", durationString);
+			durationString.ShouldBe("1 second");
 		}
 
-		[TestMethod]
+		[Fact]
 		public void ToDurationString_multiple_seconds()
 		{
 			// Arrange
@@ -120,10 +120,10 @@ namespace Picton.Messaging.UnitTests
 			var durationString = duration.ToDurationString();
 
 			// Assert
-			Assert.AreEqual("2 seconds", durationString);
+			durationString.ShouldBe("2 seconds");
 		}
 
-		[TestMethod]
+		[Fact]
 		public void ToDurationString_one_millisecond()
 		{
 			// Arrange
@@ -133,10 +133,10 @@ namespace Picton.Messaging.UnitTests
 			var durationString = duration.ToDurationString();
 
 			// Assert
-			Assert.AreEqual("1 millisecond", durationString);
+			durationString.ShouldBe("1 millisecond");
 		}
 
-		[TestMethod]
+		[Fact]
 		public void ToDurationString_multiple_milliseconds()
 		{
 			// Arrange
@@ -146,7 +146,7 @@ namespace Picton.Messaging.UnitTests
 			var durationString = duration.ToDurationString();
 
 			// Assert
-			Assert.AreEqual("2 milliseconds", durationString);
+			durationString.ShouldBe("2 milliseconds");
 		}
 	}
 }
