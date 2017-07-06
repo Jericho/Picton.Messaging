@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{53D250B0-3F11-4CD4-AF30-5F636B405D87}"
+	ProjectSection(SolutionItems) = preProject
+		..\appveyor.yml = ..\appveyor.yml
+		..\build.cake = ..\build.cake
+		..\README.md = ..\README.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Source", "Source", "{8C977A6E-1705-41CE-9F5A-0BBE29FB3FB1}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{C9E33DEC-BC2E-46D1-9545-5D7A2DF3444A}"
+EndProject
+Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Picton.Messaging", "Picton.Messaging\Picton.Messaging.xproj", "{994163F1-9AA3-4FDF-88FF-9C373237BD9D}"
+EndProject
+Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Picton.Messaging.UnitTests", "Picton.Messaging.UnitTests\Picton.Messaging.UnitTests.xproj", "{91EAA2FE-CB75-482C-9FFF-5B7C54759E41}"
+EndProject
+Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Picton.Messaging.IntegrationTests", "Picton.Messaging.IntegrationTests\Picton.Messaging.IntegrationTests.xproj", "{F241F514-7169-405E-B046-244F75733D75}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{994163F1-9AA3-4FDF-88FF-9C373237BD9D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{994163F1-9AA3-4FDF-88FF-9C373237BD9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{994163F1-9AA3-4FDF-88FF-9C373237BD9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{994163F1-9AA3-4FDF-88FF-9C373237BD9D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{91EAA2FE-CB75-482C-9FFF-5B7C54759E41}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{91EAA2FE-CB75-482C-9FFF-5B7C54759E41}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{91EAA2FE-CB75-482C-9FFF-5B7C54759E41}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{91EAA2FE-CB75-482C-9FFF-5B7C54759E41}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F241F514-7169-405E-B046-244F75733D75}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F241F514-7169-405E-B046-244F75733D75}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F241F514-7169-405E-B046-244F75733D75}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F241F514-7169-405E-B046-244F75733D75}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{994163F1-9AA3-4FDF-88FF-9C373237BD9D} = {8C977A6E-1705-41CE-9F5A-0BBE29FB3FB1}
+		{91EAA2FE-CB75-482C-9FFF-5B7C54759E41} = {C9E33DEC-BC2E-46D1-9545-5D7A2DF3444A}
+		{F241F514-7169-405E-B046-244F75733D75} = {C9E33DEC-BC2E-46D1-9545-5D7A2DF3444A}
+	EndGlobalSection
+EndGlobal

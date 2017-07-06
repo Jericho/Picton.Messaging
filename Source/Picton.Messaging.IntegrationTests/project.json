@@ -1,0 +1,33 @@
+{
+	"buildOptions": {
+		"emitEntryPoint": true
+	},
+	"dependencies": {
+		"Picton.Messaging": { "target": "project" }
+	},
+	"frameworks": {
+		//"netcoreapp1.0": {
+		//	"define": [ "NETCORE" ],
+		//	"dependencies": {
+		//		"Microsoft.NETCore.App": {
+		//			"type": "platform",
+		//			"version": "1.0.1"
+		//		}
+		//	},
+		//	"imports": "dnxcore50"
+		//}
+		"net452": {
+			"buildOptions": {
+				"define": [ "NETFULL" ]
+			},
+			"dependencies": {
+			},
+			"frameworkAssemblies": {
+				"System.Runtime": {
+					"type": "build"
+				}
+			}
+		}
+	},
+	"version": "1.0.0-*"
+}
