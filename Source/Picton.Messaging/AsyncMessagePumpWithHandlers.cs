@@ -15,13 +15,18 @@ using System.Threading;
 
 namespace Picton.Messaging
 {
+	/// <summary>
+	/// High performance message processor (also known as a message "pump") for Azure storage queues. Designed to monitor an Azure storage queue and process the message as quickly and efficiently as possible.
+	/// When messages are present in the queue, this message pump will increase the number of tasks that can concurrently process messages.
+	/// Conversly, this message pump will reduce the number of tasks that can concurrently process messages when the queue is empty.
+	/// </summary>
 	public class AsyncMessagePumpWithHandlers
 	{
 		#region FIELDS
 
-		private readonly AsyncMessagePump _messagePump;
 		private static readonly ILog _logger = LogProvider.GetLogger(typeof(AsyncMessagePumpWithHandlers));
 		private static readonly IDictionary<Type, Type[]> _messageHandlers = GetMessageHandlers();
+		private readonly AsyncMessagePump _messagePump;
 
 		#endregion
 
@@ -62,16 +67,25 @@ namespace Picton.Messaging
 
 		#region CONSTRUCTOR
 
-		public AsyncMessagePumpWithHandlers(string queueName, CloudStorageAccount cloudStorageAccount, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3) :
-			this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), minConcurrentTasks, maxConcurrentTasks, visibilityTimeout, maxDequeueCount)
+		/// <summary>
+		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
+		/// </summary>
+		/// <param name="queueName">Name of the queue.</param>
+		/// <param name="cloudStorageAccount">The cloud storage account.</param>
+		/// <param name="minConcurrentTasks">The minimum concurrent tasks.</param>
+		/// <param name="maxConcurrentTasks">The maximum concurrent tasks.</param>
+		/// <param name="visibilityTimeout">The visibility timeout.</param>
+		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
+		public AsyncMessagePumpWithHandlers(string queueName, CloudStorageAccount cloudStorageAccount, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
+			: this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), minConcurrentTasks, maxConcurrentTasks, visibilityTimeout, maxDequeueCount)
 		{
 		}
 
 		/// <summary>
-		/// High performance message processor (also known as a message "pump") for Azure storage queues. Designed to monitor an Azure storage queue and process the message as quickly and efficiently as possible.
-		/// When messages are present in the queue, this message pump will increase the number of tasks that can concurrently process messages.
-		/// Conversly, this message pump will reduce the number of tasks that can concurrently process messages when the queue is empty.
+		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
 		/// </summary>
+		/// <param name="queueName">Name of the queue.</param>
+		/// <param name="storageAccount">The storage account</param>
 		/// <param name="minConcurrentTasks">The minimum number of concurrent tasks. The message pump will not scale down below this value</param>
 		/// <param name="maxConcurrentTasks">The maximum number of concurrent tasks. The message pump will not scale up above this value</param>
 		/// <param name="visibilityTimeout">The queue visibility timeout</param>
@@ -102,11 +116,17 @@ namespace Picton.Messaging
 
 		#region PUBLIC METHODS
 
+		/// <summary>
+		/// Starts the message pump.
+		/// </summary>
 		public void Start()
 		{
 			_messagePump.Start();
 		}
 
+		/// <summary>
+		/// Stops the message pump.
+		/// </summary>
 		public void Stop()
 		{
 			_messagePump.Stop();
