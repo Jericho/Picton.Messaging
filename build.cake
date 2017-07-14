@@ -113,7 +113,19 @@ Teardown(context =>
 // TASK DEFINITIONS
 ///////////////////////////////////////////////////////////////////////////////
 
+Task("AppVeyor-Build_Number")
+	.WithCriteria(() => AppVeyor.IsRunningOnAppVeyor)
+	.Does(() =>
+{
+	GitVersion(new GitVersionSettings()
+	{
+		UpdateAssemblyInfo = false,
+		OutputType = GitVersionOutput.BuildServer
+	});
+});
+
 Task("Clean")
+	.IsDependentOn("AppVeyor-Build_Number")
 	.Does(() =>
 {
 	// Clean solution directories.
