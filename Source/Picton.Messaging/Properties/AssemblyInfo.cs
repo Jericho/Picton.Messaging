@@ -6,11 +6,8 @@ using System.Runtime.InteropServices;
 // associated with an assembly.
 [assembly: AssemblyTitle("Picton.Messaging")]
 [assembly: AssemblyDescription("High performance async message pump for Azure")]
-[assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("Picton.Messaging")]
 [assembly: AssemblyCopyright("Copyright © Jeremie Desautels")]
-[assembly: AssemblyTrademark("")]
-[assembly: AssemblyCulture("")]
 
 // Make it easy to distinguish Debug and Release builds;
 #if DEBUG
