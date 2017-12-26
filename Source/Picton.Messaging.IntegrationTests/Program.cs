@@ -75,15 +75,18 @@ namespace Picton.Messaging.IntegrationTests
 			var stopping = false;
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePump(queueName, storageAccount, 1, 25, TimeSpan.FromMinutes(1), 3);
-			messagePump.OnMessage = (message, cancellationToken) =>
+			var messagePump = new AsyncMessagePump(queueName, storageAccount, 1, 25, TimeSpan.FromMinutes(1), 3)
 			{
-				logger(Logging.LogLevel.Debug, () => message.Content.ToString());
+				OnMessage = (message, cancellationToken) =>
+				{
+					logger(Logging.LogLevel.Debug, () => message.Content.ToString());
+				}
 			};
+
+			// Stop the message pump when the queue is empty.
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
-				// Stop the message pump when the queue is empty.
-				// However, ensure that we try to stop it only once (otherwise each concurrent task would try to stop it)
+				// Make sure we try to stop it only once (otherwise each concurrent task would try to stop it)
 				if (!stopping)
 				{
 					lock (lockObject)
