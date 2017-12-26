@@ -1,13 +1,13 @@
 // Install addins.
-#addin "nuget:?package=Cake.Coveralls&version=0.4.0"
+#addin "nuget:?package=Cake.Coveralls&version=0.7.0"
 
 // Install tools.
 #tool "nuget:?package=GitVersion.CommandLine&version=4.0.0-beta0012"
 #tool "nuget:?package=GitReleaseManager&version=0.6.0"
 #tool "nuget:?package=OpenCover&version=4.6.519"
-#tool "nuget:?package=ReportGenerator&version=2.5.8"
-#tool "nuget:?package=coveralls.io&version=1.3.4"
-#tool "nuget:?package=xunit.runner.console&version=2.2.0"
+#tool "nuget:?package=ReportGenerator&version=3.0.2"
+#tool "nuget:?package=coveralls.io&version=1.4.2"
+#tool "nuget:?package=xunit.runner.console&version=2.3.1"
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -164,7 +164,7 @@ Task("Build")
 	DotNetCoreBuild(sourceFolder + libraryName + ".sln", new DotNetCoreBuildSettings
 	{
 		Configuration = configuration,
-		ArgumentCustomization = args => args.Append("/p:SemVer=" + versionInfo.NuGetVersionV2)
+		ArgumentCustomization = args => args.Append("/p:SemVer=" + versionInfo.LegacySemVerPadded)
 	});
 });
 
@@ -193,7 +193,9 @@ Task("Run-Code-Coverage")
 		codeCoverageDir + "coverage.xml",
 		new OpenCoverSettings
 		{
-			ArgumentCustomization = args => args.Append("-mergeoutput -oldstyle")
+			OldStyle = true,
+			MergeOutput = true,
+			ArgumentCustomization = args => args.Append("-returntargetcode")
 		}
 		.WithFilter(testCoverageFilter)
 		.ExcludeByAttribute(testCoverageExcludeByAttribute)
@@ -224,17 +226,24 @@ Task("Create-NuGet-Package")
 	.IsDependentOn("Build")
 	.Does(() =>
 {
-	var settings = new NuGetPackSettings
+	var settings = new DotNetCorePackSettings
 	{
-		Version                 = versionInfo.NuGetVersionV2,
-		Symbols                 = false,
-		NoPackageAnalysis       = true,
-		BasePath                = "./Source/",
-		OutputDirectory         = outputDir,
-		ArgumentCustomization   = args => args.Append("-Prop Configuration=" + configuration)
+		Configuration = configuration,
+		IncludeSource = false,
+		IncludeSymbols = false,
+		NoBuild = true,
+		OutputDirectory = outputDir,
+        ArgumentCustomization = (args) =>
+		{
+			return args
+				.Append("/p:Version={0}", versionInfo.LegacySemVerPadded)
+				.Append("/p:AssemblyVersion={0}", versionInfo.MajorMinorPatch)
+				.Append("/p:FileVersion={0}", versionInfo.MajorMinorPatch)
+				.Append("/p:AssemblyInformationalVersion={0}", versionInfo.InformationalVersion);
+		}
 	};
-			
-	NuGetPack("./nuspec/" + libraryName + ".nuspec", settings);
+
+	DotNetCorePack(sourceFolder + libraryName + "/" + libraryName + ".csproj", settings);
 });
 
 Task("Upload-AppVeyor-Artifacts")
@@ -322,10 +331,6 @@ Task("Publish-GitHub-Release")
 // TARGETS
 ///////////////////////////////////////////////////////////////////////////////
 
-Task("Package")
-	.IsDependentOn("Run-Unit-Tests")
-	.IsDependentOn("Create-NuGet-Package");
-
 Task("Coverage")
 	.IsDependentOn("Generate-Code-Coverage-Report")
 	.Does(() =>
@@ -346,7 +351,8 @@ Task("AppVeyor")
 	.IsDependentOn("Publish-GitHub-Release");
 
 Task("Default")
-	.IsDependentOn("Package");
+	.IsDependentOn("Run-Unit-Tests")
+	.IsDependentOn("Create-NuGet-Package");
 
 
 ///////////////////////////////////////////////////////////////////////////////
