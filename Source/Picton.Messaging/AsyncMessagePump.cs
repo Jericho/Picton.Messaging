@@ -152,7 +152,6 @@ namespace Picton.Messaging
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlim(_concurrentTasks, _concurrentTasks);
 			var queuedMessages = new ConcurrentQueue<CloudMessage>();
-			var fetchTaskStarted = false;
 
 			// Define the task that fetches messages from the Azure queue
 			RecurrentCancellableTask.StartNew(
@@ -170,9 +169,6 @@ namespace Picton.Messaging
 							{
 								queuedMessages.Enqueue(message);
 							}
-
-							// Indicate that we have fetched messages which will allow the message pump to start if it has not already started
-							fetchTaskStarted = true;
 						}
 						else
 						{
@@ -192,12 +188,6 @@ namespace Picton.Messaging
 				TimeSpan.FromMilliseconds(500),
 				cancellationToken,
 				TaskCreationOptions.LongRunning);
-
-			// Delay the pump until we have fetched messages
-			while (!fetchTaskStarted && !cancellationToken.IsCancellationRequested)
-			{
-				await Task.Delay(250);
-			}
 
 			// Define the task pump
 			var pumpTask = Task.Run(async () =>
