@@ -17,7 +17,7 @@ namespace Picton.Messaging.IntegrationTests
 			AzureEmulatorManager.EnsureStorageEmulatorIsStarted();
 
 			// If you want to see tracing from the Picton libary, change the LogLevel to 'Trace'
-			var minLogLevel = Logging.LogLevel.Trace;
+			var minLogLevel = Logging.LogLevel.Debug;
 
 			// Configure logging to the console
 			var logProvider = new ColoredConsoleLogProvider(minLogLevel);
@@ -75,7 +75,7 @@ namespace Picton.Messaging.IntegrationTests
 			var stopping = false;
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePump(queueName, storageAccount, 1, 25, TimeSpan.FromMinutes(1), 3)
+			var messagePump = new AsyncMessagePump(queueName, storageAccount, 1, 10, TimeSpan.FromMinutes(1), 3)
 			{
 				OnMessage = (message, cancellationToken) =>
 				{
@@ -140,7 +140,7 @@ namespace Picton.Messaging.IntegrationTests
 			Stopwatch sw = null;
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePumpWithHandlers(queueName, storageAccount, 1, 25, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePumpWithHandlers(queueName, storageAccount, 1, 10, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
 				// Stop the message pump when the queue is empty.
