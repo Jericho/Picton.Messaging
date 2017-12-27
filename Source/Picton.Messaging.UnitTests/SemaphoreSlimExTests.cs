@@ -1,4 +1,5 @@
-﻿using Picton.Messaging.Utils;
+﻿using System;
+using Picton.Messaging.Utils;
 using Shouldly;
 using Xunit;
 
@@ -88,6 +89,54 @@ namespace Picton.Messaging.UnitTests
 			// Assert
 			decreased.ShouldBeTrue();
 			semaphore.AvailableSlotsCount.ShouldBe(2);
+		}
+
+		[Fact]
+		public void Increase_negative_count_throws_exception()
+		{
+			// Arrange
+			var semaphore = new SemaphoreSlimEx(1, 1, 5);
+
+			// Act
+			Should.Throw<ArgumentOutOfRangeException>(() => semaphore.TryIncrease(increaseCount: -1));
+		}
+
+		[Fact]
+		public void Decrease_negative_count_throws_exception()
+		{
+			// Arrange
+			var semaphore = new SemaphoreSlimEx(1, 5, 5);
+
+			// Act
+			Should.Throw<ArgumentOutOfRangeException>(() => semaphore.TryDecrease(decreaseCount: -1));
+		}
+
+		[Fact]
+		public void Increase_zero_returns_false()
+		{
+			// Arrange
+			var semaphore = new SemaphoreSlimEx(1, 1, 5);
+
+			// Act
+			var increased = semaphore.TryIncrease(increaseCount: 0);
+
+			// Assert
+			increased.ShouldBeFalse();
+			semaphore.AvailableSlotsCount.ShouldBe(1);
+		}
+
+		[Fact]
+		public void Decrease_zero_returns_false()
+		{
+			// Arrange
+			var semaphore = new SemaphoreSlimEx(1, 5, 5);
+
+			// Act
+			var increased = semaphore.TryDecrease(decreaseCount: 0);
+
+			// Assert
+			increased.ShouldBeFalse();
+			semaphore.AvailableSlotsCount.ShouldBe(5);
 		}
 	}
 }
