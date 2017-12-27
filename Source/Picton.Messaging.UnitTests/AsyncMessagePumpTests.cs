@@ -6,6 +6,7 @@ using Moq;
 using Picton.Interfaces;
 using Shouldly;
 using System;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,27 +24,17 @@ namespace Picton.Messaging.UnitTests
 		{
 			Should.Throw<ArgumentNullException>(() =>
 			{
-				var messagePump = new AsyncMessagePump("myqueue", (IStorageAccount)null, 1, 1, TimeSpan.FromMinutes(1), 3);
+				var messagePump = new AsyncMessagePump("myqueue", (IStorageAccount)null, 1, TimeSpan.FromMinutes(1), 3);
 			});
 		}
 
 		[Fact]
-		public void Min_too_small_throws()
+		public void Number_of_concurrent_tasks_too_small_throws()
 		{
 			Should.Throw<ArgumentException>(() =>
 			{
 				var mockStorageAccount = new Mock<IStorageAccount>(MockBehavior.Strict);
-				var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 0, 1, TimeSpan.FromMinutes(1), 3);
-			});
-		}
-
-		[Fact]
-		public void Max_too_small_throws()
-		{
-			Should.Throw<ArgumentException>(() =>
-			{
-				var mockStorageAccount = new Mock<IStorageAccount>(MockBehavior.Strict);
-				var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 2, 1, TimeSpan.FromMinutes(1), 3);
+				var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 0, TimeSpan.FromMinutes(1), 3);
 			});
 		}
 
@@ -53,7 +44,7 @@ namespace Picton.Messaging.UnitTests
 			Should.Throw<ArgumentException>(() =>
 			{
 				var mockStorageAccount = new Mock<IStorageAccount>(MockBehavior.Strict);
-				var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 0);
+				var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), 0);
 			});
 		}
 
@@ -68,7 +59,7 @@ namespace Picton.Messaging.UnitTests
 			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
 			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
 
-			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), 3);
 
 			// Act
 			Should.Throw<ArgumentNullException>(() => messagePump.Start());
@@ -85,7 +76,7 @@ namespace Picton.Messaging.UnitTests
 			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
 			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
 
-			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), 3);
 
 			// Act
 			messagePump.Stop();
@@ -109,9 +100,9 @@ namespace Picton.Messaging.UnitTests
 			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
 			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
 
-			mockQueue.Setup(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns<CloudQueueMessage>(null);
+			mockQueue.Setup(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<CloudQueueMessage>());
 
-			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Interlocked.Increment(ref onMessageInvokeCount);
@@ -139,14 +130,14 @@ namespace Picton.Messaging.UnitTests
 			onQueueEmptyInvokeCount.ShouldBeGreaterThan(0);
 			onErrorInvokeCount.ShouldBe(0);
 
-			// You would expect the 'GetMessageAsync' method to be invoked only once, but unfortunately we can't be sure.
+			// You would expect the 'GetMessagesAsync' method to be invoked only once, but unfortunately we can't be sure.
 			// It will be invoked a small number of times (probably once or twice, maybe three times but not more than that).
-			// However we can't be more precise because we stop the message pump on another thread and 'GetMessageAsync' may be invoked
-			// a few times while we wait for the message pump to stop.
+			// However we can't be more precise because we stop the message pump on another thread and 'GetMessagesAsync' may
+			// be invoked a few times while we wait for the message pump to stop.
 			//
-			// What this means is that there is no way to precisely assert the number of times the method has been invoked. The only
-			// thing we know for sure, is that 'GetMessageAsync' has been invoked at least once
-			mockQueue.Verify(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.AtLeast(1));
+			// What this means is that there is no way to precisely assert the number of times the method has been invoked.
+			// The only thing we know for sure, is that 'GetMessagesAsync' has been invoked at least once
+			mockQueue.Verify(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.AtLeast(1));
 		}
 
 		[Fact]
@@ -167,9 +158,9 @@ namespace Picton.Messaging.UnitTests
 			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
 			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
 
-			mockQueue.Setup(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns((TimeSpan? visibilityTimeout, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
+			mockQueue.Setup(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).ReturnsAsync((int messageCount, TimeSpan? visibilityTimeout, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
 			{
-				if (cloudMessage == null) return null;
+				if (cloudMessage == null) Enumerable.Empty<CloudQueueMessage>();
 
 				lock (lockObject)
 				{
@@ -178,8 +169,13 @@ namespace Picton.Messaging.UnitTests
 						// DequeueCount is a private property. Therefore we must use reflection to change its value
 						var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
 						dequeueCountProperty.SetValue(cloudMessage, cloudMessage.DequeueCount + 1);
+
+						return new[] { cloudMessage };
 					}
-					return Task.FromResult(cloudMessage);
+					else
+					{
+						return Enumerable.Empty<CloudQueueMessage>();
+					}
 				}
 			});
 			mockQueue.Setup(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns((string messageId, string popReceipt, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
@@ -191,7 +187,7 @@ namespace Picton.Messaging.UnitTests
 				return Task.FromResult(true);
 			});
 
-			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Interlocked.Increment(ref onMessageInvokeCount);
@@ -225,7 +221,7 @@ namespace Picton.Messaging.UnitTests
 			onMessageInvokeCount.ShouldBe(1);
 			onQueueEmptyInvokeCount.ShouldBeGreaterThan(0);
 			onErrorInvokeCount.ShouldBe(0);
-			mockQueue.Verify(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.AtLeast(1));
+			mockQueue.Verify(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
 			mockQueue.Verify(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.Exactly(1));
 		}
 
@@ -249,9 +245,9 @@ namespace Picton.Messaging.UnitTests
 			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
 			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
 
-			mockQueue.Setup(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns((TimeSpan? visibilityTimeout, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
+			mockQueue.Setup(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).ReturnsAsync((int messageCount, TimeSpan? visibilityTimeout, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
 			{
-				if (cloudMessage == null) return null;
+				if (cloudMessage == null) return Enumerable.Empty<CloudQueueMessage>();
 
 				lock (lockObject)
 				{
@@ -259,9 +255,14 @@ namespace Picton.Messaging.UnitTests
 					{
 						// DequeueCount is a private property. Therefore we must use reflection to change its value
 						var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
-						dequeueCountProperty.SetValue(cloudMessage, cloudMessage.DequeueCount + 1);
+						dequeueCountProperty.SetValue(cloudMessage, retries + 1);   // intentionally set 'DequeueCount' to a value exceeding maxRetries to simulate a poison message
+
+						return new[] { cloudMessage };
 					}
-					return Task.FromResult(cloudMessage);
+					else
+					{
+						return Enumerable.Empty<CloudQueueMessage>();
+					}
 				}
 			});
 			mockQueue.Setup(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns((string messageId, string popReceipt, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
@@ -273,7 +274,7 @@ namespace Picton.Messaging.UnitTests
 				return Task.FromResult(true);
 			});
 
-			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), retries);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), retries);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Interlocked.Increment(ref onMessageInvokeCount);
@@ -306,11 +307,11 @@ namespace Picton.Messaging.UnitTests
 			messagePump.Start();
 
 			// Assert
-			onMessageInvokeCount.ShouldBe(retries + 1);
+			onMessageInvokeCount.ShouldBe(1);
 			onQueueEmptyInvokeCount.ShouldBeGreaterThan(0);
-			onErrorInvokeCount.ShouldBe(retries + 1);
+			onErrorInvokeCount.ShouldBe(1);
 			isRejected.ShouldBeTrue();
-			mockQueue.Verify(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.AtLeast(retries));
+			mockQueue.Verify(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.AtLeast(2));
 		}
 
 		[Fact]
@@ -331,9 +332,9 @@ namespace Picton.Messaging.UnitTests
 			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
 			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
 
-			mockQueue.Setup(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns<CloudQueueMessage>(null);
+			mockQueue.Setup(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<CloudQueueMessage>());
 
-			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Interlocked.Increment(ref onMessageInvokeCount);
@@ -370,7 +371,7 @@ namespace Picton.Messaging.UnitTests
 			onMessageInvokeCount.ShouldBe(0);
 			onQueueEmptyInvokeCount.ShouldBeGreaterThan(0);
 			onErrorInvokeCount.ShouldBe(0);
-			mockQueue.Verify(q => q.GetMessageAsync(It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.AtLeast(1));
+			mockQueue.Verify(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.AtLeast(1));
 		}
 
 		private static Mock<CloudBlobContainer> GetMockBlobContainer(string containerName = "mycontainer")
