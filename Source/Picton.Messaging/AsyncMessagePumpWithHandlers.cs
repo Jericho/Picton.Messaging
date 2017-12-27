@@ -96,10 +96,9 @@ namespace Picton.Messaging
 			{
 				OnMessage = (message, cancellationToken) =>
 				{
-					Type[] handlers = null;
 					var contentType = message.Content.GetType();
 
-					if (!_messageHandlers.TryGetValue(contentType, out handlers))
+					if (!_messageHandlers.TryGetValue(contentType, out Type[] handlers))
 					{
 						throw new Exception($"Received a message of type {contentType.FullName} but could not find a class implementing IMessageHandler<{contentType.FullName}>");
 					}
