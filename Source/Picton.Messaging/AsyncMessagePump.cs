@@ -157,7 +157,7 @@ namespace Picton.Messaging
 			RecurrentCancellableTask.StartNew(
 				async () =>
 				{
-					// Fetched messages from the Azure queue when the concurrent queue falls below an "acceptable" count.
+					// Fetched messages from the Azure queue when the number of items in the concurrent queue falls below an "acceptable" level.
 					if (queuedMessages.Count <= _concurrentTasks / 2)
 					{
 						var messages = await _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
@@ -254,16 +254,6 @@ namespace Picton.Messaging
 
 			// Task pump has been canceled, wait for the currently running tasks to complete
 			await Task.WhenAll(runningTasks.Values).UntilCancelled().ConfigureAwait(false);
-		}
-
-		private bool IsCancellationRequested(Exception e)
-		{
-			if (e == null) return false;
-
-			if (e is OperationCanceledException oce) return true;
-			if (e is TaskCanceledException tce) return true;
-
-			return IsCancellationRequested(e.InnerException);
 		}
 
 		#endregion
