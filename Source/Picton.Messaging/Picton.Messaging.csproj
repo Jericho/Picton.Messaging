@@ -4,26 +4,34 @@
     <TargetFrameworks>net452;netstandard1.6</TargetFrameworks>
     <PlatformTarget>anycpu</PlatformTarget>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <AssemblyName>Picton.Messaging</AssemblyName>
     <OutputType>Library</OutputType>
-    <PackageId>Picton.Messaging</PackageId>
     <PackageTargetFallback Condition=" '$(TargetFramework)' == 'netstandard1.6' ">$(PackageTargetFallback);dnxcore50</PackageTargetFallback>
     <NetStandardImplicitPackageVersion Condition=" '$(TargetFramework)' == 'netstandard1.6' ">1.6.1</NetStandardImplicitPackageVersion>
-    <GenerateAssemblyTitleAttribute>false</GenerateAssemblyTitleAttribute>
-    <GenerateAssemblyDescriptionAttribute>false</GenerateAssemblyDescriptionAttribute>
-    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
-    <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
-    <GenerateAssemblyCopyrightAttribute>false</GenerateAssemblyCopyrightAttribute>
-    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
     <Version>$(SemVer)</Version>
     <DebugType>full</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Picton.Messaging</PackageId>
+    <AssemblyName>Picton.Messaging</AssemblyName>
+    <AssemblyTitle>Picton.Messaging</AssemblyTitle>
+    <Authors>Jeremie Desautels</Authors>
+    <Company></Company>
+    <Description>High performance message processor (also known as a message "pump") designed to process messages from an Azure storage queue as efficiently as possible</Description>
+    <Copyright>Copyright © Jeremie Desautels 2016 - Present</Copyright>
+    <PackageLicenseUrl>http://jericho.mit-license.org</PackageLicenseUrl>
+    <PackageProjectUrl>https://github.com/Jericho/Picton.Messaging</PackageProjectUrl>
+    <PackageIconUrl>https://github.com/identicons/jericho.png</PackageIconUrl>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageTags>Picton Picton.Messaging Azure messaging</PackageTags>
+    <PackageReleaseNotes></PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="LibLog" Version="4.2.6" />
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="1.1.2" />
     <PackageReference Include="Microsoft.DotNet.InternalAbstractions" Version="1.0.0" />
-    <PackageReference Include="Picton" Version="2.1.0" />
+    <PackageReference Include="Picton" Version="2.2.1" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.1.0-beta004">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>

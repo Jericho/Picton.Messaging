@@ -55,7 +55,7 @@ namespace Picton.Messaging
 		/// OnQueueEmpty = cancellationToken => Task.Delay(2500, cancellationToken).Wait();
 		/// </example>
 		/// <remarks>
-		/// If this property is not set, the default logic is to pause for 1 second.
+		/// If this property is not set, the default logic is to pause for 2 seconds.
 		/// </remarks>
 		public Action<CancellationToken> OnQueueEmpty
 		{
@@ -72,12 +72,11 @@ namespace Picton.Messaging
 		/// </summary>
 		/// <param name="queueName">Name of the queue.</param>
 		/// <param name="cloudStorageAccount">The cloud storage account.</param>
-		/// <param name="minConcurrentTasks">The minimum concurrent tasks.</param>
-		/// <param name="maxConcurrentTasks">The maximum concurrent tasks.</param>
+		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		public AsyncMessagePumpWithHandlers(string queueName, CloudStorageAccount cloudStorageAccount, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
-			: this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), minConcurrentTasks, maxConcurrentTasks, visibilityTimeout, maxDequeueCount)
+		public AsyncMessagePumpWithHandlers(string queueName, CloudStorageAccount cloudStorageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
+			: this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), concurrentTasks, visibilityTimeout, maxDequeueCount)
 		{
 		}
 
@@ -86,28 +85,28 @@ namespace Picton.Messaging
 		/// </summary>
 		/// <param name="queueName">Name of the queue.</param>
 		/// <param name="storageAccount">The storage account</param>
-		/// <param name="minConcurrentTasks">The minimum number of concurrent tasks. The message pump will not scale down below this value</param>
-		/// <param name="maxConcurrentTasks">The maximum number of concurrent tasks. The message pump will not scale up above this value</param>
+		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="visibilityTimeout">The queue visibility timeout</param>
 		/// <param name="maxDequeueCount">The number of times to try processing a given message before giving up</param>
-		public AsyncMessagePumpWithHandlers(string queueName, IStorageAccount storageAccount, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
+		public AsyncMessagePumpWithHandlers(string queueName, IStorageAccount storageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
 		{
-			_messagePump = new AsyncMessagePump(queueName, storageAccount, minConcurrentTasks, maxConcurrentTasks, visibilityTimeout, maxDequeueCount);
-			_messagePump.OnMessage = (message, cancellationToken) =>
+			_messagePump = new AsyncMessagePump(queueName, storageAccount, concurrentTasks, visibilityTimeout, maxDequeueCount)
 			{
-				Type[] handlers = null;
-				var contentType = message.Content.GetType();
-
-				if (!_messageHandlers.TryGetValue(contentType, out handlers))
+				OnMessage = (message, cancellationToken) =>
 				{
-					throw new Exception($"Received a message of type {contentType.FullName} but could not find a class implementing IMessageHandler<{contentType.FullName}>");
-				}
+					var contentType = message.Content.GetType();
 
-				foreach (var handlerType in handlers)
-				{
-					var handler = Activator.CreateInstance(handlerType);
-					var handlerMethod = handlerType.GetMethod("Handle", new[] { contentType });
-					handlerMethod.Invoke(handler, new[] { message.Content });
+					if (!_messageHandlers.TryGetValue(contentType, out Type[] handlers))
+					{
+						throw new Exception($"Received a message of type {contentType.FullName} but could not find a class implementing IMessageHandler<{contentType.FullName}>");
+					}
+
+					foreach (var handlerType in handlers)
+					{
+						var handler = Activator.CreateInstance(handlerType);
+						var handlerMethod = handlerType.GetMethod("Handle", new[] { contentType });
+						handlerMethod.Invoke(handler, new[] { message.Content });
+					}
 				}
 			};
 		}
