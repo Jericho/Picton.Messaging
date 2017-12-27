@@ -184,7 +184,7 @@ namespace Picton.Messaging
 								}
 								else
 								{
-									_logger.ErrorException("An error occured when attempting to get a message from the queue", e.InnerException ?? e);
+									_logger.ErrorException("An error occured when attempting to get a message from the queue", e.GetBaseException());
 								}
 							}
 
@@ -197,7 +197,7 @@ namespace Picton.Messaging
 								}
 								catch (Exception e)
 								{
-									_logger.InfoException("An error occured when handling an empty queue. The error was caught and ignored.", e.InnerException ?? e);
+									_logger.InfoException("An error occured when handling an empty queue. The error was caught and ignored.", e.GetBaseException());
 								}
 
 								// False indicates that no message was processed
@@ -273,6 +273,9 @@ namespace Picton.Messaging
 
 			var oce = e as OperationCanceledException;
 			if (oce != null) return true;
+
+			var tce = e as TaskCanceledException;
+			if (tce != null) return true;
 
 			return IsCancellationRequested(e.InnerException);
 		}
