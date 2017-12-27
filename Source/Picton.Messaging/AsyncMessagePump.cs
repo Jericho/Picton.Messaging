@@ -14,8 +14,6 @@ namespace Picton.Messaging
 	/// <summary>
 	/// High performance message processor (also known as a message "pump") for Azure storage queues.
 	/// Designed to monitor an Azure storage queue and process the message as quickly and efficiently as possible.
-	/// When messages are present in the queue, this message pump will increase the number of tasks that can concurrently process messages.
-	/// Conversly, this message pump will reduce the number of tasks that can concurrently process messages when the queue is empty.
 	/// </summary>
 	public class AsyncMessagePump
 	{
