@@ -15,7 +15,7 @@ In March 2016 I attended three webinars by [Daniel Marbach](https://github.com/d
 Part 2 was particularly interresting to me because Daniel presented a generic message pump that met most (but not all) of my requirements. Specifically, Daniel's message pump meets the following criteria:
 
 - Concurrent message handling. This means that multiple messages can be processed at the same time. This is critical, especially if your message processing logic is I/O bound.
-- Limiting concurrency. This means tht we can decide the maximum number of messages that can be processed at the same time.
+- Limiting concurrency. This means that we can decide the maximum number of messages that can be processed at the same time.
 - Cancelling and graceful shutdown. This means that our message pump can be notified that we want to stop processing additional messages and also we can decide what to do with messages that are being processed at the moment when we decide to stop.
 
 The sample code that Daniel shared during his webinars was very generic and not specific to Azure so I made the following enhancements:

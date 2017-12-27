@@ -55,7 +55,7 @@ namespace Picton.Messaging
 		/// OnQueueEmpty = cancellationToken => Task.Delay(2500, cancellationToken).Wait();
 		/// </example>
 		/// <remarks>
-		/// If this property is not set, the default logic is to pause for 1 second.
+		/// If this property is not set, the default logic is to pause for 2 seconds.
 		/// </remarks>
 		public Action<CancellationToken> OnQueueEmpty
 		{
