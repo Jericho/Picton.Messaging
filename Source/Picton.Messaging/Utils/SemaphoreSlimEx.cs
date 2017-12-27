@@ -72,20 +72,26 @@ namespace Picton.Messaging.Utils
 		/// Attempts to increase the number of slots
 		/// </summary>
 		/// <param name="millisecondsTimeout">The timeout in milliseconds.</param>
+		/// <param name="increaseCount">The number of slots to add</param>
 		/// <returns>true if the attempt was successfully; otherwise, false.</returns>
-		public bool TryIncrease(int millisecondsTimeout = 500)
+		public bool TryIncrease(int millisecondsTimeout = 500, int increaseCount = 1)
 		{
-			return TryIncrease(TimeSpan.FromMilliseconds(millisecondsTimeout));
+			return TryIncrease(TimeSpan.FromMilliseconds(millisecondsTimeout), increaseCount);
 		}
 
 		/// <summary>
 		/// Attempts to increase the number of slots
 		/// </summary>
 		/// <param name="timeout">The timeout.</param>
+		/// <param name="increaseCount">The number of slots to add</param>
 		/// <returns>true if the attempt was successfully; otherwise, false.</returns>
-		public bool TryIncrease(TimeSpan timeout)
+		public bool TryIncrease(TimeSpan timeout, int increaseCount = 1)
 		{
+			if (increaseCount < 0) throw new ArgumentOutOfRangeException(nameof(increaseCount));
+			else if (increaseCount == 0) return false;
+
 			var increased = false;
+
 			try
 			{
 				if (this.AvailableSlotsCount < this.MaximumSlotsCount)
@@ -93,13 +99,17 @@ namespace Picton.Messaging.Utils
 					var lockAcquired = _lock.TryEnterWriteLock(timeout);
 					if (lockAcquired)
 					{
-						if (this.AvailableSlotsCount < this.MaximumSlotsCount)
+						for (int i = 0; i < increaseCount; i++)
 						{
-							Release();
-							this.AvailableSlotsCount++;
-							increased = true;
-							_logger.Trace($"Semaphore slots increased: {this.AvailableSlotsCount}");
+							if (this.AvailableSlotsCount < this.MaximumSlotsCount)
+							{
+								Release();
+								this.AvailableSlotsCount++;
+								increased = true;
+							}
 						}
+
+						if (increased) _logger.Trace($"Semaphore slots increased: {this.AvailableSlotsCount}");
 
 						_lock.ExitWriteLock();
 					}
@@ -118,19 +128,24 @@ namespace Picton.Messaging.Utils
 		/// Attempts to decrease the number of slots
 		/// </summary>
 		/// <param name="millisecondsTimeout">The timeout in milliseconds.</param>
+		/// <param name="decreaseCount">The number of slots to add</param>
 		/// <returns>true if the attempt was successfully; otherwise, false.</returns>
-		public bool TryDecrease(int millisecondsTimeout = 500)
+		public bool TryDecrease(int millisecondsTimeout = 500, int decreaseCount = 1)
 		{
-			return TryDecrease(TimeSpan.FromMilliseconds(millisecondsTimeout));
+			return TryDecrease(TimeSpan.FromMilliseconds(millisecondsTimeout), decreaseCount);
 		}
 
 		/// <summary>
 		/// Attempts to decrease the number of slots
 		/// </summary>
 		/// <param name="timeout">The timeout.</param>
+		/// <param name="decreaseCount">The number of slots to add</param>
 		/// <returns>true if the attempt was successfully; otherwise, false.</returns>
-		public bool TryDecrease(TimeSpan timeout)
+		public bool TryDecrease(TimeSpan timeout, int decreaseCount = 1)
 		{
+			if (decreaseCount < 0) throw new ArgumentOutOfRangeException(nameof(decreaseCount));
+			else if (decreaseCount == 0) return false;
+
 			var decreased = false;
 
 			if (this.AvailableSlotsCount > this.MinimumSlotsCount)
@@ -138,15 +153,19 @@ namespace Picton.Messaging.Utils
 				var lockAcquired = _lock.TryEnterWriteLock(timeout);
 				if (lockAcquired)
 				{
-					if (this.AvailableSlotsCount > this.MinimumSlotsCount)
+					for (int i = 0; i < decreaseCount; i++)
 					{
-						if (Wait(timeout))
+						if (this.AvailableSlotsCount > this.MinimumSlotsCount)
 						{
-							this.AvailableSlotsCount--;
-							decreased = true;
-							_logger.Trace($"Semaphore slots decreased: {this.AvailableSlotsCount}");
+							if (Wait(timeout))
+							{
+								this.AvailableSlotsCount--;
+								decreased = true;
+							}
 						}
 					}
+
+					if (decreased) _logger.Trace($"Semaphore slots decreased: {this.AvailableSlotsCount}");
 
 					_lock.ExitWriteLock();
 				}
