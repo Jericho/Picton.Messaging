@@ -24,27 +24,17 @@ namespace Picton.Messaging.UnitTests
 		{
 			Should.Throw<ArgumentNullException>(() =>
 			{
-				var messagePump = new AsyncMessagePump("myqueue", (IStorageAccount)null, 1, 1, TimeSpan.FromMinutes(1), 3);
+				var messagePump = new AsyncMessagePump("myqueue", (IStorageAccount)null, 1, TimeSpan.FromMinutes(1), 3);
 			});
 		}
 
 		[Fact]
-		public void Min_too_small_throws()
+		public void Number_of_concurrent_tasks_too_small_throws()
 		{
 			Should.Throw<ArgumentException>(() =>
 			{
 				var mockStorageAccount = new Mock<IStorageAccount>(MockBehavior.Strict);
-				var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 0, 1, TimeSpan.FromMinutes(1), 3);
-			});
-		}
-
-		[Fact]
-		public void Max_too_small_throws()
-		{
-			Should.Throw<ArgumentException>(() =>
-			{
-				var mockStorageAccount = new Mock<IStorageAccount>(MockBehavior.Strict);
-				var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 2, 1, TimeSpan.FromMinutes(1), 3);
+				var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 0, TimeSpan.FromMinutes(1), 3);
 			});
 		}
 
@@ -54,7 +44,7 @@ namespace Picton.Messaging.UnitTests
 			Should.Throw<ArgumentException>(() =>
 			{
 				var mockStorageAccount = new Mock<IStorageAccount>(MockBehavior.Strict);
-				var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 0);
+				var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), 0);
 			});
 		}
 
@@ -69,7 +59,7 @@ namespace Picton.Messaging.UnitTests
 			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
 			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
 
-			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), 3);
 
 			// Act
 			Should.Throw<ArgumentNullException>(() => messagePump.Start());
@@ -86,7 +76,7 @@ namespace Picton.Messaging.UnitTests
 			var mockBlobClient = GetMockBlobClient(mockBlobContainer);
 			var mockStorageAccount = GetMockStorageAccount(mockBlobClient, mockQueueClient);
 
-			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), 3);
 
 			// Act
 			messagePump.Stop();
@@ -112,7 +102,7 @@ namespace Picton.Messaging.UnitTests
 
 			mockQueue.Setup(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<CloudQueueMessage>());
 
-			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Interlocked.Increment(ref onMessageInvokeCount);
@@ -197,7 +187,7 @@ namespace Picton.Messaging.UnitTests
 				return Task.FromResult(true);
 			});
 
-			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Interlocked.Increment(ref onMessageInvokeCount);
@@ -284,7 +274,7 @@ namespace Picton.Messaging.UnitTests
 				return Task.FromResult(true);
 			});
 
-			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), retries);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), retries);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Interlocked.Increment(ref onMessageInvokeCount);
@@ -344,7 +334,7 @@ namespace Picton.Messaging.UnitTests
 
 			mockQueue.Setup(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<CloudQueueMessage>());
 
-			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, 1, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnMessage = (message, cancellationToken) =>
 			{
 				Interlocked.Increment(ref onMessageInvokeCount);

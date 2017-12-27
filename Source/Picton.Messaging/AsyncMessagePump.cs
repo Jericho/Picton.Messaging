@@ -24,8 +24,7 @@ namespace Picton.Messaging
 		private static readonly ILog _logger = LogProvider.GetLogger(typeof(AsyncMessagePump));
 
 		private readonly IQueueManager _queueManager;
-		private readonly int _minConcurrentTasks;
-		private readonly int _maxConcurrentTasks;
+		private readonly int _concurrentTasks;
 		private readonly TimeSpan? _visibilityTimeout;
 		private readonly int _maxDequeueCount;
 
@@ -76,12 +75,11 @@ namespace Picton.Messaging
 		/// </summary>
 		/// <param name="queueName">Name of the queue.</param>
 		/// <param name="cloudStorageAccount">The cloud storage account.</param>
-		/// <param name="minConcurrentTasks">The minimum concurrent tasks.</param>
-		/// <param name="maxConcurrentTasks">The maximum concurrent tasks.</param>
+		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		public AsyncMessagePump(string queueName, CloudStorageAccount cloudStorageAccount, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
-			: this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), minConcurrentTasks, maxConcurrentTasks, visibilityTimeout, maxDequeueCount)
+		public AsyncMessagePump(string queueName, CloudStorageAccount cloudStorageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
+			: this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), concurrentTasks, visibilityTimeout, maxDequeueCount)
 		{
 		}
 
@@ -90,19 +88,16 @@ namespace Picton.Messaging
 		/// </summary>
 		/// <param name="queueName">Name of the queue.</param>
 		/// <param name="storageAccount">The storage account.</param>
-		/// <param name="minConcurrentTasks">The minimum number of concurrent tasks. The message pump will not scale down below this value</param>
-		/// <param name="maxConcurrentTasks">The maximum number of concurrent tasks. The message pump will not scale up above this value</param>
+		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="visibilityTimeout">The queue visibility timeout</param>
 		/// <param name="maxDequeueCount">The number of times to try processing a given message before giving up</param>
-		public AsyncMessagePump(string queueName, IStorageAccount storageAccount, int minConcurrentTasks = 1, int maxConcurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
+		public AsyncMessagePump(string queueName, IStorageAccount storageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
 		{
-			if (minConcurrentTasks < 1) throw new ArgumentException("Minimum number of concurrent tasks must be greather than zero", nameof(minConcurrentTasks));
-			if (maxConcurrentTasks < minConcurrentTasks) throw new ArgumentException("Maximum number of concurrent tasks must be greather than or equal to the minimum", nameof(maxConcurrentTasks));
+			if (concurrentTasks < 1) throw new ArgumentException("Number of concurrent tasks must be greather than zero", nameof(concurrentTasks));
 			if (maxDequeueCount < 1) throw new ArgumentException("Number of retries must be greather than zero", nameof(maxDequeueCount));
 
 			_queueManager = new QueueManager(queueName, storageAccount);
-			_minConcurrentTasks = minConcurrentTasks;
-			_maxConcurrentTasks = maxConcurrentTasks;
+			_concurrentTasks = concurrentTasks;
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
 
@@ -157,7 +152,7 @@ namespace Picton.Messaging
 		private async Task ProcessMessages(TimeSpan? visibilityTimeout = null, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
-			var semaphore = new SemaphoreSlimEx(_minConcurrentTasks, _minConcurrentTasks, _maxConcurrentTasks);
+			var semaphore = new SemaphoreSlim(_concurrentTasks, _concurrentTasks);
 			var queuedMessages = new ConcurrentQueue<CloudMessage>();
 			var fetchTaskStarted = false;
 
@@ -166,9 +161,9 @@ namespace Picton.Messaging
 				async () =>
 				{
 					// Fetched messages from the Azure queue when the concurrent queue falls below an "acceptable" count.
-					if (queuedMessages.Count <= _maxConcurrentTasks / 2)
+					if (queuedMessages.Count <= _concurrentTasks / 2)
 					{
-						var messages = await _queueManager.GetMessagesAsync(_maxConcurrentTasks, visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
+						var messages = await _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
 						if (messages.Any())
 						{
 							_logger.Trace($"Fetched {messages.Count()} message(s) from the queue.");
@@ -176,12 +171,6 @@ namespace Picton.Messaging
 							foreach (var message in messages)
 							{
 								queuedMessages.Enqueue(message);
-							}
-
-							// Decide if we need to scale up
-							if (semaphore.AvailableSlotsCount < queuedMessages.Count)
-							{
-								semaphore.TryIncrease(increaseCount: Math.Max(queuedMessages.Count - semaphore.AvailableSlotsCount, 0));
 							}
 
 							// Indicate that we have fetched messages which will allow the message pump to start if it has not already started
@@ -261,21 +250,10 @@ namespace Picton.Messaging
 					// Add the task to the dictionary of tasks (allows us to keep track of the running tasks)
 					runningTasks.TryAdd(runningTask, runningTask);
 
-					// Increase or decrease the number of tasks running concurently
+					// Complete the task
 					runningTask.ContinueWith(
-						async t =>
+						t =>
 						{
-							// Decide if we need to scale down
-							if (!cancellationToken.IsCancellationRequested)
-							{
-								if (!await t)
-								{
-									// The queue is empty, therefore reduce the number of concurrent tasks
-									semaphore.TryDecrease();
-								}
-							}
-
-							// Complete the task
 							semaphore.Release();
 							runningTasks.TryRemove(t, out Task taskToBeRemoved);
 						}, TaskContinuationOptions.ExecuteSynchronously)
