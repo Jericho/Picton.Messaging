@@ -99,7 +99,7 @@ namespace Picton.Messaging
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
 
-			OnQueueEmpty = cancellationToken => Task.Delay(2000, cancellationToken).Wait();
+			OnQueueEmpty = cancellationToken => Task.Delay(1500, cancellationToken).Wait();
 			OnError = (message, exception, isPoison) => _logger.ErrorException("An error occured when processing a message", exception);
 		}
 
