@@ -138,37 +138,20 @@ namespace Picton.Messaging
 		{
 			var assemblies = GetLocalAssemblies();
 
-#if NETFULL
 			var typesWithMessageHandlerInterfaces = assemblies
 				.SelectMany(x => x.GetTypes())
-				.Where(t => !t.IsInterface)
+				.Where(t => !GetTypeInfo(t).IsInterface)
 				.Select(type => new
 				{
 					Type = type,
 					MessageTypes = type
 						.GetInterfaces()
-							.Where(i => i.IsGenericType)
-							.Where(t => t.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
+							.Where(i => GetTypeInfo(i).IsGenericType)
+							.Where(i => i.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
 							.SelectMany(i => i.GetGenericArguments())
 				})
 				.Where(t => t.MessageTypes != null && t.MessageTypes.Any())
 				.ToArray();
-#else
-			var typesWithMessageHandlerInterfaces = assemblies
-				.SelectMany(x => x.GetTypes())
-				.Where(t => !t.GetTypeInfo().IsInterface)
-				.Select(type => new
-				{
-					Type = type,
-					MessageTypes = type
-						.GetInterfaces()
-							.Where(i => i.GetTypeInfo().IsGenericType)
-							.Where(t => t.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
-							.SelectMany(i => i.GetGenericArguments())
-				})
-				.Where(t => t.MessageTypes != null && t.MessageTypes.Any())
-				.ToArray();
-#endif
 
 			var oneTypePerMessageHandler = typesWithMessageHandlerInterfaces
 				.SelectMany(t => t.MessageTypes, (t, messageType) =>
@@ -185,6 +168,11 @@ namespace Picton.Messaging
 		}
 
 #if NETFULL
+		private static Type GetTypeInfo(Type type)
+		{
+			return type;
+		}
+
 		private static IEnumerable<Assembly> GetLocalAssemblies()
 		{
 			var callingAssembly = Assembly.GetCallingAssembly();
@@ -194,6 +182,11 @@ namespace Picton.Messaging
 				.Where(x => !x.IsDynamic && new Uri(x.CodeBase).AbsolutePath.Contains(path)).ToList();
 		}
 #else
+		private static TypeInfo GetTypeInfo(Type type)
+		{
+			return type.GetTypeInfo();
+		}
+
 		private static IEnumerable<Assembly> GetLocalAssemblies()
 		{
 			var dependencies = DependencyContext.Default.RuntimeLibraries;
