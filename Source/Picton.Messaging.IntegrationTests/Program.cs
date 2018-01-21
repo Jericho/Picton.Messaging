@@ -71,9 +71,6 @@ namespace Picton.Messaging.IntegrationTests
 			var logger = logProvider.GetLogger("ProcessSimpleMessages");
 			Stopwatch sw = null;
 
-			var lockObject = new Object();
-			var stopping = false;
-
 			// Configure the message pump
 			var messagePump = new AsyncMessagePump(queueName, storageAccount, 10, TimeSpan.FromMinutes(1), 3)
 			{
@@ -86,29 +83,17 @@ namespace Picton.Messaging.IntegrationTests
 			// Stop the message pump when the queue is empty.
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
-				// Make sure we try to stop it only once (otherwise each concurrent task would try to stop it)
-				if (!stopping)
+				if (sw.IsRunning) sw.Stop();
+
+				// Log to console
+				logger(Logging.LogLevel.Debug, () => "Asking the 'simple' message pump to stop");
+
+				// Run the 'OnStop' on a different thread so we don't block it
+				Task.Run(() =>
 				{
-					lock (lockObject)
-					{
-						if (sw.IsRunning) sw.Stop();
-						if (!stopping)
-						{
-							// Indicate that the message pump is stopping
-							stopping = true;
-
-							// Log to console
-							logger(Logging.LogLevel.Debug, () => "Asking the 'simple' message pump to stop");
-
-							// Run the 'OnStop' on a different thread so we don't block it
-							Task.Run(() =>
-							{
-								messagePump.Stop();
-								logger(Logging.LogLevel.Debug, () => "The 'simple' message pump has been stopped");
-							}).ConfigureAwait(false);
-						}
-					}
-				}
+					messagePump.Stop();
+					logger(Logging.LogLevel.Debug, () => "The 'simple' message pump has been stopped");
+				}).ConfigureAwait(false);
 			};
 
 			// Start the message pump
