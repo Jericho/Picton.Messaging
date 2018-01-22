@@ -127,7 +127,7 @@ namespace Picton.Messaging.UnitTests
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(0);
-			onQueueEmptyInvokeCount.ShouldBeGreaterThan(0);
+			onQueueEmptyInvokeCount.ShouldBe(1);
 			onErrorInvokeCount.ShouldBe(0);
 
 			// You would expect the 'GetMessagesAsync' method to be invoked only once, but unfortunately we can't be sure.
@@ -160,23 +160,21 @@ namespace Picton.Messaging.UnitTests
 
 			mockQueue.Setup(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).ReturnsAsync((int messageCount, TimeSpan? visibilityTimeout, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
 			{
-				if (cloudMessage == null) Enumerable.Empty<CloudQueueMessage>();
-
-				lock (lockObject)
+				if (cloudMessage != null)
 				{
-					if (cloudMessage != null)
+					lock (lockObject)
 					{
-						// DequeueCount is a private property. Therefore we must use reflection to change its value
-						var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
-						dequeueCountProperty.SetValue(cloudMessage, cloudMessage.DequeueCount + 1);
+						if (cloudMessage != null)
+						{
+							// DequeueCount is a private property. Therefore we must use reflection to change its value
+							var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
+							dequeueCountProperty.SetValue(cloudMessage, cloudMessage.DequeueCount + 1);
 
-						return new[] { cloudMessage };
-					}
-					else
-					{
-						return Enumerable.Empty<CloudQueueMessage>();
+							return new[] { cloudMessage };
+						}
 					}
 				}
+				return Enumerable.Empty<CloudQueueMessage>();
 			});
 			mockQueue.Setup(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns((string messageId, string popReceipt, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
 			{
@@ -219,9 +217,9 @@ namespace Picton.Messaging.UnitTests
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(1);
-			onQueueEmptyInvokeCount.ShouldBeGreaterThan(0);
+			onQueueEmptyInvokeCount.ShouldBe(1);
 			onErrorInvokeCount.ShouldBe(0);
-			mockQueue.Verify(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+			mockQueue.Verify(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.AtLeast(2));
 			mockQueue.Verify(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.Exactly(1));
 		}
 
@@ -247,23 +245,21 @@ namespace Picton.Messaging.UnitTests
 
 			mockQueue.Setup(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).ReturnsAsync((int messageCount, TimeSpan? visibilityTimeout, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
 			{
-				if (cloudMessage == null) return Enumerable.Empty<CloudQueueMessage>();
-
-				lock (lockObject)
+				if (cloudMessage != null)
 				{
-					if (cloudMessage != null)
+					lock (lockObject)
 					{
-						// DequeueCount is a private property. Therefore we must use reflection to change its value
-						var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
-						dequeueCountProperty.SetValue(cloudMessage, retries + 1);   // intentionally set 'DequeueCount' to a value exceeding maxRetries to simulate a poison message
+						if (cloudMessage != null)
+						{
+							// DequeueCount is a private property. Therefore we must use reflection to change its value
+							var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
+							dequeueCountProperty.SetValue(cloudMessage, retries + 1);   // intentionally set 'DequeueCount' to a value exceeding maxRetries to simulate a poison message
 
-						return new[] { cloudMessage };
-					}
-					else
-					{
-						return Enumerable.Empty<CloudQueueMessage>();
+							return new[] { cloudMessage };
+						}
 					}
 				}
+				return Enumerable.Empty<CloudQueueMessage>();
 			});
 			mockQueue.Setup(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).Returns((string messageId, string popReceipt, QueueRequestOptions options, OperationContext operationContext, CancellationToken cancellationToken) =>
 			{
@@ -312,6 +308,7 @@ namespace Picton.Messaging.UnitTests
 			onErrorInvokeCount.ShouldBe(1);
 			isRejected.ShouldBeTrue();
 			mockQueue.Verify(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.AtLeast(2));
+			mockQueue.Verify(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>()), Times.Exactly(1));
 		}
 
 		[Fact]
