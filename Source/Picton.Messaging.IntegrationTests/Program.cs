@@ -120,7 +120,6 @@ namespace Picton.Messaging.IntegrationTests
 		{
 			var logger = logProvider.GetLogger("ProcessMessagesWithHandlers");
 
-			var lockObject = new Object();
 			var stopping = false;
 			Stopwatch sw = null;
 
@@ -132,25 +131,20 @@ namespace Picton.Messaging.IntegrationTests
 				// However, ensure that we try to stop it only once (otherwise each concurrent task would try to stop it)
 				if (!stopping)
 				{
-					lock (lockObject)
+					if (sw.IsRunning) sw.Stop();
+
+					// Indicate that the message pump is stopping
+					stopping = true;
+
+					// Log to console
+					logger(Logging.LogLevel.Debug, () => "Asking the message pump with handlers to stop");
+
+					// Run the 'OnStop' on a different thread so we don't block it
+					Task.Run(() =>
 					{
-						if (sw.IsRunning) sw.Stop();
-						if (!stopping)
-						{
-							// Indicate that the message pump is stopping
-							stopping = true;
-
-							// Log to console
-							logger(Logging.LogLevel.Debug, () => "Asking the message pump with handlers to stop");
-
-							// Run the 'OnStop' on a different thread so we don't block it
-							Task.Run(() =>
-							{
-								messagePump.Stop();
-								logger(Logging.LogLevel.Debug, () => "The message pump with handlers has been stopped");
-							}).ConfigureAwait(false);
-						}
-					}
+						messagePump.Stop();
+						logger(Logging.LogLevel.Debug, () => "The message pump with handlers has been stopped");
+					}).ConfigureAwait(false);
 				}
 			};
 
