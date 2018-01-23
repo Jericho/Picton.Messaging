@@ -5,6 +5,7 @@ using Picton.Messaging.Logging;
 using Picton.Messaging.Utils;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -157,10 +158,26 @@ namespace Picton.Messaging
 			RecurrentCancellableTask.StartNew(
 				() =>
 				{
-					// Fetched messages from the Azure queue when the number of items in the concurrent queue falls below an "acceptable" level.
+					// Fetch messages from the Azure queue when the number of items in the concurrent queue falls below an "acceptable" level.
 					if (queuedMessages.Count <= _concurrentTasks / 2)
 					{
-						var messages = _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).Result;
+						IEnumerable<CloudMessage> messages = null;
+						try
+						{
+							messages = _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).Result;
+						}
+						catch (TaskCanceledException)
+						{
+							// The message pump is shutting down.
+							// This exception can be safely ignored.
+						}
+						catch (Exception e)
+						{
+							_logger.InfoException("An error occured while fetching messages from the Azure queue. The error was caught and ignored.", e.GetBaseException());
+						}
+
+						if (messages == null) return;
+
 						if (messages.Any())
 						{
 							_logger.Trace($"Fetched {messages.Count()} message(s) from the queue.");
@@ -217,7 +234,8 @@ namespace Picton.Messaging
 									OnMessage?.Invoke(message, cancellationToken);
 
 									// Delete the processed message from the queue
-									await _queueManager.DeleteMessageAsync(message, null, null, cancellationToken).ConfigureAwait(false);
+									// PLEASE NOTE: we use "CancellationToken.None" to ensure a processed message is deleted from the queue even when the message pump is shutting down
+									await _queueManager.DeleteMessageAsync(message, null, null, CancellationToken.None).ConfigureAwait(false);
 								}
 								catch (Exception ex)
 								{
@@ -225,7 +243,8 @@ namespace Picton.Messaging
 									OnError?.Invoke(message, ex, isPoison);
 									if (isPoison)
 									{
-										await _queueManager.DeleteMessageAsync(message, null, null, cancellationToken).ConfigureAwait(false);
+										// PLEASE NOTE: we use "CancellationToken.None" to ensure a processed message is deleted from the queue even when the message pump is shutting down
+										await _queueManager.DeleteMessageAsync(message, null, null, CancellationToken.None).ConfigureAwait(false);
 									}
 								}
 
