@@ -155,12 +155,12 @@ namespace Picton.Messaging
 
 			// Define the task that fetches messages from the Azure queue
 			RecurrentCancellableTask.StartNew(
-				async () =>
+				() =>
 				{
 					// Fetched messages from the Azure queue when the number of items in the concurrent queue falls below an "acceptable" level.
 					if (queuedMessages.Count <= _concurrentTasks / 2)
 					{
-						var messages = await _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
+						var messages = _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).Result;
 						if (messages.Any())
 						{
 							_logger.Trace($"Fetched {messages.Count()} message(s) from the queue.");
