@@ -159,7 +159,7 @@ namespace Picton.Messaging
 				() =>
 				{
 					// Fetch messages from the Azure queue when the number of items in the concurrent queue falls below an "acceptable" level.
-					if (queuedMessages.Count <= _concurrentTasks / 2)
+					if (!cancellationToken.IsCancellationRequested && queuedMessages.Count <= _concurrentTasks / 2)
 					{
 						IEnumerable<CloudMessage> messages = null;
 						try
