@@ -27,7 +27,7 @@ namespace Picton.Messaging
 		private readonly int _concurrentTasks;
 		private readonly TimeSpan? _visibilityTimeout;
 		private readonly int _maxDequeueCount;
-		private readonly IMetricsRoot _metrics;
+		private readonly IMetrics _metrics;
 
 		private CancellationTokenSource _cancellationTokenSource;
 		private ManualResetEvent _safeToExitHandle;
@@ -79,9 +79,9 @@ namespace Picton.Messaging
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		/// <param name="metricsBuilder"></param>
-		public AsyncMessagePump(string queueName, CloudStorageAccount cloudStorageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetricsBuilder metricsBuilder = null)
-			: this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), concurrentTasks, visibilityTimeout, maxDequeueCount, metricsBuilder)
+		/// <param name="metrics"></param>
+		public AsyncMessagePump(string queueName, CloudStorageAccount cloudStorageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
+			: this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), concurrentTasks, visibilityTimeout, maxDequeueCount, metrics)
 		{
 		}
 
@@ -93,8 +93,8 @@ namespace Picton.Messaging
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="visibilityTimeout">The queue visibility timeout</param>
 		/// <param name="maxDequeueCount">The number of times to try processing a given message before giving up</param>
-		/// <param name="metricsBuilder"></param>
-		public AsyncMessagePump(string queueName, IStorageAccount storageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetricsBuilder metricsBuilder = null)
+		/// <param name="metrics"></param>
+		public AsyncMessagePump(string queueName, IStorageAccount storageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
 		{
 			if (concurrentTasks < 1) throw new ArgumentException("Number of concurrent tasks must be greather than zero", nameof(concurrentTasks));
 			if (maxDequeueCount < 1) throw new ArgumentException("Number of retries must be greather than zero", nameof(maxDequeueCount));
@@ -104,7 +104,20 @@ namespace Picton.Messaging
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
 
-			_metrics = (metricsBuilder ?? new MetricsBuilder()).Build();
+			if (metrics == null)
+			{
+				var noop = new MetricsBuilder();
+				noop.Configuration.Configure(new MetricsOptions()
+				{
+					Enabled = false,
+					ReportingEnabled = false
+				});
+				_metrics = noop.Build();
+			}
+			else
+			{
+				_metrics = metrics;
+			}
 
 			OnQueueEmpty = cancellationToken => Task.Delay(1500, cancellationToken).Wait();
 			OnError = (message, exception, isPoison) => _logger.ErrorException("An error occured when processing a message", exception);
