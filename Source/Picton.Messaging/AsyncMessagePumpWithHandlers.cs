@@ -5,12 +5,8 @@ using Picton.Messaging.Logging;
 using Picton.Messaging.Messages;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
-#if NETSTANDARD
-using System.Runtime.Loader;
-#endif
 using System.Threading;
 
 namespace Picton.Messaging
@@ -176,7 +172,7 @@ namespace Picton.Messaging
 		private static IEnumerable<Assembly> GetLocalAssemblies()
 		{
 			var callingAssembly = Assembly.GetCallingAssembly();
-			var path = new Uri(Path.GetDirectoryName(callingAssembly.Location)).AbsolutePath;
+			var path = new Uri(System.IO.Path.GetDirectoryName(callingAssembly.Location)).AbsolutePath;
 
 			return AppDomain.CurrentDomain.GetAssemblies()
 				.Where(x => !x.IsDynamic && new Uri(x.CodeBase).AbsolutePath.Contains(path)).ToList();
