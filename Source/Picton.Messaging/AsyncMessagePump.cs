@@ -173,7 +173,7 @@ namespace Picton.Messaging
 							try
 							{
 								messages = _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).Result;
-								_metrics.Measure.Counter.Increment(Metrics.MessagesFetchingCounter);
+								_metrics.Measure.Counter.Increment(Metrics.FetchMessagesCounter);
 							}
 							catch (TaskCanceledException)
 							{
