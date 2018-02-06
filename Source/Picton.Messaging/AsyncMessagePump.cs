@@ -1,4 +1,5 @@
-﻿using Microsoft.WindowsAzure.Storage;
+﻿using App.Metrics;
+using Microsoft.WindowsAzure.Storage;
 using Picton.Interfaces;
 using Picton.Managers;
 using Picton.Messaging.Logging;
@@ -26,6 +27,7 @@ namespace Picton.Messaging
 		private readonly int _concurrentTasks;
 		private readonly TimeSpan? _visibilityTimeout;
 		private readonly int _maxDequeueCount;
+		private readonly IMetricsRoot _metrics;
 
 		private CancellationTokenSource _cancellationTokenSource;
 		private ManualResetEvent _safeToExitHandle;
@@ -77,8 +79,9 @@ namespace Picton.Messaging
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		public AsyncMessagePump(string queueName, CloudStorageAccount cloudStorageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
-			: this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), concurrentTasks, visibilityTimeout, maxDequeueCount)
+		/// <param name="metricsBuilder"></param>
+		public AsyncMessagePump(string queueName, CloudStorageAccount cloudStorageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetricsBuilder metricsBuilder = null)
+			: this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), concurrentTasks, visibilityTimeout, maxDequeueCount, metricsBuilder)
 		{
 		}
 
@@ -90,7 +93,8 @@ namespace Picton.Messaging
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="visibilityTimeout">The queue visibility timeout</param>
 		/// <param name="maxDequeueCount">The number of times to try processing a given message before giving up</param>
-		public AsyncMessagePump(string queueName, IStorageAccount storageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
+		/// <param name="metricsBuilder"></param>
+		public AsyncMessagePump(string queueName, IStorageAccount storageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetricsBuilder metricsBuilder = null)
 		{
 			if (concurrentTasks < 1) throw new ArgumentException("Number of concurrent tasks must be greather than zero", nameof(concurrentTasks));
 			if (maxDequeueCount < 1) throw new ArgumentException("Number of retries must be greather than zero", nameof(maxDequeueCount));
@@ -99,6 +103,8 @@ namespace Picton.Messaging
 			_concurrentTasks = concurrentTasks;
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
+
+			_metrics = (metricsBuilder ?? new MetricsBuilder()).Build();
 
 			OnQueueEmpty = cancellationToken => Task.Delay(1500, cancellationToken).Wait();
 			OnError = (message, exception, isPoison) => _logger.ErrorException("An error occured when processing a message", exception);
@@ -161,43 +167,48 @@ namespace Picton.Messaging
 					// Fetch messages from the Azure queue when the number of items in the concurrent queue falls below an "acceptable" level.
 					if (!cancellationToken.IsCancellationRequested && queuedMessages.Count <= _concurrentTasks / 2)
 					{
-						IEnumerable<CloudMessage> messages = null;
-						try
+						using (_metrics.Measure.Timer.Time(Metrics.MessageFetchingTimer))
 						{
-							messages = _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).Result;
-						}
-						catch (TaskCanceledException)
-						{
-							// The message pump is shutting down.
-							// This exception can be safely ignored.
-						}
-						catch (Exception e)
-						{
-							_logger.InfoException("An error occured while fetching messages from the Azure queue. The error was caught and ignored.", e.GetBaseException());
-						}
-
-						if (messages == null) return;
-
-						if (messages.Any())
-						{
-							_logger.Trace($"Fetched {messages.Count()} message(s) from the queue.");
-
-							foreach (var message in messages)
-							{
-								queuedMessages.Enqueue(message);
-							}
-						}
-						else
-						{
-							_logger.Trace("The queue is empty, no messages fetched.");
+							IEnumerable<CloudMessage> messages = null;
 							try
 							{
-								// The queue is empty
-								OnQueueEmpty?.Invoke(cancellationToken);
+								messages = _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).Result;
+								_metrics.Measure.Counter.Increment(Metrics.MessagesFetchingCounter);
+							}
+							catch (TaskCanceledException)
+							{
+								// The message pump is shutting down.
+								// This exception can be safely ignored.
 							}
 							catch (Exception e)
 							{
-								_logger.InfoException("An error occured when handling an empty queue. The error was caught and ignored.", e.GetBaseException());
+								_logger.InfoException("An error occured while fetching messages from the Azure queue. The error was caught and ignored.", e.GetBaseException());
+							}
+
+							if (messages == null) return;
+
+							if (messages.Any())
+							{
+								_logger.Trace($"Fetched {messages.Count()} message(s) from the queue.");
+
+								foreach (var message in messages)
+								{
+									queuedMessages.Enqueue(message);
+								}
+							}
+							else
+							{
+								_logger.Trace("The queue is empty, no messages fetched.");
+								try
+								{
+									// The queue is empty
+									OnQueueEmpty?.Invoke(cancellationToken);
+									_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
+								}
+								catch (Exception e)
+								{
+									_logger.InfoException("An error occured when handling an empty queue. The error was caught and ignored.", e.GetBaseException());
+								}
 							}
 						}
 					}
@@ -217,40 +228,45 @@ namespace Picton.Messaging
 					var runningTask = Task.Run(
 						async () =>
 						{
-							if (cancellationToken.IsCancellationRequested) return false;
+							var messageProcessed = false;
 
-							queuedMessages.TryDequeue(out CloudMessage message);
+							if (cancellationToken.IsCancellationRequested) return messageProcessed;
 
-							if (message == null)
+							using (_metrics.Measure.Timer.Time(Metrics.MessageProcessingTimer))
 							{
-								// False indicates that no message was processed
-								return false;
-							}
-							else
-							{
-								try
-								{
-									// Process the message
-									OnMessage?.Invoke(message, cancellationToken);
+								queuedMessages.TryDequeue(out CloudMessage message);
 
-									// Delete the processed message from the queue
-									// PLEASE NOTE: we use "CancellationToken.None" to ensure a processed message is deleted from the queue even when the message pump is shutting down
-									await _queueManager.DeleteMessageAsync(message, null, null, CancellationToken.None).ConfigureAwait(false);
-								}
-								catch (Exception ex)
+								if (message != null)
 								{
-									var isPoison = message.DequeueCount > _maxDequeueCount;
-									OnError?.Invoke(message, ex, isPoison);
-									if (isPoison)
+									try
 									{
+										// Process the message
+										OnMessage?.Invoke(message, cancellationToken);
+
+										// Delete the processed message from the queue
 										// PLEASE NOTE: we use "CancellationToken.None" to ensure a processed message is deleted from the queue even when the message pump is shutting down
 										await _queueManager.DeleteMessageAsync(message, null, null, CancellationToken.None).ConfigureAwait(false);
 									}
-								}
+									catch (Exception ex)
+									{
+										var isPoison = message.DequeueCount > _maxDequeueCount;
+										OnError?.Invoke(message, ex, isPoison);
+										if (isPoison)
+										{
+											// PLEASE NOTE: we use "CancellationToken.None" to ensure a processed message is deleted from the queue even when the message pump is shutting down
+											await _queueManager.DeleteMessageAsync(message, null, null, CancellationToken.None).ConfigureAwait(false);
+										}
+									}
 
-								// True indicates that a message was processed
-								return true;
+									messageProcessed = true;
+								}
 							}
+
+							// Increment the counter if we processed a message
+							if (messageProcessed) _metrics.Measure.Counter.Increment(Metrics.MessagesProcessedCounter);
+
+							// Return a value indicating whether we processed a message or not
+							return messageProcessed;
 						},
 						CancellationToken.None);
 
