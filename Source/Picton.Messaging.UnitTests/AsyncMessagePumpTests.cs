@@ -110,12 +110,7 @@ namespace Picton.Messaging.UnitTests
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
 				Interlocked.Increment(ref onQueueEmptyInvokeCount);
-
-				// Run the 'OnStop' on a different thread so we don't block it
-				Task.Run(() =>
-				{
-					messagePump.Stop();
-				}).ConfigureAwait(false);
+				messagePump.Stop();
 			};
 			messagePump.OnError = (message, exception, isPoison) =>
 			{
@@ -193,12 +188,7 @@ namespace Picton.Messaging.UnitTests
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
 				Interlocked.Increment(ref onQueueEmptyInvokeCount);
-
-				// Run the 'OnStop' on a different thread so we don't block it
-				Task.Run(() =>
-				{
-					messagePump.Stop();
-				}).ConfigureAwait(false);
+				messagePump.Stop();
 			};
 			messagePump.OnError = (message, exception, isPoison) =>
 			{
@@ -279,12 +269,7 @@ namespace Picton.Messaging.UnitTests
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
 				Interlocked.Increment(ref onQueueEmptyInvokeCount);
-
-				// Run the 'OnStop' on a different thread so we don't block it
-				Task.Run(() =>
-				{
-					messagePump.Stop();
-				}).ConfigureAwait(false);
+				messagePump.Stop();
 			};
 			messagePump.OnError = (message, exception, isPoison) =>
 			{
@@ -350,11 +335,8 @@ namespace Picton.Messaging.UnitTests
 					}
 				}
 
-				// Run the 'OnStop' on a different thread so we don't block it
-				Task.Run(() =>
-				{
-					messagePump.Stop();
-				}).ConfigureAwait(false);
+				// Stop the message pump
+				messagePump.Stop();
 			};
 			messagePump.OnError = (message, exception, isPoison) =>
 			{

@@ -83,17 +83,13 @@ namespace Picton.Messaging.IntegrationTests
 			// Stop the message pump when the queue is empty.
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
+				// Stop the timer
 				if (sw.IsRunning) sw.Stop();
 
-				// Log to console
+				// Stop the message pump
 				logger(Logging.LogLevel.Debug, () => "Asking the 'simple' message pump to stop");
-
-				// Run the 'OnStop' on a different thread so we don't block it
-				Task.Run(() =>
-				{
-					messagePump.Stop();
-					logger(Logging.LogLevel.Debug, () => "The 'simple' message pump has been stopped");
-				}).ConfigureAwait(false);
+				messagePump.Stop();
+				logger(Logging.LogLevel.Debug, () => "The 'simple' message pump has been stopped");
 			};
 
 			// Start the message pump
@@ -120,32 +116,19 @@ namespace Picton.Messaging.IntegrationTests
 		{
 			var logger = logProvider.GetLogger("ProcessMessagesWithHandlers");
 
-			var stopping = false;
 			Stopwatch sw = null;
 
 			// Configure the message pump
 			var messagePump = new AsyncMessagePumpWithHandlers(queueName, storageAccount, 10, TimeSpan.FromMinutes(1), 3);
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
-				// Stop the message pump when the queue is empty.
-				// However, ensure that we try to stop it only once (otherwise each concurrent task would try to stop it)
-				if (!stopping)
-				{
-					if (sw.IsRunning) sw.Stop();
+				// Stop the timer
+				if (sw.IsRunning) sw.Stop();
 
-					// Indicate that the message pump is stopping
-					stopping = true;
-
-					// Log to console
-					logger(Logging.LogLevel.Debug, () => "Asking the message pump with handlers to stop");
-
-					// Run the 'OnStop' on a different thread so we don't block it
-					Task.Run(() =>
-					{
-						messagePump.Stop();
-						logger(Logging.LogLevel.Debug, () => "The message pump with handlers has been stopped");
-					}).ConfigureAwait(false);
-				}
+				// Stop the message pump
+				logger(Logging.LogLevel.Debug, () => "Asking the message pump with handlers to stop");
+				messagePump.Stop();
+				logger(Logging.LogLevel.Debug, () => "The message pump with handlers has been stopped");
 			};
 
 			// Start the message pump
