@@ -1,7 +1,9 @@
-﻿using Microsoft.WindowsAzure.Storage;
+﻿using App.Metrics;
+using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Picton.Interfaces;
 using Picton.Managers;
+using Picton.Messaging.IntegrationTests.Datadog;
 using Picton.Messaging.Logging;
 using System;
 using System.Diagnostics;
@@ -27,23 +29,42 @@ namespace Picton.Messaging.IntegrationTests
 			// Ensure the Console is tall enough
 			Console.WindowHeight = Math.Min(60, Console.LargestWindowHeight);
 
+			// Configure where metrics are published to
+			var datadogApiKey = Environment.GetEnvironmentVariable("DATADOG_APIKEY");
+			var metrics = new MetricsBuilder()
+				.Report.OverHttp(o =>
+				{
+					o.HttpSettings.RequestUri = new Uri($"https://app.datadoghq.com/api/v1/series?api_key={datadogApiKey}");
+					o.MetricsOutputFormatter = new DatadogFormatter(new DatadogFormatterOptions { Hostname = Environment.MachineName });
+					o.FlushInterval = TimeSpan.FromSeconds(2);
+				})
+				.Build();
+
 			// Setup the message queue in Azure storage emulator
 			var storageAccount = StorageAccount.FromCloudStorageAccount(CloudStorageAccount.DevelopmentStorageAccount);
 			var queueName = "myqueue";
 
 			logger(Logging.LogLevel.Info, () => "Begin integration tests...");
 
-			var numberOfMessages = 50;
+			var numberOfMessages = 25;
+
+			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} string messages to the queue...");
+			AddStringMessagesToQueue(numberOfMessages, queueName, storageAccount, logProvider).Wait();
+			logger(Logging.LogLevel.Info, () => "Processing the messages in the queue...");
+			ProcessSimpleMessages(queueName, storageAccount, logProvider, metrics);
 
 			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} simple messages to the queue...");
 			AddSimpleMessagesToQueue(numberOfMessages, queueName, storageAccount, logProvider).Wait();
 			logger(Logging.LogLevel.Info, () => "Processing the messages in the queue...");
-			ProcessSimpleMessages(queueName, storageAccount, logProvider);
+			ProcessSimpleMessages(queueName, storageAccount, logProvider, metrics);
 
 			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} messages with handlers to the queue...");
 			AddMessagesWithHandlerToQueue(numberOfMessages, queueName, storageAccount, logProvider).Wait();
 			logger(Logging.LogLevel.Info, () => "Processing the messages in the queue...");
-			ProcessMessagesWithHandlers(queueName, storageAccount, logProvider);
+			ProcessMessagesWithHandlers(queueName, storageAccount, logProvider, metrics);
+
+			// Send metrics to Datadog
+			Task.WhenAll(metrics.ReportRunner.RunAllAsync()).Wait();
 
 			// Flush the console key buffer
 			while (Console.KeyAvailable) Console.ReadKey(true);
@@ -53,9 +74,8 @@ namespace Picton.Messaging.IntegrationTests
 			Console.ReadKey();
 		}
 
-		public static async Task AddSimpleMessagesToQueue(int numberOfMessages, string queueName, IStorageAccount storageAccount, ILogProvider logProvider)
+		public static async Task AddStringMessagesToQueue(int numberOfMessages, string queueName, IStorageAccount storageAccount, ILogProvider logProvider)
 		{
-			// Add messages to our testing queue
 			var cloudQueueClient = storageAccount.CreateCloudQueueClient();
 			var cloudQueue = cloudQueueClient.GetQueueReference(queueName);
 			await cloudQueue.CreateIfNotExistsAsync().ConfigureAwait(false);
@@ -66,13 +86,24 @@ namespace Picton.Messaging.IntegrationTests
 			}
 		}
 
-		public static void ProcessSimpleMessages(string queueName, IStorageAccount storageAccount, ILogProvider logProvider)
+		public static async Task AddSimpleMessagesToQueue(int numberOfMessages, string queueName, IStorageAccount storageAccount, ILogProvider logProvider)
+		{
+			var queueManager = new QueueManager(queueName, storageAccount);
+			await queueManager.CreateIfNotExistsAsync().ConfigureAwait(false);
+			await queueManager.ClearAsync().ConfigureAwait(false);
+			for (var i = 0; i < numberOfMessages; i++)
+			{
+				await queueManager.AddMessageAsync($"Hello world {i}").ConfigureAwait(false);
+			}
+		}
+
+		public static void ProcessSimpleMessages(string queueName, IStorageAccount storageAccount, ILogProvider logProvider, IMetrics metrics)
 		{
 			var logger = logProvider.GetLogger("ProcessSimpleMessages");
 			Stopwatch sw = null;
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePump(queueName, storageAccount, 10, TimeSpan.FromMinutes(1), 3)
+			var messagePump = new AsyncMessagePump(queueName, storageAccount, 10, TimeSpan.FromMinutes(1), 3, metrics)
 			{
 				OnMessage = (message, cancellationToken) =>
 				{
@@ -112,14 +143,14 @@ namespace Picton.Messaging.IntegrationTests
 			}
 		}
 
-		public static void ProcessMessagesWithHandlers(string queueName, IStorageAccount storageAccount, ILogProvider logProvider)
+		public static void ProcessMessagesWithHandlers(string queueName, IStorageAccount storageAccount, ILogProvider logProvider, IMetrics metrics)
 		{
 			var logger = logProvider.GetLogger("ProcessMessagesWithHandlers");
 
 			Stopwatch sw = null;
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePumpWithHandlers(queueName, storageAccount, 10, TimeSpan.FromMinutes(1), 3);
+			var messagePump = new AsyncMessagePumpWithHandlers(queueName, storageAccount, 10, TimeSpan.FromMinutes(1), 3, metrics);
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
 				// Stop the timer
