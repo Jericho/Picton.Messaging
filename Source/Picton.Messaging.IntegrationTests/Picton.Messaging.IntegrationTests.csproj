@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="App.Metrics.Reporting.Http" Version="2.0.0-preview1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Picton.Messaging\Picton.Messaging.csproj" />
   </ItemGroup>
 
