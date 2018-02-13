@@ -1,4 +1,5 @@
 ﻿using App.Metrics;
+using App.Metrics.Scheduling;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Picton.Interfaces;
@@ -40,6 +41,15 @@ namespace Picton.Messaging.IntegrationTests
 				})
 				.Build();
 
+			// Send metrics to Datadog
+			var sendMetricsJob = new AppMetricsTaskScheduler(
+				TimeSpan.FromSeconds(2),
+				async () =>
+				{
+					await Task.WhenAll(metrics.ReportRunner.RunAllAsync());
+				});
+			sendMetricsJob.Start();
+
 			// Setup the message queue in Azure storage emulator
 			var storageAccount = StorageAccount.FromCloudStorageAccount(CloudStorageAccount.DevelopmentStorageAccount);
 			var queueName = "myqueue";
@@ -62,9 +72,6 @@ namespace Picton.Messaging.IntegrationTests
 			AddMessagesWithHandlerToQueue(numberOfMessages, queueName, storageAccount, logProvider).Wait();
 			logger(Logging.LogLevel.Info, () => "Processing the messages in the queue...");
 			ProcessMessagesWithHandlers(queueName, storageAccount, logProvider, metrics);
-
-			// Send metrics to Datadog
-			Task.WhenAll(metrics.ReportRunner.RunAllAsync()).Wait();
 
 			// Flush the console key buffer
 			while (Console.KeyAvailable) Console.ReadKey(true);
