@@ -175,7 +175,7 @@ namespace Picton.Messaging
 
 			// Define the task that fetches messages from the Azure queue
 			RecurrentCancellableTask.StartNew(
-				() =>
+				async () =>
 				{
 					// Fetch messages from the Azure queue when the number of items in the concurrent queue falls below an "acceptable" level.
 					if (!cancellationToken.IsCancellationRequested && queuedMessages.Count <= _concurrentTasks / 2)
@@ -185,8 +185,7 @@ namespace Picton.Messaging
 							IEnumerable<CloudMessage> messages = null;
 							try
 							{
-								messages = _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).Result;
-								_metrics.Measure.Counter.Increment(Metrics.FetchMessagesCounter);
+								messages = await _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
 							}
 							catch (TaskCanceledException)
 							{
@@ -227,6 +226,30 @@ namespace Picton.Messaging
 					}
 				},
 				TimeSpan.FromMilliseconds(500),
+				cancellationToken,
+				TaskCreationOptions.LongRunning);
+
+			// Define the task that checks how many messages are queued
+			RecurrentCancellableTask.StartNew(
+				async () =>
+				{
+					try
+					{
+						var count = await _queueManager.GetApproximateMessageCountAsync(cancellationToken).ConfigureAwait(false);
+						count += queuedMessages.Count;
+						_metrics.Measure.Gauge.SetValue(Metrics.QueuedMessagesGauge, count);
+					}
+					catch (TaskCanceledException)
+					{
+						// The message pump is shutting down.
+						// This exception can be safely ignored.
+					}
+					catch (Exception e)
+					{
+						_logger.InfoException("An error occured while checking how many message are waiting in the queue. The error was caught and ignored.", e.GetBaseException());
+					}
+				},
+				TimeSpan.FromMilliseconds(5000),
 				cancellationToken,
 				TaskCreationOptions.LongRunning);
 

@@ -1,5 +1,6 @@
 ﻿using App.Metrics;
 using App.Metrics.Counter;
+using App.Metrics.Gauge;
 using App.Metrics.Timer;
 
 namespace Picton.Messaging
@@ -11,7 +12,8 @@ namespace Picton.Messaging
 		/// </summary>
 		public static CounterOptions MessagesProcessedCounter => new CounterOptions
 		{
-			Name = "Messages processed",
+			Context = "Picton",
+			Name = "MessagesProcessedCount",
 			MeasurementUnit = Unit.Items
 		};
 
@@ -20,21 +22,14 @@ namespace Picton.Messaging
 		/// </summary>
 		public static TimerOptions MessageProcessingTimer => new TimerOptions
 		{
-			Name = "Message processing timer"
-		};
-
-		/// <summary>
-		/// Gets the counter indicating the number of times messages have been fetched from the Azure queue
-		/// </summary>
-		public static CounterOptions FetchMessagesCounter => new CounterOptions
-		{
-			Name = "Fetch Messages",
-			MeasurementUnit = Unit.Items
+			Context = "Picton",
+			Name = "MessageProcessingTime"
 		};
 
 		public static TimerOptions MessageFetchingTimer => new TimerOptions
 		{
-			Name = "Message fetching timer"
+			Context = "Picton",
+			Name = "MessageFetchingTime"
 		};
 
 		/// <summary>
@@ -42,7 +37,18 @@ namespace Picton.Messaging
 		/// </summary>
 		public static CounterOptions QueueEmptyCounter => new CounterOptions
 		{
-			Name = "Queue Empty"
+			Context = "Picton",
+			Name = "QueueEmptyCount"
+		};
+
+		/// <summary>
+		/// Gets the guage indicating the number of messages waiting in the queue over time
+		/// </summary>
+		public static GaugeOptions QueuedMessagesGauge => new GaugeOptions
+		{
+			Context = "Picton",
+			Name = "QueuedMessages",
+			MeasurementUnit = Unit.Items
 		};
 	}
 }
