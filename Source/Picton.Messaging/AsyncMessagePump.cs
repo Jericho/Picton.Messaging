@@ -75,26 +75,12 @@ namespace Picton.Messaging
 		/// Initializes a new instance of the <see cref="AsyncMessagePump"/> class.
 		/// </summary>
 		/// <param name="queueName">Name of the queue.</param>
-		/// <param name="cloudStorageAccount">The cloud storage account.</param>
+		/// <param name="storageAccount">The cloud storage account.</param>
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		/// <param name="metrics"></param>
-		public AsyncMessagePump(string queueName, CloudStorageAccount cloudStorageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
-			: this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), concurrentTasks, visibilityTimeout, maxDequeueCount, metrics)
-		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMessagePump"/> class.
-		/// </summary>
-		/// <param name="queueName">Name of the queue.</param>
-		/// <param name="storageAccount">The storage account.</param>
-		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
-		/// <param name="visibilityTimeout">The queue visibility timeout</param>
-		/// <param name="maxDequeueCount">The number of times to try processing a given message before giving up</param>
-		/// <param name="metrics"></param>
-		public AsyncMessagePump(string queueName, IStorageAccount storageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
+		/// <param name="metrics">The system where metrics are published</param>
+		public AsyncMessagePump(string queueName, CloudStorageAccount storageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
 		{
 			if (concurrentTasks < 1) throw new ArgumentException("Number of concurrent tasks must be greather than zero", nameof(concurrentTasks));
 			if (maxDequeueCount < 1) throw new ArgumentException("Number of retries must be greather than zero", nameof(maxDequeueCount));

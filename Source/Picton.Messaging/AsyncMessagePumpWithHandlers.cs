@@ -1,7 +1,6 @@
 ﻿using App.Metrics;
 using Microsoft.Extensions.DependencyModel;
 using Microsoft.WindowsAzure.Storage;
-using Picton.Interfaces;
 using Picton.Messaging.Logging;
 using Picton.Messaging.Messages;
 using System;
@@ -67,26 +66,12 @@ namespace Picton.Messaging
 		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
 		/// </summary>
 		/// <param name="queueName">Name of the queue.</param>
-		/// <param name="cloudStorageAccount">The cloud storage account.</param>
+		/// <param name="storageAccount">The cloud storage account.</param>
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		/// <param name="metrics"></param>
-		public AsyncMessagePumpWithHandlers(string queueName, CloudStorageAccount cloudStorageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
-			: this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), concurrentTasks, visibilityTimeout, maxDequeueCount, metrics)
-		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
-		/// </summary>
-		/// <param name="queueName">Name of the queue.</param>
-		/// <param name="storageAccount">The storage account</param>
-		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
-		/// <param name="visibilityTimeout">The queue visibility timeout</param>
-		/// <param name="maxDequeueCount">The number of times to try processing a given message before giving up</param>
-		/// <param name="metrics"></param>
-		public AsyncMessagePumpWithHandlers(string queueName, IStorageAccount storageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
+		/// <param name="metrics">The system where metrics are published</param>
+		public AsyncMessagePumpWithHandlers(string queueName, CloudStorageAccount storageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
 		{
 			_messagePump = new AsyncMessagePump(queueName, storageAccount, concurrentTasks, visibilityTimeout, maxDequeueCount, metrics)
 			{

@@ -3,11 +3,11 @@ using Microsoft.WindowsAzure.Storage.Auth;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Moq;
-using Picton.Interfaces;
 using Shouldly;
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -24,7 +24,7 @@ namespace Picton.Messaging.UnitTests
 		{
 			Should.Throw<ArgumentNullException>(() =>
 			{
-				var messagePump = new AsyncMessagePump("myqueue", (IStorageAccount)null, 1, TimeSpan.FromMinutes(1), 3);
+				var messagePump = new AsyncMessagePump("myqueue", (CloudStorageAccount)null, 1, TimeSpan.FromMinutes(1), 3);
 			});
 		}
 
@@ -33,7 +33,7 @@ namespace Picton.Messaging.UnitTests
 		{
 			Should.Throw<ArgumentException>(() =>
 			{
-				var mockStorageAccount = new Mock<IStorageAccount>(MockBehavior.Strict);
+				var mockStorageAccount = GetMockStorageAccount(null, null);
 				var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 0, TimeSpan.FromMinutes(1), 3);
 			});
 		}
@@ -43,7 +43,7 @@ namespace Picton.Messaging.UnitTests
 		{
 			Should.Throw<ArgumentException>(() =>
 			{
-				var mockStorageAccount = new Mock<IStorageAccount>(MockBehavior.Strict);
+				var mockStorageAccount = GetMockStorageAccount(null, null);
 				var messagePump = new AsyncMessagePump("myqueue", mockStorageAccount.Object, 1, TimeSpan.FromMinutes(1), 0);
 			});
 		}
@@ -389,8 +389,8 @@ namespace Picton.Messaging.UnitTests
 		private static Mock<CloudQueueClient> GetMockQueueClient(Mock<CloudQueue> mockQueue)
 		{
 			var mockQueueStorageUri = new Uri(QUEUE_STORAGE_URL);
-			var mockCredentials = new StorageCredentials("mySasToken");
-			var mockQueueClient = new Mock<CloudQueueClient>(MockBehavior.Strict, mockQueueStorageUri, mockCredentials);
+			var storageCredentials = GetStorageCredentials();
+			var mockQueueClient = new Mock<CloudQueueClient>(MockBehavior.Strict, mockQueueStorageUri, storageCredentials);
 			mockQueueClient
 				.Setup(c => c.GetQueueReference(mockQueue.Object.Name))
 				.Returns(mockQueue.Object)
@@ -398,18 +398,36 @@ namespace Picton.Messaging.UnitTests
 			return mockQueueClient;
 		}
 
-		private static Mock<IStorageAccount> GetMockStorageAccount(Mock<CloudBlobClient> mockBlobClient, Mock<CloudQueueClient> mockQueueClient)
+		private static Mock<CloudStorageAccount> GetMockStorageAccount(Mock<CloudBlobClient> mockBlobClient, Mock<CloudQueueClient> mockQueueClient)
 		{
-			var storageAccount = new Mock<IStorageAccount>(MockBehavior.Strict);
-			storageAccount
-				.Setup(s => s.CreateCloudBlobClient())
-				.Returns(mockBlobClient.Object)
-				.Verifiable();
-			storageAccount
-				.Setup(s => s.CreateCloudQueueClient())
-				.Returns(mockQueueClient.Object)
-				.Verifiable();
+			var storageCredentials = GetStorageCredentials();
+			var storageAccount = new Mock<CloudStorageAccount>(MockBehavior.Strict, storageCredentials, true);
+
+			if (mockBlobClient != null)
+			{
+				storageAccount
+					.Setup(s => s.CreateCloudBlobClient())
+					.Returns(mockBlobClient.Object)
+					.Verifiable();
+			}
+
+			if (mockQueueClient != null)
+			{
+				storageAccount
+					.Setup(s => s.CreateCloudQueueClient())
+					.Returns(mockQueueClient.Object)
+					.Verifiable();
+			}
+
 			return storageAccount;
 		}
+
+		private static StorageCredentials GetStorageCredentials()
+		{
+			var accountAccessKey = Convert.ToBase64String(Encoding.UTF8.GetBytes("this_is_a_bogus_account_access_key"));
+			var storageCredentials = new StorageCredentials("account_name", accountAccessKey);
+			return storageCredentials;
+		}
+
 	}
 }
