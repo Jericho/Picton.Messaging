@@ -19,16 +19,16 @@ namespace Picton.Messaging.Utils
 		/// <param name="pollInterval">The poll interval.</param>
 		/// <param name="token">The token.</param>
 		/// <param name="taskCreationOptions">The task creation options</param>
-		public static void StartNew(Action action, TimeSpan pollInterval, CancellationToken token, TaskCreationOptions taskCreationOptions = TaskCreationOptions.None)
+		public static void StartNew(Func<Task> action, TimeSpan pollInterval, CancellationToken token, TaskCreationOptions taskCreationOptions = TaskCreationOptions.None)
 		{
 			Task.Factory.StartNew(
-				() =>
+				async () =>
 				{
 					do
 					{
 						try
 						{
-							action();
+							await action().ConfigureAwait(false);
 							if (token.WaitHandle.WaitOne(pollInterval)) break;
 						}
 						catch

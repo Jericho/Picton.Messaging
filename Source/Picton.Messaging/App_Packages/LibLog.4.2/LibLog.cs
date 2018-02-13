@@ -9,7 +9,7 @@
 //
 // https://github.com/damianh/LibLog
 //===============================================================================
-// Copyright © 2011-2015 Damian Hickey.  All rights reserved.
+// Copyright © 2011-2017 Damian Hickey.  All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -127,6 +127,9 @@ namespace Picton.Messaging.Logging
 	}
 
 #if !LIBLOG_PROVIDERS_ONLY
+#if !LIBLOG_PORTABLE
+	[ExcludeFromCodeCoverage]
+#endif
 #if LIBLOG_PUBLIC
 	public
 #else
@@ -173,7 +176,7 @@ namespace Picton.Messaging.Logging
 		public static void Debug(this ILog logger, Func<string> messageFunc)
 		{
 			GuardAgainstNullLogger(logger);
-			logger.Log(LogLevel.Debug, messageFunc);
+			logger.Log(LogLevel.Debug, WrapLogInternal(messageFunc));
 		}
 
 		public static void Debug(this ILog logger, string message)
@@ -221,7 +224,7 @@ namespace Picton.Messaging.Logging
 		public static void Error(this ILog logger, Func<string> messageFunc)
 		{
 			GuardAgainstNullLogger(logger);
-			logger.Log(LogLevel.Error, messageFunc);
+			logger.Log(LogLevel.Error, WrapLogInternal(messageFunc));
 		}
 
 		public static void Error(this ILog logger, string message)
@@ -260,7 +263,7 @@ namespace Picton.Messaging.Logging
 
 		public static void Fatal(this ILog logger, Func<string> messageFunc)
 		{
-			logger.Log(LogLevel.Fatal, messageFunc);
+			logger.Log(LogLevel.Fatal, WrapLogInternal(messageFunc));
 		}
 
 		public static void Fatal(this ILog logger, string message)
@@ -300,7 +303,7 @@ namespace Picton.Messaging.Logging
 		public static void Info(this ILog logger, Func<string> messageFunc)
 		{
 			GuardAgainstNullLogger(logger);
-			logger.Log(LogLevel.Info, messageFunc);
+			logger.Log(LogLevel.Info, WrapLogInternal(messageFunc));
 		}
 
 		public static void Info(this ILog logger, string message)
@@ -340,7 +343,7 @@ namespace Picton.Messaging.Logging
 		public static void Trace(this ILog logger, Func<string> messageFunc)
 		{
 			GuardAgainstNullLogger(logger);
-			logger.Log(LogLevel.Trace, messageFunc);
+			logger.Log(LogLevel.Trace, WrapLogInternal(messageFunc));
 		}
 
 		public static void Trace(this ILog logger, string message)
@@ -380,7 +383,7 @@ namespace Picton.Messaging.Logging
 		public static void Warn(this ILog logger, Func<string> messageFunc)
 		{
 			GuardAgainstNullLogger(logger);
-			logger.Log(LogLevel.Warn, messageFunc);
+			logger.Log(LogLevel.Warn, WrapLogInternal(messageFunc));
 		}
 
 		public static void Warn(this ILog logger, string message)
@@ -422,7 +425,7 @@ namespace Picton.Messaging.Logging
 		{
 			if (logger == null)
 			{
-				throw new ArgumentNullException(nameof(logger));
+				throw new ArgumentNullException("logger");
 			}
 		}
 
@@ -440,6 +443,34 @@ namespace Picton.Messaging.Logging
 		private static T Return<T>(this T value)
 		{
 			return value;
+		}
+
+		// Allow passing callsite-logger-type to LogProviderBase using messageFunc
+		internal static Func<string> WrapLogSafeInternal(LoggerExecutionWrapper logger, Func<string> messageFunc)
+		{
+			Func<string> wrappedMessageFunc = () =>
+			{
+				try
+				{
+					return messageFunc();
+				}
+				catch (Exception ex)
+				{
+					logger.WrappedLogger(LogLevel.Error, () => LoggerExecutionWrapper.FailedToGenerateLogMessage, ex);
+				}
+				return null;
+			};
+			return wrappedMessageFunc;
+		}
+
+		// Allow passing callsite-logger-type to LogProviderBase using messageFunc
+		private static Func<string> WrapLogInternal(Func<string> messageFunc)
+		{
+			Func<string> wrappedMessageFunc = () =>
+			{
+				return messageFunc();
+			};
+			return wrappedMessageFunc;
 		}
 	}
 #endif
@@ -474,12 +505,15 @@ namespace Picton.Messaging.Logging
 		/// <param name="key">A key.</param>
 		/// <param name="value">A value.</param>
 		/// <returns>A disposable that when disposed removes the map from the context.</returns>
-		IDisposable OpenMappedContext(string key, string value);
+		IDisposable OpenMappedContext(string key, object value, bool destructure = false);
 	}
 
 	/// <summary>
 	/// Provides a mechanism to create instances of <see cref="ILog" /> objects.
 	/// </summary>
+#if !LIBLOG_PORTABLE
+	[ExcludeFromCodeCoverage]
+#endif
 #if LIBLOG_PROVIDERS_ONLY
 	internal
 #else
@@ -492,6 +526,7 @@ namespace Picton.Messaging.Logging
 											   "with a non-null value first.";
 		private static dynamic s_currentLogProvider;
 		private static Action<ILogProvider> s_onCurrentLogProviderSet;
+		private static Lazy<ILogProvider> s_resolvedLogProvider = new Lazy<ILogProvider>(() => ForceResolveLogProvider());
 
 		[SuppressMessage("Microsoft.Performance", "CA1810:InitializeReferenceTypeStaticFieldsInline")]
 		static LogProvider()
@@ -641,13 +676,13 @@ namespace Picton.Messaging.Logging
 #else
 		internal
 #endif
-		static IDisposable OpenMappedContext(string key, string value)
+		static IDisposable OpenMappedContext(string key, object value, bool destructure = false)
 		{
 			ILogProvider logProvider = CurrentLogProvider ?? ResolveLogProvider();
 
 			return logProvider == null
 				? new DisposableAction(() => { })
-				: logProvider.OpenMappedContext(key, value);
+				: logProvider.OpenMappedContext(key, value, destructure);
 		}
 #endif
 
@@ -677,7 +712,7 @@ namespace Picton.Messaging.Logging
 			new Tuple<IsLoggerAvailable, CreateLogProvider>(NLogLogProvider.IsLoggerAvailable, () => new NLogLogProvider()),
 			new Tuple<IsLoggerAvailable, CreateLogProvider>(Log4NetLogProvider.IsLoggerAvailable, () => new Log4NetLogProvider()),
 			new Tuple<IsLoggerAvailable, CreateLogProvider>(EntLibLogProvider.IsLoggerAvailable, () => new EntLibLogProvider()),
-			new Tuple<IsLoggerAvailable, CreateLogProvider>(LoupeLogProvider.IsLoggerAvailable, () => new LoupeLogProvider())
+			new Tuple<IsLoggerAvailable, CreateLogProvider>(LoupeLogProvider.IsLoggerAvailable, () => new LoupeLogProvider()),
 			};
 
 #if !LIBLOG_PROVIDERS_ONLY
@@ -690,9 +725,14 @@ namespace Picton.Messaging.Logging
 		}
 #endif
 
+		internal static ILogProvider ResolveLogProvider()
+		{
+			return s_resolvedLogProvider.Value;
+		}
+
 		[SuppressMessage("Microsoft.Globalization", "CA1303:Do not pass literals as localized parameters", MessageId = "System.Console.WriteLine(System.String,System.Object,System.Object)")]
 		[SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-		internal static ILogProvider ResolveLogProvider()
+		internal static ILogProvider ForceResolveLogProvider()
 		{
 			try
 			{
@@ -719,6 +759,9 @@ namespace Picton.Messaging.Logging
 		}
 
 #if !LIBLOG_PROVIDERS_ONLY
+#if !LIBLOG_PORTABLE
+		[ExcludeFromCodeCoverage]
+#endif
 		internal class NoOpLogger : ILog
 		{
 			internal static readonly NoOpLogger Instance = new NoOpLogger();
@@ -732,15 +775,22 @@ namespace Picton.Messaging.Logging
 	}
 
 #if !LIBLOG_PROVIDERS_ONLY
+#if !LIBLOG_PORTABLE
+	[ExcludeFromCodeCoverage]
+#endif
 	internal class LoggerExecutionWrapper : ILog
 	{
 		private readonly Logger _logger;
+		private readonly ICallSiteExtension _callsiteLogger;
 		private readonly Func<bool> _getIsDisabled;
 		internal const string FailedToGenerateLogMessage = "Failed to generate log message";
+
+		Func<string> _lastExtensionMethod;
 
 		internal LoggerExecutionWrapper(Logger logger, Func<bool> getIsDisabled = null)
 		{
 			_logger = logger;
+			_callsiteLogger = new CallSiteExtension();
 			_getIsDisabled = getIsDisabled ?? (() => false);
 		}
 
@@ -761,19 +811,58 @@ namespace Picton.Messaging.Logging
 				return _logger(logLevel, null);
 			}
 
-			Func<string> wrappedMessageFunc = () =>
+#if !LIBLOG_PORTABLE
+			// Callsite HACK - Using the messageFunc to provide the callsite-logger-type
+			var lastExtensionMethod = _lastExtensionMethod;
+			if (lastExtensionMethod == null || !lastExtensionMethod.Equals(messageFunc))
 			{
-				try
+				// Callsite HACK - Cache the last validated messageFunc as Equals is faster than type-check
+				lastExtensionMethod = null;
+				var methodType = messageFunc.Method.DeclaringType;
+				if (methodType == typeof(LogExtensions) || (methodType != null && methodType.DeclaringType == typeof(LogExtensions)))
 				{
-					return messageFunc();
+					lastExtensionMethod = messageFunc;
 				}
-				catch (Exception ex)
+			}
+
+			if (lastExtensionMethod != null)
+			{
+				// Callsite HACK - LogExtensions has called virtual ILog interface method to get here, callsite-stack is good
+				_lastExtensionMethod = lastExtensionMethod;
+				return _logger(logLevel, LogExtensions.WrapLogSafeInternal(this, messageFunc), exception, formatParameters);
+			}
+			else
+#endif
+			{
+				Func<string> wrappedMessageFunc = () =>
 				{
-					Log(LogLevel.Error, () => FailedToGenerateLogMessage, ex);
-				}
-				return null;
-			};
-			return _logger(logLevel, wrappedMessageFunc, exception, formatParameters);
+					try
+					{
+						return messageFunc();
+					}
+					catch (Exception ex)
+					{
+						_logger(LogLevel.Error, () => FailedToGenerateLogMessage, ex);
+					}
+					return null;
+				};
+
+				// Callsite HACK - Need to ensure proper callsite stack without inlining, so calling the logger within a virtual interface method
+				return _callsiteLogger.Log(_logger, logLevel, wrappedMessageFunc, exception, formatParameters);
+			}
+		}
+
+		interface ICallSiteExtension
+		{
+			bool Log(Logger logger, LogLevel logLevel, Func<string> messageFunc, Exception exception, object[] formatParameters);
+		}
+
+		class CallSiteExtension : ICallSiteExtension
+		{
+			bool ICallSiteExtension.Log(Logger logger, LogLevel logLevel, Func<string> messageFunc, Exception exception, object[] formatParameters)
+			{
+				return logger(logLevel, messageFunc, exception, formatParameters);
+			}
 		}
 	}
 #endif
@@ -800,10 +889,13 @@ namespace Picton.Messaging.Logging.LogProviders
 #endif
 	using System.Text.RegularExpressions;
 
+#if !LIBLOG_PORTABLE
+	[ExcludeFromCodeCoverage]
+#endif
 	internal abstract class LogProviderBase : ILogProvider
 	{
 		protected delegate IDisposable OpenNdc(string message);
-		protected delegate IDisposable OpenMdc(string key, string value);
+		protected delegate IDisposable OpenMdc(string key, object value, bool destructure);
 
 		private readonly Lazy<OpenNdc> _lazyOpenNdcMethod;
 		private readonly Lazy<OpenMdc> _lazyOpenMdcMethod;
@@ -824,9 +916,9 @@ namespace Picton.Messaging.Logging.LogProviders
 			return _lazyOpenNdcMethod.Value(message);
 		}
 
-		public IDisposable OpenMappedContext(string key, string value)
+		public IDisposable OpenMappedContext(string key, object value, bool destructure = false)
 		{
-			return _lazyOpenMdcMethod.Value(key, value);
+			return _lazyOpenMdcMethod.Value(key, value, destructure);
 		}
 
 		protected virtual OpenNdc GetOpenNdcMethod()
@@ -836,10 +928,13 @@ namespace Picton.Messaging.Logging.LogProviders
 
 		protected virtual OpenMdc GetOpenMdcMethod()
 		{
-			return (_, __) => NoopDisposableInstance;
+			return (_, __, ___) => NoopDisposableInstance;
 		}
 	}
 
+#if !LIBLOG_PORTABLE
+	[ExcludeFromCodeCoverage]
+#endif
 	internal class NLogLogProvider : LogProviderBase
 	{
 		private readonly Func<string, object> _getLoggerByNameDelegate;
@@ -900,9 +995,9 @@ namespace Picton.Messaging.Logging.LogProviders
 				.Lambda<Action<string>>(removeMethodCall, keyParam)
 				.Compile();
 
-			return (key, value) =>
+			return (key, value, _) =>
 			{
-				set(key, value);
+				set(key, value.ToString());
 				return new DisposableAction(() => remove(key));
 			};
 		}
@@ -921,6 +1016,9 @@ namespace Picton.Messaging.Logging.LogProviders
 			return Expression.Lambda<Func<string, object>>(methodCall, nameParam).Compile();
 		}
 
+#if !LIBLOG_PORTABLE
+		[ExcludeFromCodeCoverage]
+#endif
 		internal class NLogLogger
 		{
 			private readonly dynamic _logger;
@@ -957,18 +1055,27 @@ namespace Picton.Messaging.Logging.LogProviders
 					{
 						throw new InvalidOperationException("Type NLog.LogEventInfo was not found.");
 					}
-					MethodInfo createLogEventInfoMethodInfo = logEventInfoType.GetMethodPortable("Create",
-						logEventLevelType, typeof(string), typeof(Exception), typeof(IFormatProvider), typeof(string), typeof(object[]));
+
+					ConstructorInfo loggingEventConstructor =
+						logEventInfoType.GetConstructorPortable(logEventLevelType, typeof(string), typeof(IFormatProvider), typeof(string), typeof(object[]), typeof(Exception));
+
 					ParameterExpression loggerNameParam = Expression.Parameter(typeof(string));
 					ParameterExpression levelParam = Expression.Parameter(typeof(object));
 					ParameterExpression messageParam = Expression.Parameter(typeof(string));
 					ParameterExpression exceptionParam = Expression.Parameter(typeof(Exception));
 					UnaryExpression levelCast = Expression.Convert(levelParam, logEventLevelType);
-					MethodCallExpression createLogEventInfoMethodCall = Expression.Call(null,
-						createLogEventInfoMethodInfo,
-						levelCast, loggerNameParam, exceptionParam,
-						Expression.Constant(null, typeof(IFormatProvider)), messageParam, Expression.Constant(null, typeof(object[])));
-					_logEventInfoFact = Expression.Lambda<Func<string, object, string, Exception, object>>(createLogEventInfoMethodCall,
+
+					NewExpression newLoggingEventExpression =
+						Expression.New(loggingEventConstructor,
+									   levelCast,
+										loggerNameParam,
+										Expression.Constant(null, typeof(IFormatProvider)),
+										messageParam,
+										Expression.Constant(null, typeof(object[])),
+										exceptionParam
+										);
+
+					_logEventInfoFact = Expression.Lambda<Func<string, object, string, Exception, object>>(newLoggingEventExpression,
 						loggerNameParam, levelParam, messageParam, exceptionParam).Compile();
 				}
 				catch { }
@@ -986,40 +1093,30 @@ namespace Picton.Messaging.Logging.LogProviders
 				{
 					return IsLogLevelEnable(logLevel);
 				}
+
+				var callsiteMessageFunc = messageFunc;
 				messageFunc = LogMessageFormatter.SimulateStructuredLogging(messageFunc, formatParameters);
 
 				if (_logEventInfoFact != null)
 				{
 					if (IsLogLevelEnable(logLevel))
 					{
-						var nlogLevel = this.TranslateLevel(logLevel);
-						Type s_callerStackBoundaryType;
+						Type callsiteLoggerType = typeof(NLogLogger);
 #if !LIBLOG_PORTABLE
-						StackTrace stack = new StackTrace();
-						Type thisType = GetType();
-						Type knownType0 = typeof(LoggerExecutionWrapper);
-						Type knownType1 = typeof(LogExtensions);
-						//Maybe inline, so we may can't found any LibLog classes in stack
-						s_callerStackBoundaryType = null;
-						for (var i = 0; i < stack.FrameCount; i++)
+						// Callsite HACK - Extract the callsite-logger-type from the messageFunc
+						var methodType = callsiteMessageFunc.Method.DeclaringType;
+						if (methodType == typeof(LogExtensions) || (methodType != null && methodType.DeclaringType == typeof(LogExtensions)))
 						{
-							var declaringType = stack.GetFrame(i).GetMethod().DeclaringType;
-							if (!IsInTypeHierarchy(thisType, declaringType) &&
-								!IsInTypeHierarchy(knownType0, declaringType) &&
-								!IsInTypeHierarchy(knownType1, declaringType))
-							{
-								if (i > 1)
-									s_callerStackBoundaryType = stack.GetFrame(i - 1).GetMethod().DeclaringType;
-								break;
-							}
+							callsiteLoggerType = typeof(LogExtensions);
 						}
-#else
-						s_callerStackBoundaryType = null;
+						else if (methodType == typeof(LoggerExecutionWrapper) || (methodType != null && methodType.DeclaringType == typeof(LoggerExecutionWrapper)))
+						{
+							callsiteLoggerType = typeof(LoggerExecutionWrapper);
+						}
 #endif
-						if (s_callerStackBoundaryType != null)
-							_logger.Log(s_callerStackBoundaryType, _logEventInfoFact(_logger.Name, nlogLevel, messageFunc(), exception));
-						else
-							_logger.Log(_logEventInfoFact(_logger.Name, nlogLevel, messageFunc(), exception));
+						var nlogLevel = this.TranslateLevel(logLevel);
+						var nlogEvent = _logEventInfoFact(_logger.Name, nlogLevel, messageFunc(), exception);
+						_logger.Log(callsiteLoggerType, nlogEvent);
 						return true;
 					}
 					return false;
@@ -1029,6 +1126,7 @@ namespace Picton.Messaging.Logging.LogProviders
 				{
 					return LogException(logLevel, messageFunc, exception);
 				}
+
 				switch (logLevel)
 				{
 					case LogLevel.Debug:
@@ -1073,19 +1171,6 @@ namespace Picton.Messaging.Logging.LogProviders
 							return true;
 						}
 						break;
-				}
-				return false;
-			}
-
-			private static bool IsInTypeHierarchy(Type currentType, Type checkType)
-			{
-				while (currentType != null && currentType != typeof(object))
-				{
-					if (currentType == checkType)
-					{
-						return true;
-					}
-					currentType = currentType.GetBaseTypePortable();
 				}
 				return false;
 			}
@@ -1177,12 +1262,15 @@ namespace Picton.Messaging.Logging.LogProviders
 					case LogLevel.Fatal:
 						return _levelFatal;
 					default:
-						throw new ArgumentOutOfRangeException(nameof(logLevel), logLevel, null);
+						throw new ArgumentOutOfRangeException("logLevel", logLevel, null);
 				}
 			}
 		}
 	}
 
+#if !LIBLOG_PORTABLE
+	[ExcludeFromCodeCoverage]
+#endif
 	internal class Log4NetLogProvider : LogProviderBase
 	{
 		private readonly Func<string, object> _getLoggerByNameDelegate;
@@ -1270,9 +1358,9 @@ namespace Picton.Messaging.Logging.LogProviders
 				.Lambda<Action<string>>(removeMethodCall, keyParam)
 				.Compile();
 
-			return (key, value) =>
+			return (key, value, _) =>
 			{
-				set(key, value);
+				set(key, value.ToString());
 				return new DisposableAction(() => remove(key));
 			};
 		}
@@ -1291,27 +1379,27 @@ namespace Picton.Messaging.Logging.LogProviders
 			return Expression.Lambda<Func<string, object>>(methodCall, nameParam).Compile();
 		}
 
+#if !LIBLOG_PORTABLE
+		[ExcludeFromCodeCoverage]
+#endif
 		internal class Log4NetLogger
 		{
 			private readonly dynamic _logger;
 			private static Type s_callerStackBoundaryType;
 			private static readonly object CallerStackBoundaryTypeSync = new object();
 
-			private readonly object _levelDebug;
-			private readonly object _levelInfo;
-			private readonly object _levelWarn;
-			private readonly object _levelError;
-			private readonly object _levelFatal;
-			private readonly Func<object, object, bool> _isEnabledForDelegate;
-			private readonly Action<object, object> _logDelegate;
-			private readonly Func<object, Type, object, string, Exception, object> _createLoggingEvent;
-			private Action<object, string, object> _loggingEventPropertySetter;
+			private static readonly object _levelDebug;
+			private static readonly object _levelInfo;
+			private static readonly object _levelWarn;
+			private static readonly object _levelError;
+			private static readonly object _levelFatal;
+			private static readonly Func<object, object, bool> _isEnabledForDelegate;
+			private static readonly Action<object, object> _logDelegate;
+			private static readonly Func<object, Type, object, string, Exception, object> _createLoggingEvent;
+			private static readonly Action<object, string, object> _loggingEventPropertySetter;
 
-			[SuppressMessage("Microsoft.Naming", "CA2204:Literals should be spelled correctly", MessageId = "ILogger")]
-			internal Log4NetLogger(dynamic logger)
+			static Log4NetLogger()
 			{
-				_logger = logger.Logger;
-
 				var logEventLevelType = Type.GetType("log4net.Core.Level, log4net");
 				if (logEventLevelType == null)
 				{
@@ -1344,6 +1432,12 @@ namespace Picton.Messaging.Logging.LogProviders
 				_logDelegate = GetLogDelegate(loggerType, loggingEventType, instanceCast, instanceParam);
 
 				_loggingEventPropertySetter = GetLoggingEventPropertySetter(loggingEventType);
+			}
+
+			[SuppressMessage("Microsoft.Naming", "CA2204:Literals should be spelled correctly", MessageId = "ILogger")]
+			internal Log4NetLogger(dynamic logger)
+			{
+				_logger = logger.Logger;
 			}
 
 			private static Action<object, object> GetLogDelegate(Type loggerType, Type loggingEventType, UnaryExpression instanceCast,
@@ -1552,12 +1646,15 @@ namespace Picton.Messaging.Logging.LogProviders
 					case LogLevel.Fatal:
 						return _levelFatal;
 					default:
-						throw new ArgumentOutOfRangeException(nameof(logLevel), logLevel, null);
+						throw new ArgumentOutOfRangeException("logLevel", logLevel, null);
 				}
 			}
 		}
 	}
 
+#if !LIBLOG_PORTABLE
+	[ExcludeFromCodeCoverage]
+#endif
 	internal class EntLibLogProvider : LogProviderBase
 	{
 		private const string TypeTemplate = "Microsoft.Practices.EnterpriseLibrary.Logging.{0}, Microsoft.Practices.EnterpriseLibrary.Logging";
@@ -1674,6 +1771,9 @@ namespace Picton.Messaging.Logging.LogProviders
 			return memberInit;
 		}
 
+#if !LIBLOG_PORTABLE
+		[ExcludeFromCodeCoverage]
+#endif
 		internal class EntLibLogger
 		{
 			private readonly string _loggerName;
@@ -1732,10 +1832,14 @@ namespace Picton.Messaging.Logging.LogProviders
 		}
 	}
 
+#if !LIBLOG_PORTABLE
+	[ExcludeFromCodeCoverage]
+#endif
 	internal class SerilogLogProvider : LogProviderBase
 	{
 		private readonly Func<string, object> _getLoggerByNameDelegate;
 		private static bool s_providerIsAvailableOverride = true;
+		private static Func<string, object, bool, IDisposable> _pushProperty;
 
 		[SuppressMessage("Microsoft.Naming", "CA2204:Literals should be spelled correctly", MessageId = "Serilog")]
 		public SerilogLogProvider()
@@ -1745,6 +1849,7 @@ namespace Picton.Messaging.Logging.LogProviders
 				throw new InvalidOperationException("Serilog.Log not found");
 			}
 			_getLoggerByNameDelegate = GetForContextMethodCall();
+			_pushProperty = GetPushProperty();
 		}
 
 		public static bool ProviderIsAvailableOverride
@@ -1765,15 +1870,15 @@ namespace Picton.Messaging.Logging.LogProviders
 
 		protected override OpenNdc GetOpenNdcMethod()
 		{
-			return message => GetPushProperty()("NDC", message);
+			return message => _pushProperty("NDC", message, false);
 		}
 
 		protected override OpenMdc GetOpenMdcMethod()
 		{
-			return (key, value) => GetPushProperty()(key, value);
+			return (key, value, destructure) => _pushProperty(key, value, destructure);
 		}
 
-		private static Func<string, string, IDisposable> GetPushProperty()
+		private static Func<string, object, bool, IDisposable> GetPushProperty()
 		{
 			Type ndcContextType = Type.GetType("Serilog.Context.LogContext, Serilog") ??
 								  Type.GetType("Serilog.Context.LogContext, Serilog.FullNetFx");
@@ -1797,7 +1902,7 @@ namespace Picton.Messaging.Logging.LogProviders
 					destructureObjectParam)
 				.Compile();
 
-			return (key, value) => pushProperty(key, value, false);
+			return (key, value, destructure) => pushProperty(key, value, destructure);
 		}
 
 		private static Type GetLogManagerType()
@@ -1827,6 +1932,9 @@ namespace Picton.Messaging.Logging.LogProviders
 			return name => func("SourceContext", name, false);
 		}
 
+#if !LIBLOG_PORTABLE
+		[ExcludeFromCodeCoverage]
+#endif
 		internal class SerilogLogger
 		{
 			private readonly object _logger;
@@ -1977,6 +2085,9 @@ namespace Picton.Messaging.Logging.LogProviders
 		}
 	}
 
+#if !LIBLOG_PORTABLE
+	[ExcludeFromCodeCoverage]
+#endif
 	internal class LoupeLogProvider : LogProviderBase
 	{
 		/// <summary>
@@ -2051,6 +2162,9 @@ namespace Picton.Messaging.Logging.LogProviders
 			return callDelegate;
 		}
 
+#if !LIBLOG_PORTABLE
+		[ExcludeFromCodeCoverage]
+#endif
 		internal class LoupeLogger
 		{
 			private const string LogSystem = "LibLog";
@@ -2103,12 +2217,15 @@ namespace Picton.Messaging.Logging.LogProviders
 					case LogLevel.Fatal:
 						return TraceEventTypeValues.Critical;
 					default:
-						throw new ArgumentOutOfRangeException(nameof(logLevel));
+						throw new ArgumentOutOfRangeException("logLevel");
 				}
 			}
 		}
 	}
 
+#if !LIBLOG_PORTABLE
+	[ExcludeFromCodeCoverage]
+#endif
 	internal static class TraceEventTypeValues
 	{
 		internal static readonly Type Type;
@@ -2136,6 +2253,9 @@ namespace Picton.Messaging.Logging.LogProviders
 		}
 	}
 
+#if !LIBLOG_PORTABLE
+	[ExcludeFromCodeCoverage]
+#endif
 	internal static class LogMessageFormatter
 	{
 		//private static readonly Regex Pattern = new Regex(@"\{@?\w{1,}\}");
@@ -2220,6 +2340,9 @@ namespace Picton.Messaging.Logging.LogProviders
 		}
 	}
 
+#if !LIBLOG_PORTABLE
+	[ExcludeFromCodeCoverage]
+#endif
 	internal static class TypeExtensions
 	{
 		internal static ConstructorInfo GetConstructorPortable(this Type type, params Type[] types)
@@ -2309,6 +2432,9 @@ namespace Picton.Messaging.Logging.LogProviders
 		}
 	}
 
+#if !LIBLOG_PORTABLE
+	[ExcludeFromCodeCoverage]
+#endif
 	internal class DisposableAction : IDisposable
 	{
 		private readonly Action _onDispose;

@@ -1,24 +1,19 @@
-﻿using Microsoft.Extensions.DependencyModel;
+﻿using App.Metrics;
+using Microsoft.Extensions.DependencyModel;
 using Microsoft.WindowsAzure.Storage;
-using Picton.Interfaces;
 using Picton.Messaging.Logging;
 using Picton.Messaging.Messages;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
-#if NETSTANDARD
-using System.Runtime.Loader;
-#endif
 using System.Threading;
 
 namespace Picton.Messaging
 {
 	/// <summary>
-	/// High performance message processor (also known as a message "pump") for Azure storage queues. Designed to monitor an Azure storage queue and process the message as quickly and efficiently as possible.
-	/// When messages are present in the queue, this message pump will increase the number of tasks that can concurrently process messages.
-	/// Conversly, this message pump will reduce the number of tasks that can concurrently process messages when the queue is empty.
+	/// High performance message processor (also known as a message "pump") for Azure storage queues.
+	/// Designed to monitor an Azure storage queue and process the message as quickly and efficiently as possible.
 	/// </summary>
 	public class AsyncMessagePumpWithHandlers
 	{
@@ -71,26 +66,14 @@ namespace Picton.Messaging
 		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
 		/// </summary>
 		/// <param name="queueName">Name of the queue.</param>
-		/// <param name="cloudStorageAccount">The cloud storage account.</param>
+		/// <param name="storageAccount">The cloud storage account.</param>
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		public AsyncMessagePumpWithHandlers(string queueName, CloudStorageAccount cloudStorageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
-			: this(queueName, StorageAccount.FromCloudStorageAccount(cloudStorageAccount), concurrentTasks, visibilityTimeout, maxDequeueCount)
+		/// <param name="metrics">The system where metrics are published</param>
+		public AsyncMessagePumpWithHandlers(string queueName, CloudStorageAccount storageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
 		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
-		/// </summary>
-		/// <param name="queueName">Name of the queue.</param>
-		/// <param name="storageAccount">The storage account</param>
-		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
-		/// <param name="visibilityTimeout">The queue visibility timeout</param>
-		/// <param name="maxDequeueCount">The number of times to try processing a given message before giving up</param>
-		public AsyncMessagePumpWithHandlers(string queueName, IStorageAccount storageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
-		{
-			_messagePump = new AsyncMessagePump(queueName, storageAccount, concurrentTasks, visibilityTimeout, maxDequeueCount)
+			_messagePump = new AsyncMessagePump(queueName, storageAccount, concurrentTasks, visibilityTimeout, maxDequeueCount, metrics)
 			{
 				OnMessage = (message, cancellationToken) =>
 				{
@@ -139,37 +122,20 @@ namespace Picton.Messaging
 		{
 			var assemblies = GetLocalAssemblies();
 
-#if NETFULL
 			var typesWithMessageHandlerInterfaces = assemblies
 				.SelectMany(x => x.GetTypes())
-				.Where(t => !t.IsInterface)
+				.Where(t => !GetTypeInfo(t).IsInterface)
 				.Select(type => new
 				{
 					Type = type,
 					MessageTypes = type
 						.GetInterfaces()
-							.Where(i => i.IsGenericType)
-							.Where(t => t.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
+							.Where(i => GetTypeInfo(i).IsGenericType)
+							.Where(i => i.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
 							.SelectMany(i => i.GetGenericArguments())
 				})
 				.Where(t => t.MessageTypes != null && t.MessageTypes.Any())
 				.ToArray();
-#else
-			var typesWithMessageHandlerInterfaces = assemblies
-				.SelectMany(x => x.GetTypes())
-				.Where(t => !t.GetTypeInfo().IsInterface)
-				.Select(type => new
-				{
-					Type = type,
-					MessageTypes = type
-						.GetInterfaces()
-							.Where(i => i.GetTypeInfo().IsGenericType)
-							.Where(t => t.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
-							.SelectMany(i => i.GetGenericArguments())
-				})
-				.Where(t => t.MessageTypes != null && t.MessageTypes.Any())
-				.ToArray();
-#endif
 
 			var oneTypePerMessageHandler = typesWithMessageHandlerInterfaces
 				.SelectMany(t => t.MessageTypes, (t, messageType) =>
@@ -186,15 +152,25 @@ namespace Picton.Messaging
 		}
 
 #if NETFULL
+		private static Type GetTypeInfo(Type type)
+		{
+			return type;
+		}
+
 		private static IEnumerable<Assembly> GetLocalAssemblies()
 		{
 			var callingAssembly = Assembly.GetCallingAssembly();
-			var path = new Uri(Path.GetDirectoryName(callingAssembly.Location)).AbsolutePath;
+			var path = new Uri(System.IO.Path.GetDirectoryName(callingAssembly.Location)).AbsolutePath;
 
 			return AppDomain.CurrentDomain.GetAssemblies()
 				.Where(x => !x.IsDynamic && new Uri(x.CodeBase).AbsolutePath.Contains(path)).ToList();
 		}
 #else
+		private static TypeInfo GetTypeInfo(Type type)
+		{
+			return type.GetTypeInfo();
+		}
+
 		private static IEnumerable<Assembly> GetLocalAssemblies()
 		{
 			var dependencies = DependencyContext.Default.RuntimeLibraries;
