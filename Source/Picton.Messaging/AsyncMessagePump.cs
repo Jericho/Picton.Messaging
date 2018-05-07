@@ -24,6 +24,7 @@ namespace Picton.Messaging
 		private static readonly ILog _logger = LogProvider.GetLogger(typeof(AsyncMessagePump));
 
 		private readonly IQueueManager _queueManager;
+		private readonly IQueueManager _poisonQueueManager;
 		private readonly int _concurrentTasks;
 		private readonly TimeSpan? _visibilityTimeout;
 		private readonly int _maxDequeueCount;
@@ -77,10 +78,11 @@ namespace Picton.Messaging
 		/// <param name="queueName">Name of the queue.</param>
 		/// <param name="storageAccount">The cloud storage account.</param>
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
+		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poinson' messages.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="metrics">The system where metrics are published</param>
-		public AsyncMessagePump(string queueName, CloudStorageAccount storageAccount, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
+		public AsyncMessagePump(string queueName, CloudStorageAccount storageAccount, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
 		{
 			if (concurrentTasks < 1) throw new ArgumentException("Number of concurrent tasks must be greather than zero", nameof(concurrentTasks));
 			if (maxDequeueCount < 1) throw new ArgumentException("Number of retries must be greather than zero", nameof(maxDequeueCount));
@@ -89,6 +91,11 @@ namespace Picton.Messaging
 			_concurrentTasks = concurrentTasks;
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
+
+			if (!string.IsNullOrEmpty(poisonQueueName))
+			{
+				_poisonQueueManager = new QueueManager(poisonQueueName, storageAccount);
+			}
 
 			if (metrics == null)
 			{
@@ -275,7 +282,8 @@ namespace Picton.Messaging
 										OnError?.Invoke(message, ex, isPoison);
 										if (isPoison)
 										{
-											// PLEASE NOTE: we use "CancellationToken.None" to ensure a processed message is deleted from the queue even when the message pump is shutting down
+											// PLEASE NOTE: we use "CancellationToken.None" to ensure a processed message is deleted from the queue and moved to poison queue even when the message pump is shutting down
+											if (_poisonQueueManager != null) await _poisonQueueManager.AddMessageAsync(message.Content, null, null, null, null, CancellationToken.None).ConfigureAwait(false);
 											await _queueManager.DeleteMessageAsync(message, null, null, CancellationToken.None).ConfigureAwait(false);
 										}
 									}

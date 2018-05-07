@@ -110,7 +110,7 @@ namespace Picton.Messaging.IntegrationTests
 			Stopwatch sw = null;
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePump(queueName, storageAccount, 10, TimeSpan.FromMinutes(1), 3, metrics)
+			var messagePump = new AsyncMessagePump(queueName, storageAccount, 10, null, TimeSpan.FromMinutes(1), 3, metrics)
 			{
 				OnMessage = (message, cancellationToken) =>
 				{
@@ -157,7 +157,7 @@ namespace Picton.Messaging.IntegrationTests
 			Stopwatch sw = null;
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePumpWithHandlers(queueName, storageAccount, 10, TimeSpan.FromMinutes(1), 3, metrics);
+			var messagePump = new AsyncMessagePumpWithHandlers(queueName, storageAccount, 10, null, TimeSpan.FromMinutes(1), 3, metrics);
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
 				// Stop the timer
