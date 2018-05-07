@@ -530,6 +530,5 @@ namespace Picton.Messaging.UnitTests
 			var storageCredentials = new StorageCredentials("account_name", accountAccessKey);
 			return storageCredentials;
 		}
-
 	}
 }
