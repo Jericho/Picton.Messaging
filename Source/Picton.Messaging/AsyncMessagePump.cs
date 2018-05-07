@@ -166,10 +166,6 @@ namespace Picton.Messaging
 			var semaphore = new SemaphoreSlim(_concurrentTasks, _concurrentTasks);
 			var queuedMessages = new ConcurrentQueue<CloudMessage>();
 
-			// Make sure the queues exist
-			await _queueManager.CreateIfNotExistsAsync(null, null, cancellationToken).ConfigureAwait(false);
-			if (_poisonQueueManager != null) await _poisonQueueManager.CreateIfNotExistsAsync(null, null, cancellationToken).ConfigureAwait(false);
-
 			// Define the task that fetches messages from the Azure queue
 			RecurrentCancellableTask.StartNew(
 				async () =>
