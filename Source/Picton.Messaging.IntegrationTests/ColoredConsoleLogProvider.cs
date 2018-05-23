@@ -16,7 +16,7 @@
 			{LogLevel.Debug, ConsoleColor.Gray},
 			{LogLevel.Trace, ConsoleColor.DarkGray}
 		};
-		private LogLevel _minLevel = LogLevel.Trace;
+		private readonly LogLevel _minLevel = LogLevel.Trace;
 
 		public ColoredConsoleLogProvider(LogLevel minLevel = LogLevel.Trace)
 		{
