@@ -78,7 +78,7 @@ namespace Picton.Messaging
 		/// <param name="queueName">Name of the queue.</param>
 		/// <param name="storageAccount">The cloud storage account.</param>
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
-		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poinson' messages.</param>
+		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poison' messages.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="metrics">The system where metrics are published</param>
