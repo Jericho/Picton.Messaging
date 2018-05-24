@@ -67,13 +67,11 @@ namespace WorkerRole1
 		public override bool OnStart()
 		{
 			var storageAccount = CloudStorageAccount.DevelopmentStorageAccount;
-			var cloudQueueClient = storageAccount.CreateCloudQueueClient();
-			cloudQueueClient.DefaultRequestOptions.RetryPolicy = new NoRetry();
-			var cloudQueue = cloudQueueClient.GetQueueReference("myqueue");
-			cloudQueue.CreateIfNotExists();
+			var queueName = "myqueue";
+			var poisonQueueName = "myqueue-poison";
 
 			// Configure the message pump
-			_messagePump = new AsyncMessagePump(cloudQueue, 1, 25, TimeSpan.FromMinutes(1), 3)
+			_messagePump = new AsyncMessagePump(queueName, storageAccount, 25, poisonQueueName, TimeSpan.FromMinutes(1), 3)
 			{
 				OnMessage = (message, cancellationToken) =>
 				{
@@ -82,10 +80,6 @@ namespace WorkerRole1
 				OnError = (message, exception, isPoison) =>
 				{
 					Trace.TraceInformation("An error occured: {0}", exception);
-					if (isPoison)
-					{
-						// Copy message to a poison queue otherwise it will be lost forever
-					}
 				}
 			};
 

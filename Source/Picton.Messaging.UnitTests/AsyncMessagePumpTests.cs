@@ -103,19 +103,21 @@ namespace Picton.Messaging.UnitTests
 
 			mockQueue.Setup(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<CloudQueueMessage>());
 
-			var messagePump = new AsyncMessagePump(queueName, mockStorageAccount.Object, 1, null, TimeSpan.FromMinutes(1), 3);
-			messagePump.OnMessage = (message, cancellationToken) =>
+			var messagePump = new AsyncMessagePump(queueName, mockStorageAccount.Object, 1, null, TimeSpan.FromMinutes(1), 3)
 			{
-				Interlocked.Increment(ref onMessageInvokeCount);
+				OnMessage = (message, cancellationToken) =>
+				{
+					Interlocked.Increment(ref onMessageInvokeCount);
+				},
+				OnError = (message, exception, isPoison) =>
+				{
+					Interlocked.Increment(ref onErrorInvokeCount);
+				}
 			};
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
 				Interlocked.Increment(ref onQueueEmptyInvokeCount);
 				messagePump.Stop();
-			};
-			messagePump.OnError = (message, exception, isPoison) =>
-			{
-				Interlocked.Increment(ref onErrorInvokeCount);
 			};
 
 			// Act
@@ -181,26 +183,28 @@ namespace Picton.Messaging.UnitTests
 				return Task.FromResult(true);
 			});
 
-			var messagePump = new AsyncMessagePump(queueName, mockStorageAccount.Object, 1, null, TimeSpan.FromMinutes(1), 3);
-			messagePump.OnMessage = (message, cancellationToken) =>
+			var messagePump = new AsyncMessagePump(queueName, mockStorageAccount.Object, 1, null, TimeSpan.FromMinutes(1), 3)
 			{
-				Interlocked.Increment(ref onMessageInvokeCount);
+				OnMessage = (message, cancellationToken) =>
+				{
+					Interlocked.Increment(ref onMessageInvokeCount);
+				},
+				OnError = (message, exception, isPoison) =>
+				{
+					Interlocked.Increment(ref onErrorInvokeCount);
+					if (isPoison)
+					{
+						lock (lockObject)
+						{
+							cloudMessage = null;
+						}
+					}
+				}
 			};
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
 				Interlocked.Increment(ref onQueueEmptyInvokeCount);
 				messagePump.Stop();
-			};
-			messagePump.OnError = (message, exception, isPoison) =>
-			{
-				Interlocked.Increment(ref onErrorInvokeCount);
-				if (isPoison)
-				{
-					lock (lockObject)
-					{
-						cloudMessage = null;
-					}
-				}
 			};
 
 			// Act
@@ -261,28 +265,30 @@ namespace Picton.Messaging.UnitTests
 				return Task.FromResult(true);
 			});
 
-			var messagePump = new AsyncMessagePump(queueName, mockStorageAccount.Object, 1, null, TimeSpan.FromMinutes(1), retries);
-			messagePump.OnMessage = (message, cancellationToken) =>
+			var messagePump = new AsyncMessagePump(queueName, mockStorageAccount.Object, 1, null, TimeSpan.FromMinutes(1), retries)
 			{
-				Interlocked.Increment(ref onMessageInvokeCount);
-				throw new Exception("An error occured when attempting to process the message");
+				OnMessage = (message, cancellationToken) =>
+				{
+					Interlocked.Increment(ref onMessageInvokeCount);
+					throw new Exception("An error occured when attempting to process the message");
+				},
+				OnError = (message, exception, isPoison) =>
+				{
+					Interlocked.Increment(ref onErrorInvokeCount);
+					if (isPoison)
+					{
+						lock (lockObject)
+						{
+							isRejected = true;
+							cloudMessage = null;
+						}
+					}
+				}
 			};
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
 				Interlocked.Increment(ref onQueueEmptyInvokeCount);
 				messagePump.Stop();
-			};
-			messagePump.OnError = (message, exception, isPoison) =>
-			{
-				Interlocked.Increment(ref onErrorInvokeCount);
-				if (isPoison)
-				{
-					lock (lockObject)
-					{
-						isRejected = true;
-						cloudMessage = null;
-					}
-				}
 			};
 
 			// Act
@@ -352,28 +358,30 @@ namespace Picton.Messaging.UnitTests
 				return Task.FromResult(true);
 			});
 
-			var messagePump = new AsyncMessagePump(queueName, mockStorageAccount.Object, 1, poisonQueueName, TimeSpan.FromMinutes(1), retries);
-			messagePump.OnMessage = (message, cancellationToken) =>
+			var messagePump = new AsyncMessagePump(queueName, mockStorageAccount.Object, 1, poisonQueueName, TimeSpan.FromMinutes(1), retries)
 			{
-				Interlocked.Increment(ref onMessageInvokeCount);
-				throw new Exception("An error occured when attempting to process the message");
+				OnMessage = (message, cancellationToken) =>
+				{
+					Interlocked.Increment(ref onMessageInvokeCount);
+					throw new Exception("An error occured when attempting to process the message");
+				},
+				OnError = (message, exception, isPoison) =>
+				{
+					Interlocked.Increment(ref onErrorInvokeCount);
+					if (isPoison)
+					{
+						lock (lockObject)
+						{
+							isRejected = true;
+							cloudMessage = null;
+						}
+					}
+				}
 			};
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
 				Interlocked.Increment(ref onQueueEmptyInvokeCount);
 				messagePump.Stop();
-			};
-			messagePump.OnError = (message, exception, isPoison) =>
-			{
-				Interlocked.Increment(ref onErrorInvokeCount);
-				if (isPoison)
-				{
-					lock (lockObject)
-					{
-						isRejected = true;
-						cloudMessage = null;
-					}
-				}
 			};
 
 			// Act
@@ -409,10 +417,16 @@ namespace Picton.Messaging.UnitTests
 
 			mockQueue.Setup(q => q.GetMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<QueueRequestOptions>(), It.IsAny<OperationContext>(), It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<CloudQueueMessage>());
 
-			var messagePump = new AsyncMessagePump(queueName, mockStorageAccount.Object, 1, null, TimeSpan.FromMinutes(1), 3);
-			messagePump.OnMessage = (message, cancellationToken) =>
+			var messagePump = new AsyncMessagePump(queueName, mockStorageAccount.Object, 1, null, TimeSpan.FromMinutes(1), 3)
 			{
-				Interlocked.Increment(ref onMessageInvokeCount);
+				OnMessage = (message, cancellationToken) =>
+				{
+					Interlocked.Increment(ref onMessageInvokeCount);
+				},
+				OnError = (message, exception, isPoison) =>
+				{
+					Interlocked.Increment(ref onErrorInvokeCount);
+				}
 			};
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
@@ -430,10 +444,6 @@ namespace Picton.Messaging.UnitTests
 
 				// Stop the message pump
 				messagePump.Stop();
-			};
-			messagePump.OnError = (message, exception, isPoison) =>
-			{
-				Interlocked.Increment(ref onErrorInvokeCount);
 			};
 
 			// Act

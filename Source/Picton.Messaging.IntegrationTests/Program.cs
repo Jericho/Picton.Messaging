@@ -2,7 +2,6 @@
 using App.Metrics.Scheduling;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
-using Picton.Interfaces;
 using Picton.Managers;
 using Picton.Messaging.IntegrationTests.Datadog;
 using Picton.Messaging.Logging;
