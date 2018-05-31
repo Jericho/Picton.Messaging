@@ -283,7 +283,13 @@ namespace Picton.Messaging
 										if (isPoison)
 										{
 											// PLEASE NOTE: we use "CancellationToken.None" to ensure a processed message is deleted from the queue and moved to poison queue even when the message pump is shutting down
-											if (_poisonQueueManager != null) await _poisonQueueManager.AddMessageAsync(message.Content, null, null, null, null, CancellationToken.None).ConfigureAwait(false);
+											if (_poisonQueueManager != null)
+											{
+												message.Metadata["PoisonExceptionMessage"] = ex.GetBaseException().Message;
+												message.Metadata["PoisonExceptionDetails"] = ex.GetBaseException().ToString();
+
+												await _poisonQueueManager.AddMessageAsync(message.Content, message.Metadata, null, null, null, null, CancellationToken.None).ConfigureAwait(false);
+											}
 											await _queueManager.DeleteMessageAsync(message, null, null, CancellationToken.None).ConfigureAwait(false);
 										}
 									}
