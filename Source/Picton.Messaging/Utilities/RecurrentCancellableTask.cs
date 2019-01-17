@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Picton.Messaging.Utils
+namespace Picton.Messaging.Utilities
 {
 	/// <summary>
 	/// Recurrent Cancellable Task

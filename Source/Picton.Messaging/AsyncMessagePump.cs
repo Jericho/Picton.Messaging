@@ -5,7 +5,7 @@ using Microsoft.WindowsAzure.Storage.Queue;
 using Picton.Interfaces;
 using Picton.Managers;
 using Picton.Messaging.Logging;
-using Picton.Messaging.Utils;
+using Picton.Messaging.Utilities;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
