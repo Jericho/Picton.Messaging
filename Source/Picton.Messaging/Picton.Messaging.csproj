@@ -48,11 +48,11 @@
   </ItemGroup>
 
   <PropertyGroup Condition="'$(TargetFramework)' == 'net452' ">
-    <DefineConstants>$(DefineConstants);NETFULL;LIBLOG_EXCLUDE_CODE_COVERAGE;LIBLOG_PUBLIC</DefineConstants>
+    <DefineConstants>$(DefineConstants);NETFULL;LIBLOG_EXCLUDE_CODE_COVERAGE</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(TargetFramework)' != 'net452' ">
-    <DefineConstants>$(DefineConstants);NETSTANDARD;LIBLOG_EXCLUDE_CODE_COVERAGE;LIBLOG_PUBLIC</DefineConstants>
+    <DefineConstants>$(DefineConstants);NETSTANDARD;LIBLOG_EXCLUDE_CODE_COVERAGE</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release' ">
