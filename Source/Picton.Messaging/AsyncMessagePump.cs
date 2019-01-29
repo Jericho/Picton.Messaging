@@ -98,7 +98,7 @@ namespace Picton.Messaging
 			_concurrentTasks = concurrentTasks;
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
-			_metrics = EnsureValidMetrics(metrics);
+			_metrics = metrics ?? TurnOffMetrics();
 
 			if (!string.IsNullOrEmpty(poisonQueueName))
 			{
@@ -128,7 +128,7 @@ namespace Picton.Messaging
 			_concurrentTasks = concurrentTasks;
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
-			_metrics = EnsureValidMetrics(metrics);
+			_metrics = metrics ?? TurnOffMetrics();
 
 			if (!string.IsNullOrEmpty(poisonQueueName))
 			{
@@ -182,13 +182,8 @@ namespace Picton.Messaging
 
 		#region PRIVATE METHODS
 
-		private IMetrics EnsureValidMetrics(IMetrics metrics)
+		private IMetrics TurnOffMetrics()
 		{
-			if (metrics != null)
-			{
-				return metrics;
-			}
-
 			var metricsTurnedOff = new MetricsBuilder();
 			metricsTurnedOff.Configuration.Configure(new MetricsOptions()
 			{
