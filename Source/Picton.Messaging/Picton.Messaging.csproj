@@ -28,7 +28,7 @@
   <ItemGroup>
     <PackageReference Include="App.Metrics" Version="3.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="2.1.0" />
-    <PackageReference Include="Picton" Version="4.1.0" />
+    <PackageReference Include="Picton" Version="5.0.0" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.1.0-beta004">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
