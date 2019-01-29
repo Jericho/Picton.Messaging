@@ -23,7 +23,7 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
-		private static readonly ILog _logger = LogProvider.GetLogger(typeof(AsyncMessagePump));
+		private static readonly ILog _logger = LogProvider.GetCurrentClassLogger();
 
 		private readonly IQueueManager _queueManager;
 		private readonly IQueueManager _poisonQueueManager;
