@@ -19,7 +19,7 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
-		private static readonly ILog _logger = LogProvider.GetLogger(typeof(AsyncMessagePumpWithHandlers));
+		private static readonly ILog _logger = LogProvider.GetCurrentClassLogger();
 		private static readonly IDictionary<Type, Type[]> _messageHandlers = GetMessageHandlers();
 		private readonly AsyncMessagePump _messagePump;
 

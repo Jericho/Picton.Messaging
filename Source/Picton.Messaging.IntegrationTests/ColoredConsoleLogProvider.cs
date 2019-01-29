@@ -1,11 +1,12 @@
 ﻿namespace Picton.Messaging.IntegrationTests
 {
 	using Logging;
+	using Picton.Messaging.Logging.LogProviders;
 	using System;
 	using System.Collections.Generic;
 	using System.Globalization;
 
-	public class ColoredConsoleLogProvider : ILogProvider
+	public class ColoredConsoleLogProvider : LogProviderBase
 	{
 		private static readonly Dictionary<LogLevel, ConsoleColor> Colors = new Dictionary<LogLevel, ConsoleColor>
 		{
@@ -23,24 +24,23 @@
 			_minLevel = minLevel;
 		}
 
-
 		/// <summary>
 		/// Gets the specified named logger.
 		/// </summary>
 		/// <param name="name">Name of the logger.</param>
 		/// <returns>The logger reference.</returns>
-		public Logger GetLogger(string name)
+		public override Logger GetLogger(string name)
 		{
 			return (logLevel, messageFunc, exception, formatParameters) =>
 			{
 				// messageFunc is null when checking if logLevel is enabled
 				if (messageFunc == null) return (logLevel >= _minLevel);
 
-				// Please note: locking is important to ensure that multiple threads 
-				// don't attempt to change the foreground color at the same time
-				lock (this)
+				if (logLevel >= _minLevel)
 				{
-					if (logLevel >= _minLevel)
+					// Please note: locking is important to ensure that multiple threads 
+					// don't attempt to change the foreground color at the same time
+					lock (this)
 					{
 						if (Colors.TryGetValue(logLevel, out ConsoleColor consoleColor))
 						{
@@ -61,6 +61,7 @@
 						}
 					}
 				}
+
 				return true;
 			};
 		}
@@ -79,37 +80,6 @@
 				message = message + "|" + exception;
 			}
 			Console.WriteLine("{0} | {1} | {2} | {3}", DateTime.UtcNow, logLevel, name, message);
-		}
-
-
-		/// <summary>
-		/// Opens a nested diagnostics context. Not supported in EntLib logging.
-		/// </summary>
-		/// <param name="message">The message to add to the diagnostics context.</param>
-		/// <returns>A disposable that when disposed removes the message from the context.</returns>
-		public IDisposable OpenNestedContext(string message)
-		{
-			return NullDisposable.Instance;
-		}
-
-
-		/// <summary>
-		/// Opens a mapped diagnostics context. Not supported in EntLib logging.
-		/// </summary>
-		/// <param name="key">A key.</param>
-		/// <param name="value">A value.</param>
-		/// <returns>A disposable that when disposed removes the map from the context.</returns>
-		public IDisposable OpenMappedContext(string key, object value, bool destructure = false)
-		{
-			return NullDisposable.Instance;
-		}
-
-		private class NullDisposable : IDisposable
-		{
-			internal static readonly IDisposable Instance = new NullDisposable();
-
-			public void Dispose()
-			{ }
 		}
 	}
 }

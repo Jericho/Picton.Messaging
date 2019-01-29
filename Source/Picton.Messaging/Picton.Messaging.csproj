@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net452;netstandard1.6;netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>net452;netstandard2.0</TargetFrameworks>
     <PlatformTarget>anycpu</PlatformTarget>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <OutputType>Library</OutputType>
@@ -27,8 +27,12 @@
 
   <ItemGroup>
     <PackageReference Include="App.Metrics" Version="3.0.0" />
+    <PackageReference Include="LibLog" Version="5.0.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="2.1.0" />
-    <PackageReference Include="Picton" Version="4.0.0" />
+    <PackageReference Include="Picton" Version="5.0.0" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.1.0-beta004">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
@@ -44,11 +48,11 @@
   </ItemGroup>
 
   <PropertyGroup Condition="'$(TargetFramework)' == 'net452' ">
-    <DefineConstants>$(DefineConstants);NETFULL;LIBLOG_PORTABLE</DefineConstants>
+    <DefineConstants>$(DefineConstants);NETFULL;LIBLOG_EXCLUDE_CODE_COVERAGE;LIBLOG_PUBLIC</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(TargetFramework)' != 'net452' ">
-    <DefineConstants>$(DefineConstants);NETSTANDARD;LIBLOG_PORTABLE</DefineConstants>
+    <DefineConstants>$(DefineConstants);NETSTANDARD;LIBLOG_EXCLUDE_CODE_COVERAGE;LIBLOG_PUBLIC</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release' ">

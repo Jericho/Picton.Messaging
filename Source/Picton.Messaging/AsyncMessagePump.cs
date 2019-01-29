@@ -1,9 +1,11 @@
 ﻿using App.Metrics;
 using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Blob;
+using Microsoft.WindowsAzure.Storage.Queue;
 using Picton.Interfaces;
 using Picton.Managers;
 using Picton.Messaging.Logging;
-using Picton.Messaging.Utils;
+using Picton.Messaging.Utilities;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -21,7 +23,7 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
-		private static readonly ILog _logger = LogProvider.GetLogger(typeof(AsyncMessagePump));
+		private static readonly ILog _logger = LogProvider.GetCurrentClassLogger();
 
 		private readonly IQueueManager _queueManager;
 		private readonly IQueueManager _poisonQueueManager;
@@ -84,36 +86,56 @@ namespace Picton.Messaging
 		/// <param name="metrics">The system where metrics are published</param>
 		public AsyncMessagePump(string queueName, CloudStorageAccount storageAccount, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
 		{
+			if (storageAccount == null) throw new ArgumentNullException(nameof(storageAccount));
+
 			if (concurrentTasks < 1) throw new ArgumentException("Number of concurrent tasks must be greather than zero", nameof(concurrentTasks));
 			if (maxDequeueCount < 1) throw new ArgumentException("Number of retries must be greather than zero", nameof(maxDequeueCount));
 
-			_queueManager = new QueueManager(queueName, storageAccount);
+			var queueClient = storageAccount.CreateCloudQueueClient();
+			var blobClient = storageAccount.CreateCloudBlobClient();
+
+			_queueManager = new QueueManager(queueName, queueClient, blobClient);
 			_concurrentTasks = concurrentTasks;
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
+			_metrics = metrics ?? TurnOffMetrics();
 
 			if (!string.IsNullOrEmpty(poisonQueueName))
 			{
-				_poisonQueueManager = new QueueManager(poisonQueueName, storageAccount);
+				_poisonQueueManager = new QueueManager(poisonQueueName, queueClient, blobClient);
 			}
 
-			if (metrics == null)
+			InitMessagePump();
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="AsyncMessagePump"/> class.
+		/// </summary>
+		/// <param name="queueName">Name of the queue.</param>
+		/// <param name="queueClient">The queue client.</param>
+		/// <param name="blobClient">The blob client.</param>
+		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
+		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poison' messages.</param>
+		/// <param name="visibilityTimeout">The visibility timeout.</param>
+		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
+		/// <param name="metrics">The system where metrics are published</param>
+		public AsyncMessagePump(string queueName, CloudQueueClient queueClient, CloudBlobClient blobClient, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
+		{
+			if (concurrentTasks < 1) throw new ArgumentException("Number of concurrent tasks must be greather than zero", nameof(concurrentTasks));
+			if (maxDequeueCount < 1) throw new ArgumentException("Number of retries must be greather than zero", nameof(maxDequeueCount));
+
+			_queueManager = new QueueManager(queueName, queueClient, blobClient);
+			_concurrentTasks = concurrentTasks;
+			_visibilityTimeout = visibilityTimeout;
+			_maxDequeueCount = maxDequeueCount;
+			_metrics = metrics ?? TurnOffMetrics();
+
+			if (!string.IsNullOrEmpty(poisonQueueName))
 			{
-				var noop = new MetricsBuilder();
-				noop.Configuration.Configure(new MetricsOptions()
-				{
-					Enabled = false,
-					ReportingEnabled = false
-				});
-				_metrics = noop.Build();
-			}
-			else
-			{
-				_metrics = metrics;
+				_poisonQueueManager = new QueueManager(poisonQueueName, queueClient, blobClient);
 			}
 
-			OnQueueEmpty = cancellationToken => Task.Delay(1500, cancellationToken).Wait();
-			OnError = (message, exception, isPoison) => _logger.ErrorException("An error occured when processing a message", exception);
+			InitMessagePump();
 		}
 
 		#endregion
@@ -159,6 +181,23 @@ namespace Picton.Messaging
 		#endregion
 
 		#region PRIVATE METHODS
+
+		private IMetrics TurnOffMetrics()
+		{
+			var metricsTurnedOff = new MetricsBuilder();
+			metricsTurnedOff.Configuration.Configure(new MetricsOptions()
+			{
+				Enabled = false,
+				ReportingEnabled = false
+			});
+			return metricsTurnedOff.Build();
+		}
+
+		private void InitMessagePump()
+		{
+			OnQueueEmpty = cancellationToken => Task.Delay(1500, cancellationToken).Wait();
+			OnError = (message, exception, isPoison) => _logger.ErrorException("An error occured when processing a message", exception);
+		}
 
 		private async Task ProcessMessages(TimeSpan? visibilityTimeout = null, CancellationToken cancellationToken = default(CancellationToken))
 		{
