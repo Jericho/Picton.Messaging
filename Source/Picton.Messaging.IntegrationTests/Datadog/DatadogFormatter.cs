@@ -29,7 +29,7 @@ namespace Picton.Messaging.IntegrationTests.Datadog
 			using (var streamWriter = new StreamWriter(output))
 			{
 				using (var writer = new MetricSnapshotDatadogWriter(streamWriter, _options))
-					serializer.Serialize(writer, metricsData);
+					serializer.Serialize(writer, metricsData, this.MetricFields);
 			}
 
 			return Task.CompletedTask;
@@ -37,5 +37,8 @@ namespace Picton.Messaging.IntegrationTests.Datadog
 
 		/// <inheritdoc />
 		public MetricsMediaTypeValue MediaType => new MetricsMediaTypeValue("application", "com.datadoghq.metrics", "v1", "json");
+
+		/// <inheritdoc />
+		public MetricFields MetricFields { get; set; }
 	}
 }

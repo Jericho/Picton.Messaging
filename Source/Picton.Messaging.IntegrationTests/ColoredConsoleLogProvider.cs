@@ -1,6 +1,7 @@
 ﻿namespace Picton.Messaging.IntegrationTests
 {
 	using Logging;
+	using Picton.Messaging.Logging.LogProviders;
 	using System;
 	using System.Collections.Generic;
 	using System.Globalization;
@@ -23,7 +24,6 @@
 			_minLevel = minLevel;
 		}
 
-
 		/// <summary>
 		/// Gets the specified named logger.
 		/// </summary>
@@ -36,11 +36,11 @@
 				// messageFunc is null when checking if logLevel is enabled
 				if (messageFunc == null) return (logLevel >= _minLevel);
 
-				// Please note: locking is important to ensure that multiple threads 
-				// don't attempt to change the foreground color at the same time
-				lock (this)
+				if (logLevel >= _minLevel)
 				{
-					if (logLevel >= _minLevel)
+					// Please note: locking is important to ensure that multiple threads 
+					// don't attempt to change the foreground color at the same time
+					lock (this)
 					{
 						if (Colors.TryGetValue(logLevel, out ConsoleColor consoleColor))
 						{
@@ -61,26 +61,10 @@
 						}
 					}
 				}
+
 				return true;
 			};
 		}
-
-		private static void WriteMessage(
-			LogLevel logLevel,
-			string name,
-			Func<string> messageFunc,
-			object[] formatParameters,
-			Exception exception)
-		{
-			var message = messageFunc();
-			if (formatParameters?.Length > 0) message = string.Format(CultureInfo.InvariantCulture, message, formatParameters);
-			if (exception != null)
-			{
-				message = message + "|" + exception;
-			}
-			Console.WriteLine("{0} | {1} | {2} | {3}", DateTime.UtcNow, logLevel, name, message);
-		}
-
 
 		/// <summary>
 		/// Opens a nested diagnostics context. Not supported in EntLib logging.
@@ -91,8 +75,7 @@
 		{
 			return NullDisposable.Instance;
 		}
-
-
+		
 		/// <summary>
 		/// Opens a mapped diagnostics context. Not supported in EntLib logging.
 		/// </summary>
@@ -110,6 +93,22 @@
 
 			public void Dispose()
 			{ }
+		}
+
+		private static void WriteMessage(
+			LogLevel logLevel,
+			string name,
+			Func<string> messageFunc,
+			object[] formatParameters,
+			Exception exception)
+		{
+			var message = messageFunc();
+			if (formatParameters?.Length > 0) message = string.Format(CultureInfo.InvariantCulture, message, formatParameters);
+			if (exception != null)
+			{
+				message = message + "|" + exception;
+			}
+			Console.WriteLine("{0} | {1} | {2} | {3}", DateTime.UtcNow, logLevel, name, message);
 		}
 	}
 }

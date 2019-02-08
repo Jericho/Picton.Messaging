@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace Picton.Messaging
 {
 	/// <summary>
-	/// Extension methods
+	/// Extension methods.
 	/// </summary>
 	public static class Extensions
 	{
@@ -13,7 +13,7 @@ namespace Picton.Messaging
 
 #pragma warning disable RECS0154 // Parameter is never used
 		/// <summary>
-		/// The purpose of this extension method is to avoid a Visual Studio warning about async calls that are not awaited
+		/// The purpose of this extension method is to avoid a Visual Studio warning about async calls that are not awaited.
 		/// </summary>
 		/// <param name="task">The task.</param>
 		public static void IgnoreAwait(this Task task)
@@ -23,7 +23,7 @@ namespace Picton.Messaging
 		}
 
 		/// <summary>
-		/// The purpose of this extension method is to ignore the exception thrown when a task is cancelled
+		/// The purpose of this extension method is to ignore the exception thrown when a task is cancelled.
 		/// </summary>
 		/// <param name="task">The task.</param>
 		/// <returns>A task.</returns>
@@ -43,7 +43,7 @@ namespace Picton.Messaging
 		/// Converts a <see cref="TimeSpan"/> into a human readable format.
 		/// </summary>
 		/// <param name="timeSpan">The time span.</param>
-		/// <returns>A human readable string</returns>
+		/// <returns>A human readable string.</returns>
 		public static string ToDurationString(this TimeSpan timeSpan)
 		{
 			// In case the TimeSpan is extremely short

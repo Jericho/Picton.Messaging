@@ -19,8 +19,9 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
-		private static readonly ILog _logger = LogProvider.GetLogger(typeof(AsyncMessagePumpWithHandlers));
+		private static readonly ILog _logger = LogProvider.For<AsyncMessagePumpWithHandlers>();
 		private static readonly IDictionary<Type, Type[]> _messageHandlers = GetMessageHandlers();
+
 		private readonly AsyncMessagePump _messagePump;
 
 		#endregion
@@ -31,7 +32,9 @@ namespace Picton.Messaging
 		/// Gets or sets the logic to execute when an error occurs.
 		/// </summary>
 		/// <example>
+		/// <code>
 		/// OnError = (message, exception, isPoison) => Trace.TraceError("An error occured: {0}", exception);
+		/// </code>
 		/// </example>
 		/// <remarks>
 		/// When isPoison is set to true, you should copy this message to a poison queue because it will be deleted from the original queue.
@@ -46,8 +49,9 @@ namespace Picton.Messaging
 		/// Gets or sets the logic to execute when queue is empty.
 		/// </summary>
 		/// <example>
-		/// Here's an example:
+		/// <code>
 		/// OnQueueEmpty = cancellationToken => Task.Delay(2500, cancellationToken).Wait();
+		/// </code>
 		/// </example>
 		/// <remarks>
 		/// If this property is not set, the default logic is to pause for 2 seconds.
@@ -71,7 +75,7 @@ namespace Picton.Messaging
 		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poinson' messages.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		/// <param name="metrics">The system where metrics are published</param>
+		/// <param name="metrics">The system where metrics are published.</param>
 		public AsyncMessagePumpWithHandlers(string queueName, CloudStorageAccount storageAccount, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
 		{
 			_messagePump = new AsyncMessagePump(queueName, storageAccount, concurrentTasks, poisonQueueName, visibilityTimeout, maxDequeueCount, metrics)

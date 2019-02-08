@@ -46,9 +46,9 @@ namespace Picton.Messaging.IntegrationTests.Datadog
 		}
 
 		/// <inheritdoc />
-		public void Write(string context, string name, object value, MetricTags tags, DateTime timestamp)
+		public void Write(string context, string name, string field, object value, MetricTags tags, DateTime timestamp)
 		{
-			Write(context, name, new[] { "value" }, new[] { value }, tags, timestamp);
+			Write(context, name, new[] { field }, new[] { value }, tags, timestamp);
 		}
 
 		/// <inheritdoc />
@@ -133,7 +133,5 @@ namespace Picton.Messaging.IntegrationTests.Datadog
 		{
 			_streamWriter.Write(JsonConvert.SerializeObject(new SeriesJson { Series = _metrics.ToArray() }, JsonSettings));
 		}
-
-		public GeneratedMetricNameMapping MetricNameMapping { get; } = new GeneratedMetricNameMapping();
 	}
 }
