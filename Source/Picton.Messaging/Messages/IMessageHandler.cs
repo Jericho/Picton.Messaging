@@ -1,9 +1,9 @@
 ﻿namespace Picton.Messaging.Messages
 {
 	/// <summary>
-	/// Message handler interface
+	/// Message handler interface.
 	/// </summary>
-	/// <typeparam name="T">The type of message</typeparam>
+	/// <typeparam name="T">The type of message.</typeparam>
 	public interface IMessageHandler<T>
 		where T : IMessage
 	{

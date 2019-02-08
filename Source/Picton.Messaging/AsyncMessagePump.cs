@@ -23,7 +23,7 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
-		private static readonly ILog _logger = LogProvider.GetCurrentClassLogger();
+		private static readonly ILog _logger = LogProvider.For<AsyncMessagePump>();
 
 		private readonly IQueueManager _queueManager;
 		private readonly IQueueManager _poisonQueueManager;
@@ -51,7 +51,9 @@ namespace Picton.Messaging
 		/// Gets or sets the logic to execute when an error occurs.
 		/// </summary>
 		/// <example>
+		/// <code>
 		/// OnError = (message, exception, isPoison) => Trace.TraceError("An error occured: {0}", exception);
+		/// </code>
 		/// </example>
 		/// <remarks>
 		/// When isPoison is set to true, you should copy this message to a poison queue because it will be deleted from the original queue.
@@ -62,8 +64,9 @@ namespace Picton.Messaging
 		/// Gets or sets the logic to execute when queue is empty.
 		/// </summary>
 		/// <example>
-		/// Here's an example:
+		/// <code>
 		/// OnQueueEmpty = cancellationToken => Task.Delay(2500, cancellationToken).Wait();
+		/// </code>
 		/// </example>
 		/// <remarks>
 		/// If this property is not set, the default logic is to pause for 2 seconds.
@@ -83,7 +86,7 @@ namespace Picton.Messaging
 		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poison' messages.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		/// <param name="metrics">The system where metrics are published</param>
+		/// <param name="metrics">The system where metrics are published.</param>
 		public AsyncMessagePump(string queueName, CloudStorageAccount storageAccount, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
 		{
 			if (storageAccount == null) throw new ArgumentNullException(nameof(storageAccount));
@@ -118,7 +121,7 @@ namespace Picton.Messaging
 		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poison' messages.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		/// <param name="metrics">The system where metrics are published</param>
+		/// <param name="metrics">The system where metrics are published.</param>
 		public AsyncMessagePump(string queueName, CloudQueueClient queueClient, CloudBlobClient blobClient, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
 		{
 			if (concurrentTasks < 1) throw new ArgumentException("Number of concurrent tasks must be greather than zero", nameof(concurrentTasks));
@@ -145,7 +148,7 @@ namespace Picton.Messaging
 		/// <summary>
 		/// Starts the message pump.
 		/// </summary>
-		/// <exception cref="System.ArgumentNullException">OnMessage</exception>
+		/// <exception cref="System.ArgumentNullException">OnMessage.</exception>
 		public void Start()
 		{
 			if (OnMessage == null) throw new ArgumentNullException(nameof(OnMessage));
@@ -212,9 +215,9 @@ namespace Picton.Messaging
 					// Fetch messages from the Azure queue when the number of items in the concurrent queue falls below an "acceptable" level.
 					if (!cancellationToken.IsCancellationRequested && queuedMessages.Count <= _concurrentTasks / 2)
 					{
-						using (_metrics.Measure.Timer.Time(Metrics.MessageFetchingTimer))
+						IEnumerable<CloudMessage> messages = null;
+						using (_metrics.Measure.Timer.Time(Metrics.MessagesFetchingTimer))
 						{
-							IEnumerable<CloudMessage> messages = null;
 							try
 							{
 								messages = await _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
@@ -228,31 +231,31 @@ namespace Picton.Messaging
 							{
 								_logger.InfoException("An error occured while fetching messages from the Azure queue. The error was caught and ignored.", e.GetBaseException());
 							}
+						}
 
-							if (messages == null) return;
+						if (messages == null) return;
 
-							if (messages.Any())
+						if (messages.Any())
+						{
+							_logger.Trace($"Fetched {messages.Count()} message(s) from the queue.");
+
+							foreach (var message in messages)
 							{
-								_logger.Trace($"Fetched {messages.Count()} message(s) from the queue.");
-
-								foreach (var message in messages)
-								{
-									queuedMessages.Enqueue(message);
-								}
+								queuedMessages.Enqueue(message);
 							}
-							else
+						}
+						else
+						{
+							_logger.Trace("The queue is empty, no messages fetched.");
+							try
 							{
-								_logger.Trace("The queue is empty, no messages fetched.");
-								try
-								{
-									// The queue is empty
-									OnQueueEmpty?.Invoke(cancellationToken);
-									_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
-								}
-								catch (Exception e)
-								{
-									_logger.InfoException("An error occured when handling an empty queue. The error was caught and ignored.", e.GetBaseException());
-								}
+								// The queue is empty
+								OnQueueEmpty?.Invoke(cancellationToken);
+								_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
+							}
+							catch (Exception e)
+							{
+								_logger.InfoException("An error occured when handling an empty queue. The error was caught and ignored.", e.GetBaseException());
 							}
 						}
 					}
@@ -329,6 +332,7 @@ namespace Picton.Messaging
 
 												await _poisonQueueManager.AddMessageAsync(message.Content, message.Metadata, null, null, null, null, CancellationToken.None).ConfigureAwait(false);
 											}
+
 											await _queueManager.DeleteMessageAsync(message, null, null, CancellationToken.None).ConfigureAwait(false);
 										}
 									}

@@ -5,9 +5,11 @@ using System.Threading.Tasks;
 namespace Picton.Messaging.Utilities
 {
 	/// <summary>
-	/// Recurrent Cancellable Task
+	/// Recurrent Cancellable Task.
 	/// </summary>
-	/// <remarks>From: https://stackoverflow.com/a/35308832/153084</remarks>
+	/// <remarks>
+	/// From a <a href="https://stackoverflow.com/a/35308832/153084">StackOverflow discussion</a>.
+	/// </remarks>
 	public static class RecurrentCancellableTask
 	{
 		/// <summary>
@@ -18,7 +20,7 @@ namespace Picton.Messaging.Utilities
 		/// <param name="action">The action.</param>
 		/// <param name="pollInterval">The poll interval.</param>
 		/// <param name="token">The token.</param>
-		/// <param name="taskCreationOptions">The task creation options</param>
+		/// <param name="taskCreationOptions">The task creation options.</param>
 		public static void StartNew(Func<Task> action, TimeSpan pollInterval, CancellationToken token, TaskCreationOptions taskCreationOptions = TaskCreationOptions.None)
 		{
 			Task.Factory.StartNew(

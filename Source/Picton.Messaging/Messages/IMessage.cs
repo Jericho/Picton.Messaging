@@ -1,7 +1,7 @@
 ﻿namespace Picton.Messaging.Messages
 {
 	/// <summary>
-	/// Message interface
+	/// Message interface.
 	/// </summary>
 	public interface IMessage
 	{
