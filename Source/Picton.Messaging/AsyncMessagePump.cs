@@ -215,9 +215,9 @@ namespace Picton.Messaging
 					// Fetch messages from the Azure queue when the number of items in the concurrent queue falls below an "acceptable" level.
 					if (!cancellationToken.IsCancellationRequested && queuedMessages.Count <= _concurrentTasks / 2)
 					{
-						using (_metrics.Measure.Timer.Time(Metrics.MessageFetchingTimer))
+						IEnumerable<CloudMessage> messages = null;
+						using (_metrics.Measure.Timer.Time(Metrics.MessagesFetchingTimer))
 						{
-							IEnumerable<CloudMessage> messages = null;
 							try
 							{
 								messages = await _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
@@ -231,31 +231,31 @@ namespace Picton.Messaging
 							{
 								_logger.InfoException("An error occured while fetching messages from the Azure queue. The error was caught and ignored.", e.GetBaseException());
 							}
+						}
 
-							if (messages == null) return;
+						if (messages == null) return;
 
-							if (messages.Any())
+						if (messages.Any())
+						{
+							_logger.Trace($"Fetched {messages.Count()} message(s) from the queue.");
+
+							foreach (var message in messages)
 							{
-								_logger.Trace($"Fetched {messages.Count()} message(s) from the queue.");
-
-								foreach (var message in messages)
-								{
-									queuedMessages.Enqueue(message);
-								}
+								queuedMessages.Enqueue(message);
 							}
-							else
+						}
+						else
+						{
+							_logger.Trace("The queue is empty, no messages fetched.");
+							try
 							{
-								_logger.Trace("The queue is empty, no messages fetched.");
-								try
-								{
-									// The queue is empty
-									OnQueueEmpty?.Invoke(cancellationToken);
-									_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
-								}
-								catch (Exception e)
-								{
-									_logger.InfoException("An error occured when handling an empty queue. The error was caught and ignored.", e.GetBaseException());
-								}
+								// The queue is empty
+								OnQueueEmpty?.Invoke(cancellationToken);
+								_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
+							}
+							catch (Exception e)
+							{
+								_logger.InfoException("An error occured when handling an empty queue. The error was caught and ignored.", e.GetBaseException());
 							}
 						}
 					}
