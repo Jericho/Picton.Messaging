@@ -32,7 +32,9 @@ namespace Picton.Messaging
 		/// Gets or sets the logic to execute when an error occurs.
 		/// </summary>
 		/// <example>
+		/// <code>
 		/// OnError = (message, exception, isPoison) => Trace.TraceError("An error occured: {0}", exception);
+		/// </code>
 		/// </example>
 		/// <remarks>
 		/// When isPoison is set to true, you should copy this message to a poison queue because it will be deleted from the original queue.
@@ -47,8 +49,9 @@ namespace Picton.Messaging
 		/// Gets or sets the logic to execute when queue is empty.
 		/// </summary>
 		/// <example>
-		/// Here's an example:
+		/// <code>
 		/// OnQueueEmpty = cancellationToken => Task.Delay(2500, cancellationToken).Wait();
+		/// </code>
 		/// </example>
 		/// <remarks>
 		/// If this property is not set, the default logic is to pause for 2 seconds.
