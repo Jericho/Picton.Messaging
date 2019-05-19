@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net452;netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>net461;net472;netstandard2.0</TargetFrameworks>
     <PlatformTarget>anycpu</PlatformTarget>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <OutputType>Library</OutputType>
@@ -38,22 +38,21 @@
     </PackageReference>
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(TargetFramework)' == 'net452' ">
-    <Reference Include="System" />
+  <ItemGroup Condition=" !$(TargetFramework.StartsWith('netstandard')) ">
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' != 'net452'">
+  <ItemGroup Condition=" $(TargetFramework.StartsWith('netstandard')) ">
     <PackageReference Include="Microsoft.CSharp" Version="4.5.0" />
   </ItemGroup>
 
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net452' ">
-    <DefineConstants>$(DefineConstants);NETFULL;LIBLOG_EXCLUDE_CODE_COVERAGE</DefineConstants>
+  <PropertyGroup Condition=" !$(TargetFramework.StartsWith('netstandard')) ">
+    <DefineConstants>$(DefineConstants);NETFULL</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(TargetFramework)' != 'net452' ">
-    <DefineConstants>$(DefineConstants);NETSTANDARD;LIBLOG_EXCLUDE_CODE_COVERAGE</DefineConstants>
+  <PropertyGroup Condition=" $(TargetFramework.StartsWith('netstandard')) ">
+    <DefineConstants>$(DefineConstants);NETSTANDARD</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release' ">
