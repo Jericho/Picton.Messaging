@@ -1,6 +1,6 @@
-﻿using App.Metrics;
+using App.Metrics;
+using Microsoft.Azure.Storage;
 using Microsoft.Extensions.DependencyModel;
-using Microsoft.WindowsAzure.Storage;
 using Picton.Messaging.Logging;
 using Picton.Messaging.Messages;
 using System;

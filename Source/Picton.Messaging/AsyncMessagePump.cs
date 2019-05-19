@@ -1,7 +1,7 @@
-﻿using App.Metrics;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
-using Microsoft.WindowsAzure.Storage.Queue;
+using App.Metrics;
+using Microsoft.Azure.Storage;
+using Microsoft.Azure.Storage.Blob;
+using Microsoft.Azure.Storage.Queue;
 using Picton.Interfaces;
 using Picton.Managers;
 using Picton.Messaging.Logging;
