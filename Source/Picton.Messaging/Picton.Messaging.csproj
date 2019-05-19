@@ -17,7 +17,7 @@
     <Company></Company>
     <Description>High performance message processor (also known as a message "pump") designed to process messages from an Azure storage queue as efficiently as possible</Description>
     <Copyright>Copyright © Jeremie Desautels 2016 - Present</Copyright>
-    <PackageLicenseUrl>http://jericho.mit-license.org</PackageLicenseUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/Jericho/Picton.Messaging</PackageProjectUrl>
     <PackageIconUrl>https://github.com/identicons/jericho.png</PackageIconUrl>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
@@ -41,6 +41,7 @@
   <ItemGroup Condition=" '$(TargetFramework)' == 'net452' ">
     <Reference Include="System" />
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' != 'net452'">
