@@ -1,7 +1,7 @@
-﻿using App.Metrics;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
-using Microsoft.WindowsAzure.Storage.Queue;
+using App.Metrics;
+using Microsoft.Azure.Storage;
+using Microsoft.Azure.Storage.Blob;
+using Microsoft.Azure.Storage.Queue;
 using Picton.Interfaces;
 using Picton.Managers;
 using Picton.Messaging.Logging;
@@ -202,7 +202,7 @@ namespace Picton.Messaging
 			OnError = (message, exception, isPoison) => _logger.ErrorException("An error occured when processing a message", exception);
 		}
 
-		private async Task ProcessMessages(TimeSpan? visibilityTimeout = null, CancellationToken cancellationToken = default(CancellationToken))
+		private async Task ProcessMessages(TimeSpan? visibilityTimeout = null, CancellationToken cancellationToken = default)
 		{
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlim(_concurrentTasks, _concurrentTasks);
