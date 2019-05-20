@@ -202,7 +202,7 @@ namespace Picton.Messaging
 			OnError = (message, exception, isPoison) => _logger.ErrorException("An error occured when processing a message", exception);
 		}
 
-		private async Task ProcessMessages(TimeSpan? visibilityTimeout = null, CancellationToken cancellationToken = default(CancellationToken))
+		private async Task ProcessMessages(TimeSpan? visibilityTimeout = null, CancellationToken cancellationToken = default)
 		{
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlim(_concurrentTasks, _concurrentTasks);
