@@ -1,11 +1,11 @@
-﻿namespace Picton.Messaging.IntegrationTests
+namespace Picton.Messaging.IntegrationTests
 {
 	using Logging;
-	using Picton.Messaging.Logging.LogProviders;
 	using System;
 	using System.Collections.Generic;
 	using System.Globalization;
 
+	// Inspired by: https://github.com/damianh/LibLog/blob/master/src/LibLog.Example.ColoredConsoleLogProvider/ColoredConsoleLogProvider.cs
 	public class ColoredConsoleLogProvider : ILogProvider
 	{
 		private static readonly Dictionary<LogLevel, ConsoleColor> Colors = new Dictionary<LogLevel, ConsoleColor>
@@ -40,7 +40,7 @@
 				{
 					// Please note: locking is important to ensure that multiple threads 
 					// don't attempt to change the foreground color at the same time
-					lock (this)
+					lock (Console.Out)
 					{
 						if (Colors.TryGetValue(logLevel, out ConsoleColor consoleColor))
 						{
@@ -75,7 +75,7 @@
 		{
 			return NullDisposable.Instance;
 		}
-		
+
 		/// <summary>
 		/// Opens a mapped diagnostics context. Not supported in EntLib logging.
 		/// </summary>
