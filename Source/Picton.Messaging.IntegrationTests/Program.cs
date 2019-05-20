@@ -26,8 +26,9 @@ namespace Picton.Messaging.IntegrationTests
 			var logger = logProvider.GetLogger("Main");
 			LogProvider.SetCurrentLogProvider(logProvider);
 
-			// Ensure the Console is tall enough
+			// Ensure the Console is tall enough and centered on the screen
 			Console.WindowHeight = Math.Min(60, Console.LargestWindowHeight);
+			ConsoleUtils.CenterConsole();
 
 			// Configure where metrics are published to
 			var datadogApiKey = Environment.GetEnvironmentVariable("DATADOG_APIKEY");
