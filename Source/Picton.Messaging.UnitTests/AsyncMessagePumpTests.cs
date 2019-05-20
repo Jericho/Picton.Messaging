@@ -1,13 +1,12 @@
-﻿using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Auth;
-using Microsoft.WindowsAzure.Storage.Blob;
-using Microsoft.WindowsAzure.Storage.Queue;
+using Microsoft.Azure.Storage;
+using Microsoft.Azure.Storage.Auth;
+using Microsoft.Azure.Storage.Blob;
+using Microsoft.Azure.Storage.Queue;
 using Moq;
 using Shouldly;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
