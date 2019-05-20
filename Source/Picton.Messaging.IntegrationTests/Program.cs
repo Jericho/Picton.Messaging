@@ -59,10 +59,9 @@ namespace Picton.Messaging.IntegrationTests
 			// Setup the message queue in Azure storage emulator
 			var storageAccount = CloudStorageAccount.DevelopmentStorageAccount;
 			var queueName = "myqueue";
+			var numberOfMessages = 25;
 
 			logger(Logging.LogLevel.Info, () => "Begin integration tests...");
-
-			var numberOfMessages = 25;
 
 			var stringMessagesLogger = logProvider.GetLogger("StringMessages");
 			AddStringMessagesToQueue(numberOfMessages, queueName, storageAccount, stringMessagesLogger).Wait();
