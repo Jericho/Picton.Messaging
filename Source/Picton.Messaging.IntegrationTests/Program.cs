@@ -64,20 +64,17 @@ namespace Picton.Messaging.IntegrationTests
 
 			var numberOfMessages = 25;
 
-			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} string messages to the queue...");
-			AddStringMessagesToQueue(numberOfMessages, queueName, storageAccount, logProvider).Wait();
-			logger(Logging.LogLevel.Info, () => "Processing the messages in the queue...");
-			ProcessSimpleMessages(queueName, storageAccount, logProvider, metrics);
+			var stringMessagesLogger = logProvider.GetLogger("StringMessages");
+			AddStringMessagesToQueue(numberOfMessages, queueName, storageAccount, stringMessagesLogger).Wait();
+			ProcessSimpleMessages(queueName, storageAccount, stringMessagesLogger, metrics);
 
-			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} simple messages to the queue...");
-			AddSimpleMessagesToQueue(numberOfMessages, queueName, storageAccount, logProvider).Wait();
-			logger(Logging.LogLevel.Info, () => "Processing the messages in the queue...");
-			ProcessSimpleMessages(queueName, storageAccount, logProvider, metrics);
+			var simpleMessagesLogger = logProvider.GetLogger("SimpleMessages");
+			AddSimpleMessagesToQueue(numberOfMessages, queueName, storageAccount, simpleMessagesLogger).Wait();
+			ProcessSimpleMessages(queueName, storageAccount, simpleMessagesLogger, metrics);
 
-			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} messages with handlers to the queue...");
-			AddMessagesWithHandlerToQueue(numberOfMessages, queueName, storageAccount, logProvider).Wait();
-			logger(Logging.LogLevel.Info, () => "Processing the messages in the queue...");
-			ProcessMessagesWithHandlers(queueName, storageAccount, logProvider, metrics);
+			var messagesWithHandlerLogger = logProvider.GetLogger("MessagesWithHandler");
+			AddMessagesWithHandlerToQueue(numberOfMessages, queueName, storageAccount, messagesWithHandlerLogger).Wait();
+			ProcessMessagesWithHandlers(queueName, storageAccount, messagesWithHandlerLogger, metrics);
 
 			// Flush the console key buffer
 			while (Console.KeyAvailable) Console.ReadKey(true);
@@ -87,8 +84,10 @@ namespace Picton.Messaging.IntegrationTests
 			Console.ReadKey();
 		}
 
-		public static async Task AddStringMessagesToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, ILogProvider logProvider)
+		public static async Task AddStringMessagesToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, Logger logger)
 		{
+			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} string messages to the queue...");
+
 			var cloudQueueClient = storageAccount.CreateCloudQueueClient();
 			var cloudQueue = cloudQueueClient.GetQueueReference(queueName);
 			await cloudQueue.CreateIfNotExistsAsync().ConfigureAwait(false);
@@ -99,8 +98,10 @@ namespace Picton.Messaging.IntegrationTests
 			}
 		}
 
-		public static async Task AddSimpleMessagesToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, ILogProvider logProvider)
+		public static async Task AddSimpleMessagesToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, Logger logger)
 		{
+			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} simple messages to the queue...");
+
 			var queueManager = new QueueManager(queueName, storageAccount);
 			await queueManager.CreateIfNotExistsAsync().ConfigureAwait(false);
 			await queueManager.ClearAsync().ConfigureAwait(false);
@@ -110,9 +111,8 @@ namespace Picton.Messaging.IntegrationTests
 			}
 		}
 
-		public static void ProcessSimpleMessages(string queueName, CloudStorageAccount storageAccount, ILogProvider logProvider, IMetrics metrics)
+		public static void ProcessSimpleMessages(string queueName, CloudStorageAccount storageAccount, Logger logger, IMetrics metrics)
 		{
-			var logger = logProvider.GetLogger("ProcessSimpleMessages");
 			Stopwatch sw = null;
 
 			// Configure the message pump
@@ -145,8 +145,10 @@ namespace Picton.Messaging.IntegrationTests
 			logger(Logging.LogLevel.Info, () => $"\tDone in {sw.Elapsed.ToDurationString()}");
 		}
 
-		public static async Task AddMessagesWithHandlerToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, ILogProvider logProvider)
+		public static async Task AddMessagesWithHandlerToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, Logger logger)
 		{
+			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} messages with handlers to the queue...");
+
 			var queueManager = new QueueManager(queueName, storageAccount);
 			await queueManager.CreateIfNotExistsAsync().ConfigureAwait(false);
 			await queueManager.ClearAsync().ConfigureAwait(false);
@@ -156,10 +158,8 @@ namespace Picton.Messaging.IntegrationTests
 			}
 		}
 
-		public static void ProcessMessagesWithHandlers(string queueName, CloudStorageAccount storageAccount, ILogProvider logProvider, IMetrics metrics)
+		public static void ProcessMessagesWithHandlers(string queueName, CloudStorageAccount storageAccount, Logger logger, IMetrics metrics)
 		{
-			var logger = logProvider.GetLogger("ProcessMessagesWithHandlers");
-
 			Stopwatch sw = null;
 
 			// Configure the message pump
