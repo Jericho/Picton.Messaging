@@ -5,6 +5,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/Jericho/Picton.Messaging/badge.svg?branch=master)](https://coveralls.io/github/Jericho/Picton.Messaging?branch=master)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bhttps%3A%2F%2Fgithub.com%2FJericho%2FPicton.Messaging.svg?type=shield)](https://app.fossa.io/projects/git%2Bhttps%3A%2F%2Fgithub.com%2FJericho%2FPicton.Messaging?ref=badge_shield)
 
+
 ## About
 
 Picton.Messaging is a C# library containing a high performance message processor (also known as a message "pump") designed to process messages from an Azure storage queue as efficiently as possible.

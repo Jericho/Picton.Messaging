@@ -1,7 +1,7 @@
-﻿using App.Metrics;
+using App.Metrics;
 using App.Metrics.Scheduling;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Queue;
+using Microsoft.Azure.Storage;
+using Microsoft.Azure.Storage.Queue;
 using Picton.Managers;
 using Picton.Messaging.IntegrationTests.Datadog;
 using Picton.Messaging.Logging;
@@ -26,51 +26,54 @@ namespace Picton.Messaging.IntegrationTests
 			var logger = logProvider.GetLogger("Main");
 			LogProvider.SetCurrentLogProvider(logProvider);
 
-			// Ensure the Console is tall enough
+			// Ensure the Console is tall enough and centered on the screen
 			Console.WindowHeight = Math.Min(60, Console.LargestWindowHeight);
+			ConsoleUtils.CenterConsole();
 
-			// Configure where metrics are published to
+			// Configure where metrics are published to. By default, don't publish metrics
+			var metrics = (IMetricsRoot)null;
+
+			// In this example, I'm publishing metrics to a DataDog account
 			var datadogApiKey = Environment.GetEnvironmentVariable("DATADOG_APIKEY");
-			var metrics = new MetricsBuilder()
-				.Report.OverHttp(o =>
-				{
-					o.HttpSettings.RequestUri = new Uri($"https://app.datadoghq.com/api/v1/series?api_key={datadogApiKey}");
-					o.MetricsOutputFormatter = new DatadogFormatter(new DatadogFormatterOptions { Hostname = Environment.MachineName });
-					o.FlushInterval = TimeSpan.FromSeconds(2);
-				})
-				.Build();
+			if (!string.IsNullOrEmpty(datadogApiKey))
+			{
+				metrics = new MetricsBuilder()
+					.Report.OverHttp(o =>
+					{
+						o.HttpSettings.RequestUri = new Uri($"https://app.datadoghq.com/api/v1/series?api_key={datadogApiKey}");
+						o.MetricsOutputFormatter = new DatadogFormatter(new DatadogFormatterOptions { Hostname = Environment.MachineName });
+						o.FlushInterval = TimeSpan.FromSeconds(2);
+					})
+					.Build();
 
-			// Send metrics to Datadog
-			var sendMetricsJob = new AppMetricsTaskScheduler(
-				TimeSpan.FromSeconds(2),
-				async () =>
-				{
-					await Task.WhenAll(metrics.ReportRunner.RunAllAsync());
-				});
-			sendMetricsJob.Start();
+				// Send metrics to Datadog
+				var sendMetricsJob = new AppMetricsTaskScheduler(
+					TimeSpan.FromSeconds(2),
+					async () =>
+					{
+						await Task.WhenAll(metrics.ReportRunner.RunAllAsync());
+					});
+				sendMetricsJob.Start();
+			}
 
 			// Setup the message queue in Azure storage emulator
 			var storageAccount = CloudStorageAccount.DevelopmentStorageAccount;
 			var queueName = "myqueue";
+			var numberOfMessages = 25;
 
 			logger(Logging.LogLevel.Info, () => "Begin integration tests...");
 
-			var numberOfMessages = 25;
+			var stringMessagesLogger = logProvider.GetLogger("StringMessages");
+			AddStringMessagesToQueue(numberOfMessages, queueName, storageAccount, stringMessagesLogger).Wait();
+			ProcessSimpleMessages(queueName, storageAccount, stringMessagesLogger, metrics);
 
-			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} string messages to the queue...");
-			AddStringMessagesToQueue(numberOfMessages, queueName, storageAccount, logProvider).Wait();
-			logger(Logging.LogLevel.Info, () => "Processing the messages in the queue...");
-			ProcessSimpleMessages(queueName, storageAccount, logProvider, metrics);
+			var simpleMessagesLogger = logProvider.GetLogger("SimpleMessages");
+			AddSimpleMessagesToQueue(numberOfMessages, queueName, storageAccount, simpleMessagesLogger).Wait();
+			ProcessSimpleMessages(queueName, storageAccount, simpleMessagesLogger, metrics);
 
-			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} simple messages to the queue...");
-			AddSimpleMessagesToQueue(numberOfMessages, queueName, storageAccount, logProvider).Wait();
-			logger(Logging.LogLevel.Info, () => "Processing the messages in the queue...");
-			ProcessSimpleMessages(queueName, storageAccount, logProvider, metrics);
-
-			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} messages with handlers to the queue...");
-			AddMessagesWithHandlerToQueue(numberOfMessages, queueName, storageAccount, logProvider).Wait();
-			logger(Logging.LogLevel.Info, () => "Processing the messages in the queue...");
-			ProcessMessagesWithHandlers(queueName, storageAccount, logProvider, metrics);
+			var messagesWithHandlerLogger = logProvider.GetLogger("MessagesWithHandler");
+			AddMessagesWithHandlerToQueue(numberOfMessages, queueName, storageAccount, messagesWithHandlerLogger).Wait();
+			ProcessMessagesWithHandlers(queueName, storageAccount, messagesWithHandlerLogger, metrics);
 
 			// Flush the console key buffer
 			while (Console.KeyAvailable) Console.ReadKey(true);
@@ -80,8 +83,10 @@ namespace Picton.Messaging.IntegrationTests
 			Console.ReadKey();
 		}
 
-		public static async Task AddStringMessagesToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, ILogProvider logProvider)
+		public static async Task AddStringMessagesToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, Logger logger)
 		{
+			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} string messages to the queue...");
+
 			var cloudQueueClient = storageAccount.CreateCloudQueueClient();
 			var cloudQueue = cloudQueueClient.GetQueueReference(queueName);
 			await cloudQueue.CreateIfNotExistsAsync().ConfigureAwait(false);
@@ -92,8 +97,10 @@ namespace Picton.Messaging.IntegrationTests
 			}
 		}
 
-		public static async Task AddSimpleMessagesToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, ILogProvider logProvider)
+		public static async Task AddSimpleMessagesToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, Logger logger)
 		{
+			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} simple messages to the queue...");
+
 			var queueManager = new QueueManager(queueName, storageAccount);
 			await queueManager.CreateIfNotExistsAsync().ConfigureAwait(false);
 			await queueManager.ClearAsync().ConfigureAwait(false);
@@ -103,9 +110,8 @@ namespace Picton.Messaging.IntegrationTests
 			}
 		}
 
-		public static void ProcessSimpleMessages(string queueName, CloudStorageAccount storageAccount, ILogProvider logProvider, IMetrics metrics)
+		public static void ProcessSimpleMessages(string queueName, CloudStorageAccount storageAccount, Logger logger, IMetrics metrics)
 		{
-			var logger = logProvider.GetLogger("ProcessSimpleMessages");
 			Stopwatch sw = null;
 
 			// Configure the message pump
@@ -138,8 +144,10 @@ namespace Picton.Messaging.IntegrationTests
 			logger(Logging.LogLevel.Info, () => $"\tDone in {sw.Elapsed.ToDurationString()}");
 		}
 
-		public static async Task AddMessagesWithHandlerToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, ILogProvider logProvider)
+		public static async Task AddMessagesWithHandlerToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, Logger logger)
 		{
+			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} messages with handlers to the queue...");
+
 			var queueManager = new QueueManager(queueName, storageAccount);
 			await queueManager.CreateIfNotExistsAsync().ConfigureAwait(false);
 			await queueManager.ClearAsync().ConfigureAwait(false);
@@ -149,10 +157,8 @@ namespace Picton.Messaging.IntegrationTests
 			}
 		}
 
-		public static void ProcessMessagesWithHandlers(string queueName, CloudStorageAccount storageAccount, ILogProvider logProvider, IMetrics metrics)
+		public static void ProcessMessagesWithHandlers(string queueName, CloudStorageAccount storageAccount, Logger logger, IMetrics metrics)
 		{
-			var logger = logProvider.GetLogger("ProcessMessagesWithHandlers");
-
 			Stopwatch sw = null;
 
 			// Configure the message pump

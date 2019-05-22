@@ -1,6 +1,6 @@
-﻿using App.Metrics;
+using App.Metrics;
+using Microsoft.Azure.Storage;
 using Microsoft.Extensions.DependencyModel;
-using Microsoft.WindowsAzure.Storage;
 using Picton.Messaging.Logging;
 using Picton.Messaging.Messages;
 using System;
@@ -125,7 +125,14 @@ namespace Picton.Messaging
 
 		private static IDictionary<Type, Type[]> GetMessageHandlers()
 		{
+			_logger.Trace("Discovering message handlers.");
+
 			var assemblies = GetLocalAssemblies();
+
+			var assembliesCount = assemblies.Length;
+			if (assembliesCount == 0) _logger.Trace($"Did not find any local assembly.");
+			else if (assembliesCount == 1) _logger.Trace("Found 1 local assembly.");
+			else _logger.Trace($"Found {assemblies.Count()} local assemblies.");
 
 			var typesWithMessageHandlerInterfaces = assemblies
 				.SelectMany(x => x.GetTypes())
@@ -142,17 +149,25 @@ namespace Picton.Messaging
 				.Where(t => t.MessageTypes != null && t.MessageTypes.Any())
 				.ToArray();
 
+			var classesCount = typesWithMessageHandlerInterfaces.Length;
+			if (classesCount == 0) _logger.Trace($"Did not find any class implementing the 'IMessageHandler' interface.");
+			else if (classesCount == 1) _logger.Trace("Found 1 class implementing the 'IMessageHandler' interface.");
+			else _logger.Trace($"Found {typesWithMessageHandlerInterfaces.Count()} classes implementing the 'IMessageHandler' interface.");
+
 			var oneTypePerMessageHandler = typesWithMessageHandlerInterfaces
 				.SelectMany(t => t.MessageTypes, (t, messageType) =>
 				new
 				{
 					t.Type,
 					MessageType = messageType
-				}).ToArray();
+				})
+				.ToArray();
 
 			var messageHandlers = oneTypePerMessageHandler
 				.GroupBy(h => h.MessageType)
-				.ToDictionary(group => group.Key, group => group.Select(t => t.Type).ToArray());
+				.ToDictionary(group => group.Key, group => group.Select(t => t.Type)
+				.ToArray());
+
 			return messageHandlers;
 		}
 
@@ -162,13 +177,14 @@ namespace Picton.Messaging
 			return type;
 		}
 
-		private static IEnumerable<Assembly> GetLocalAssemblies()
+		private static Assembly[] GetLocalAssemblies()
 		{
 			var callingAssembly = Assembly.GetCallingAssembly();
 			var path = new Uri(System.IO.Path.GetDirectoryName(callingAssembly.Location)).AbsolutePath;
 
 			return AppDomain.CurrentDomain.GetAssemblies()
-				.Where(x => !x.IsDynamic && new Uri(x.CodeBase).AbsolutePath.Contains(path)).ToList();
+				.Where(x => !x.IsDynamic && new Uri(x.CodeBase).AbsolutePath.Contains(path))
+				.ToArray();
 		}
 #else
 		private static TypeInfo GetTypeInfo(Type type)
@@ -176,7 +192,7 @@ namespace Picton.Messaging
 			return type.GetTypeInfo();
 		}
 
-		private static IEnumerable<Assembly> GetLocalAssemblies()
+		private static Assembly[] GetLocalAssemblies()
 		{
 			var dependencies = DependencyContext.Default.RuntimeLibraries;
 
@@ -190,7 +206,7 @@ namespace Picton.Messaging
 				}
 			}
 
-			return assemblies;
+			return assemblies.ToArray();
 		}
 
 		private static bool IsCandidateLibrary(RuntimeLibrary library)
