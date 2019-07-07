@@ -5,7 +5,7 @@
 #tool nuget:?package=GitVersion.CommandLine&version=4.0.0
 #tool nuget:?package=GitReleaseManager&version=0.8.0
 #tool nuget:?package=OpenCover&version=4.7.922
-#tool nuget:?package=ReportGenerator&version=4.1.8
+#tool nuget:?package=ReportGenerator&version=4.2.5
 #tool nuget:?package=coveralls.io&version=1.4.2
 #tool nuget:?package=xunit.runner.console&version=2.4.1
 
@@ -149,7 +149,6 @@ Task("Restore-NuGet-Packages")
 	DotNetCoreRestore("./Source/", new DotNetCoreRestoreSettings
 	{
 		Sources = new [] {
-			"https://www.myget.org/F/xunit/api/v3/index.json",
 			"https://api.nuget.org/v3/index.json",
 		}
 	});
