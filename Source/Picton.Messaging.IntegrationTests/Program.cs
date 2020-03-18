@@ -1,7 +1,5 @@
 using App.Metrics;
 using App.Metrics.Scheduling;
-using Microsoft.Azure.Storage;
-using Microsoft.Azure.Storage.Queue;
 using Picton.Managers;
 using Picton.Messaging.IntegrationTests.Datadog;
 using Picton.Messaging.Logging;
@@ -57,23 +55,23 @@ namespace Picton.Messaging.IntegrationTests
 			}
 
 			// Setup the message queue in Azure storage emulator
-			var storageAccount = CloudStorageAccount.DevelopmentStorageAccount;
+			var connectionString = "UseDevelopmentStorage=true";
 			var queueName = "myqueue";
 			var numberOfMessages = 25;
 
 			logger(Logging.LogLevel.Info, () => "Begin integration tests...");
 
 			var stringMessagesLogger = logProvider.GetLogger("StringMessages");
-			AddStringMessagesToQueue(numberOfMessages, queueName, storageAccount, stringMessagesLogger).Wait();
-			ProcessSimpleMessages(queueName, storageAccount, stringMessagesLogger, metrics);
+			AddStringMessagesToQueue(numberOfMessages, queueName, connectionString, stringMessagesLogger).Wait();
+			ProcessSimpleMessages(queueName, connectionString, stringMessagesLogger, metrics);
 
 			var simpleMessagesLogger = logProvider.GetLogger("SimpleMessages");
-			AddSimpleMessagesToQueue(numberOfMessages, queueName, storageAccount, simpleMessagesLogger).Wait();
-			ProcessSimpleMessages(queueName, storageAccount, simpleMessagesLogger, metrics);
+			AddSimpleMessagesToQueue(numberOfMessages, queueName, connectionString, simpleMessagesLogger).Wait();
+			ProcessSimpleMessages(queueName, connectionString, simpleMessagesLogger, metrics);
 
 			var messagesWithHandlerLogger = logProvider.GetLogger("MessagesWithHandler");
-			AddMessagesWithHandlerToQueue(numberOfMessages, queueName, storageAccount, messagesWithHandlerLogger).Wait();
-			ProcessMessagesWithHandlers(queueName, storageAccount, messagesWithHandlerLogger, metrics);
+			AddMessagesWithHandlerToQueue(numberOfMessages, queueName, connectionString, messagesWithHandlerLogger).Wait();
+			ProcessMessagesWithHandlers(queueName, connectionString, messagesWithHandlerLogger, metrics);
 
 			// Flush the console key buffer
 			while (Console.KeyAvailable) Console.ReadKey(true);
@@ -83,26 +81,11 @@ namespace Picton.Messaging.IntegrationTests
 			Console.ReadKey();
 		}
 
-		public static async Task AddStringMessagesToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, Logger logger)
+		public static async Task AddStringMessagesToQueue(int numberOfMessages, string queueName, string connectionString, Logger logger)
 		{
 			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} string messages to the queue...");
 
-			var cloudQueueClient = storageAccount.CreateCloudQueueClient();
-			var cloudQueue = cloudQueueClient.GetQueueReference(queueName);
-			await cloudQueue.CreateIfNotExistsAsync().ConfigureAwait(false);
-			await cloudQueue.ClearAsync().ConfigureAwait(false);
-			for (var i = 0; i < numberOfMessages; i++)
-			{
-				await cloudQueue.AddMessageAsync(new CloudQueueMessage($"Hello world {i}")).ConfigureAwait(false);
-			}
-		}
-
-		public static async Task AddSimpleMessagesToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, Logger logger)
-		{
-			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} simple messages to the queue...");
-
-			var queueManager = new QueueManager(queueName, storageAccount);
-			await queueManager.CreateIfNotExistsAsync().ConfigureAwait(false);
+			var queueManager = new QueueManager(connectionString, queueName);
 			await queueManager.ClearAsync().ConfigureAwait(false);
 			for (var i = 0; i < numberOfMessages; i++)
 			{
@@ -110,12 +93,24 @@ namespace Picton.Messaging.IntegrationTests
 			}
 		}
 
-		public static void ProcessSimpleMessages(string queueName, CloudStorageAccount storageAccount, Logger logger, IMetrics metrics)
+		public static async Task AddSimpleMessagesToQueue(int numberOfMessages, string queueName, string connectionString, Logger logger)
+		{
+			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} simple messages to the queue...");
+
+			var queueManager = new QueueManager(connectionString, queueName);
+			await queueManager.ClearAsync().ConfigureAwait(false);
+			for (var i = 0; i < numberOfMessages; i++)
+			{
+				await queueManager.AddMessageAsync($"Hello world {i}").ConfigureAwait(false);
+			}
+		}
+
+		public static void ProcessSimpleMessages(string queueName, string connectionString, Logger logger, IMetrics metrics)
 		{
 			Stopwatch sw = null;
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePump(queueName, storageAccount, 10, null, TimeSpan.FromMinutes(1), 3, metrics)
+			var messagePump = new AsyncMessagePump(connectionString, queueName, 10, null, TimeSpan.FromMinutes(1), 3, metrics)
 			{
 				OnMessage = (message, cancellationToken) =>
 				{
@@ -144,12 +139,11 @@ namespace Picton.Messaging.IntegrationTests
 			logger(Logging.LogLevel.Info, () => $"\tDone in {sw.Elapsed.ToDurationString()}");
 		}
 
-		public static async Task AddMessagesWithHandlerToQueue(int numberOfMessages, string queueName, CloudStorageAccount storageAccount, Logger logger)
+		public static async Task AddMessagesWithHandlerToQueue(int numberOfMessages, string queueName, string connectionString, Logger logger)
 		{
 			logger(Logging.LogLevel.Info, () => $"Adding {numberOfMessages} messages with handlers to the queue...");
 
-			var queueManager = new QueueManager(queueName, storageAccount);
-			await queueManager.CreateIfNotExistsAsync().ConfigureAwait(false);
+			var queueManager = new QueueManager(connectionString, queueName);
 			await queueManager.ClearAsync().ConfigureAwait(false);
 			for (var i = 0; i < numberOfMessages; i++)
 			{
@@ -157,12 +151,12 @@ namespace Picton.Messaging.IntegrationTests
 			}
 		}
 
-		public static void ProcessMessagesWithHandlers(string queueName, CloudStorageAccount storageAccount, Logger logger, IMetrics metrics)
+		public static void ProcessMessagesWithHandlers(string queueName, string connectionString, Logger logger, IMetrics metrics)
 		{
 			Stopwatch sw = null;
 
 			// Configure the message pump
-			var messagePump = new AsyncMessagePumpWithHandlers(queueName, storageAccount, 10, null, TimeSpan.FromMinutes(1), 3, metrics);
+			var messagePump = new AsyncMessagePumpWithHandlers(connectionString, queueName, 10, null, TimeSpan.FromMinutes(1), 3, metrics);
 			messagePump.OnQueueEmpty = cancellationToken =>
 			{
 				// Stop the timer

@@ -1,8 +1,9 @@
 using App.Metrics;
-using Microsoft.Azure.Storage;
 using Microsoft.Extensions.DependencyModel;
+using Picton.Managers;
 using Picton.Messaging.Logging;
 using Picton.Messaging.Messages;
+using Picton.Messaging.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -69,16 +70,34 @@ namespace Picton.Messaging
 		/// <summary>
 		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
 		/// </summary>
+		/// <param name="connectionString">
+		/// A connection string includes the authentication information required for your application to access data in an Azure Storage account at runtime.
+		/// For more information, https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string.
+		/// </param>
 		/// <param name="queueName">Name of the queue.</param>
-		/// <param name="storageAccount">The cloud storage account.</param>
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poinson' messages.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMessagePumpWithHandlers(string queueName, CloudStorageAccount storageAccount, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
+		[ExcludeFromCodeCoverage]
+		public AsyncMessagePumpWithHandlers(string connectionString, string queueName, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
+			: this(new QueueManager(connectionString, queueName), string.IsNullOrEmpty(poisonQueueName) ? null : new QueueManager(connectionString, poisonQueueName), concurrentTasks, visibilityTimeout, maxDequeueCount, metrics)
 		{
-			_messagePump = new AsyncMessagePump(queueName, storageAccount, concurrentTasks, poisonQueueName, visibilityTimeout, maxDequeueCount, metrics)
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
+		/// </summary>
+		/// <param name="queueManager">The queue manager.</param>
+		/// <param name="poisonQueueManager">The poison queue manager.</param>
+		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
+		/// <param name="visibilityTimeout">The visibility timeout.</param>
+		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
+		/// <param name="metrics">The system where metrics are published.</param>
+		public AsyncMessagePumpWithHandlers(QueueManager queueManager, QueueManager poisonQueueManager, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
+		{
+			_messagePump = new AsyncMessagePump(queueManager, poisonQueueManager, concurrentTasks, visibilityTimeout, maxDequeueCount, metrics)
 			{
 				OnMessage = (message, cancellationToken) =>
 				{
