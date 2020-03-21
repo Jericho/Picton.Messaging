@@ -90,9 +90,6 @@ namespace Picton.Messaging.UnitTests
 			var mockQueueClient = MockUtils.GetMockQueueClient();
 
 			mockQueueClient
-				.SetupGet(q => q.MaxPeekableMessages)
-				.Returns(10);
-			mockQueueClient
 				.Setup(q => q.GetPropertiesAsync(It.IsAny<CancellationToken>()))
 				.ReturnsAsync((CancellationToken cancellationToken) =>
 				{
@@ -155,9 +152,6 @@ namespace Picton.Messaging.UnitTests
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 			var mockQueueClient = MockUtils.GetMockQueueClient();
 
-			mockQueueClient
-				.SetupGet(q => q.MaxPeekableMessages)
-				.Returns(10);
 			mockQueueClient
 				.Setup(q => q.GetPropertiesAsync(It.IsAny<CancellationToken>()))
 				.ReturnsAsync((CancellationToken cancellationToken) =>
@@ -251,9 +245,6 @@ namespace Picton.Messaging.UnitTests
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 			var mockQueueClient = MockUtils.GetMockQueueClient();
 
-			mockQueueClient
-				.SetupGet(q => q.MaxPeekableMessages)
-				.Returns(10);
 			mockQueueClient
 				.Setup(q => q.GetPropertiesAsync(It.IsAny<CancellationToken>()))
 				.ReturnsAsync((CancellationToken cancellationToken) =>
@@ -455,9 +446,6 @@ namespace Picton.Messaging.UnitTests
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 			var mockQueueClient = MockUtils.GetMockQueueClient();
 
-			mockQueueClient
-				.SetupGet(q => q.MaxPeekableMessages)
-				.Returns(10);
 			mockQueueClient
 				.Setup(q => q.GetPropertiesAsync(It.IsAny<CancellationToken>()))
 				.ReturnsAsync((CancellationToken cancellationToken) =>
