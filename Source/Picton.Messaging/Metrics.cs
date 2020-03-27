@@ -1,4 +1,4 @@
-﻿using App.Metrics;
+using App.Metrics;
 using App.Metrics.Counter;
 using App.Metrics.Gauge;
 using App.Metrics.Timer;
@@ -45,12 +45,22 @@ namespace Picton.Messaging
 		};
 
 		/// <summary>
-		/// Gets the gauge indicating the number of messages waiting in the queue over time.
+		/// Gets the gauge indicating the number of messages waiting in the Azure queue over time.
 		/// </summary>
-		public static GaugeOptions QueuedMessagesGauge => new GaugeOptions
+		public static GaugeOptions QueuedCloudMessagesGauge => new GaugeOptions
 		{
 			Context = "Picton",
-			Name = "QueuedMessages",
+			Name = "QueuedCloudMessages",
+			MeasurementUnit = Unit.Items
+		};
+
+		/// <summary>
+		/// Gets the gauge indicating the number of messages waiting in the memory queue over time.
+		/// </summary>
+		public static GaugeOptions QueuedMemoryMessagesGauge => new GaugeOptions
+		{
+			Context = "Picton",
+			Name = "QueuedMemoryMessages",
 			MeasurementUnit = Unit.Items
 		};
 	}
