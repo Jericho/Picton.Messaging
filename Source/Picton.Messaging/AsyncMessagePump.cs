@@ -1,7 +1,4 @@
 using App.Metrics;
-using Microsoft.Azure.Storage;
-using Microsoft.Azure.Storage.Blob;
-using Microsoft.Azure.Storage.Queue;
 using Picton.Interfaces;
 using Picton.Managers;
 using Picton.Messaging.Logging;
@@ -80,63 +77,42 @@ namespace Picton.Messaging
 		/// <summary>
 		/// Initializes a new instance of the <see cref="AsyncMessagePump"/> class.
 		/// </summary>
+		/// <param name="connectionString">
+		/// A connection string includes the authentication information required for your application to access data in an Azure Storage account at runtime.
+		/// For more information, https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string.
+		/// </param>
 		/// <param name="queueName">Name of the queue.</param>
-		/// <param name="storageAccount">The cloud storage account.</param>
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poison' messages.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMessagePump(string queueName, CloudStorageAccount storageAccount, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
+		[ExcludeFromCodeCoverage]
+		public AsyncMessagePump(string connectionString, string queueName, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
+			: this(new QueueManager(connectionString, queueName), string.IsNullOrEmpty(poisonQueueName) ? null : new QueueManager(connectionString, poisonQueueName), concurrentTasks, visibilityTimeout, maxDequeueCount, metrics)
 		{
-			if (storageAccount == null) throw new ArgumentNullException(nameof(storageAccount));
-
-			if (concurrentTasks < 1) throw new ArgumentException("Number of concurrent tasks must be greather than zero", nameof(concurrentTasks));
-			if (maxDequeueCount < 1) throw new ArgumentException("Number of retries must be greather than zero", nameof(maxDequeueCount));
-
-			var queueClient = storageAccount.CreateCloudQueueClient();
-			var blobClient = storageAccount.CreateCloudBlobClient();
-
-			_queueManager = new QueueManager(queueName, queueClient, blobClient);
-			_concurrentTasks = concurrentTasks;
-			_visibilityTimeout = visibilityTimeout;
-			_maxDequeueCount = maxDequeueCount;
-			_metrics = metrics ?? TurnOffMetrics();
-
-			if (!string.IsNullOrEmpty(poisonQueueName))
-			{
-				_poisonQueueManager = new QueueManager(poisonQueueName, queueClient, blobClient);
-			}
-
-			InitMessagePump();
 		}
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="AsyncMessagePump"/> class.
 		/// </summary>
-		/// <param name="queueName">Name of the queue.</param>
-		/// <param name="queueClient">The queue client.</param>
-		/// <param name="blobClient">The blob client.</param>
+		/// <param name="queueManager">The queue manager.</param>
+		/// <param name="poisonQueueManager">The poison queue manager.</param>
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
-		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poison' messages.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMessagePump(string queueName, CloudQueueClient queueClient, CloudBlobClient blobClient, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
+		public AsyncMessagePump(QueueManager queueManager, QueueManager poisonQueueManager, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
 		{
 			if (concurrentTasks < 1) throw new ArgumentException("Number of concurrent tasks must be greather than zero", nameof(concurrentTasks));
 			if (maxDequeueCount < 1) throw new ArgumentException("Number of retries must be greather than zero", nameof(maxDequeueCount));
 
-			_queueManager = new QueueManager(queueName, queueClient, blobClient);
+			_queueManager = queueManager ?? throw new ArgumentNullException(nameof(queueManager));
 			_concurrentTasks = concurrentTasks;
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
 			_metrics = metrics ?? TurnOffMetrics();
-
-			if (!string.IsNullOrEmpty(poisonQueueName))
-			{
-				_poisonQueueManager = new QueueManager(poisonQueueName, queueClient, blobClient);
-			}
+			_poisonQueueManager = poisonQueueManager;
 
 			InitMessagePump();
 		}
@@ -220,7 +196,7 @@ namespace Picton.Messaging
 						{
 							try
 							{
-								messages = await _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, null, null, cancellationToken).ConfigureAwait(false);
+								messages = await _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, cancellationToken).ConfigureAwait(false);
 							}
 							catch (TaskCanceledException)
 							{
@@ -264,15 +240,14 @@ namespace Picton.Messaging
 				cancellationToken,
 				TaskCreationOptions.LongRunning);
 
-			// Define the task that checks how many messages are queued
+			// Define the task that checks how many messages are queued in the Azure queue
 			RecurrentCancellableTask.StartNew(
 				async () =>
 				{
 					try
 					{
 						var count = await _queueManager.GetApproximateMessageCountAsync(cancellationToken).ConfigureAwait(false);
-						count += queuedMessages.Count;
-						_metrics.Measure.Gauge.SetValue(Metrics.QueuedMessagesGauge, count);
+						_metrics.Measure.Gauge.SetValue(Metrics.QueuedCloudMessagesGauge, count);
 					}
 					catch (TaskCanceledException)
 					{
@@ -281,8 +256,27 @@ namespace Picton.Messaging
 					}
 					catch (Exception e)
 					{
-						_logger.InfoException("An error occured while checking how many message are waiting in the queue. The error was caught and ignored.", e.GetBaseException());
+						_logger.InfoException("An error occured while checking how many message are waiting in the Azure queue. The error was caught and ignored.", e.GetBaseException());
 					}
+				},
+				TimeSpan.FromMilliseconds(5000),
+				cancellationToken,
+				TaskCreationOptions.LongRunning);
+
+			// Define the task that checks how many messages are queued in memory
+			RecurrentCancellableTask.StartNew(
+				() =>
+				{
+					try
+					{
+						_metrics.Measure.Gauge.SetValue(Metrics.QueuedMemoryMessagesGauge, queuedMessages.Count);
+					}
+					catch (Exception e)
+					{
+						_logger.InfoException("An error occured while checking how many message are waiting in the memory queue. The error was caught and ignored.", e.GetBaseException());
+					}
+
+					return Task.CompletedTask;
 				},
 				TimeSpan.FromMilliseconds(5000),
 				cancellationToken,
@@ -316,7 +310,7 @@ namespace Picton.Messaging
 
 										// Delete the processed message from the queue
 										// PLEASE NOTE: we use "CancellationToken.None" to ensure a processed message is deleted from the queue even when the message pump is shutting down
-										await _queueManager.DeleteMessageAsync(message, null, null, CancellationToken.None).ConfigureAwait(false);
+										await _queueManager.DeleteMessageAsync(message, CancellationToken.None).ConfigureAwait(false);
 									}
 									catch (Exception ex)
 									{
@@ -330,10 +324,10 @@ namespace Picton.Messaging
 												message.Metadata["PoisonExceptionMessage"] = ex.GetBaseException().Message;
 												message.Metadata["PoisonExceptionDetails"] = ex.GetBaseException().ToString();
 
-												await _poisonQueueManager.AddMessageAsync(message.Content, message.Metadata, null, null, null, null, CancellationToken.None).ConfigureAwait(false);
+												await _poisonQueueManager.AddMessageAsync(message.Content, message.Metadata, null, null, CancellationToken.None).ConfigureAwait(false);
 											}
 
-											await _queueManager.DeleteMessageAsync(message, null, null, CancellationToken.None).ConfigureAwait(false);
+											await _queueManager.DeleteMessageAsync(message, CancellationToken.None).ConfigureAwait(false);
 										}
 									}
 
