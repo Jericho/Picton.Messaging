@@ -25,7 +25,7 @@ namespace Picton.Messaging.IntegrationTests
 			LogProvider.SetCurrentLogProvider(logProvider);
 
 			// Ensure the Console is tall enough and centered on the screen
-			Console.WindowHeight = Math.Min(60, Console.LargestWindowHeight);
+			if (OperatingSystem.IsWindows()) Console.WindowHeight = Math.Min(60, Console.LargestWindowHeight);
 			ConsoleUtils.CenterConsole();
 
 			// Configure where metrics are published to. By default, don't publish metrics
