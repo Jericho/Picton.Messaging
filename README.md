@@ -1,6 +1,6 @@
 # Picton
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](http://jericho.mit-license.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://jericho.mit-license.org/)
 [![Build status](https://ci.appveyor.com/api/projects/status/2tl8wuancvf3awap?svg=true)](https://ci.appveyor.com/project/Jericho/picton.messaging)
 [![Coverage Status](https://coveralls.io/repos/github/Jericho/Picton.Messaging/badge.svg?branch=master)](https://coveralls.io/github/Jericho/Picton.Messaging?branch=master)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bhttps%3A%2F%2Fgithub.com%2FJericho%2FPicton.Messaging.svg?type=shield)](https://app.fossa.io/projects/git%2Bhttps%3A%2F%2Fgithub.com%2FJericho%2FPicton.Messaging?ref=badge_shield)
@@ -32,7 +32,7 @@ In December 2017 version 2.0 was released with a much more efficient method of f
 
 Picton.Messaging is available as a Nuget package.
 
-[![NuGet Version](http://img.shields.io/nuget/v/Picton.Messaging.svg)](https://www.nuget.org/packages/Picton.Messaging/)
+[![NuGet Version](https://img.shields.io/nuget/v/Picton.Messaging.svg)](https://www.nuget.org/packages/Picton.Messaging/)
 
 
 ## Installation
