@@ -3,9 +3,9 @@ using Microsoft.Extensions.DependencyModel;
 using Picton.Managers;
 using Picton.Messaging.Logging;
 using Picton.Messaging.Messages;
-using Picton.Messaging.Utilities;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -190,22 +190,6 @@ namespace Picton.Messaging
 			return messageHandlers;
 		}
 
-#if NETFULL
-		private static Type GetTypeInfo(Type type)
-		{
-			return type;
-		}
-
-		private static Assembly[] GetLocalAssemblies()
-		{
-			var callingAssembly = Assembly.GetCallingAssembly();
-			var path = new Uri(System.IO.Path.GetDirectoryName(callingAssembly.Location)).AbsolutePath;
-
-			return AppDomain.CurrentDomain.GetAssemblies()
-				.Where(x => !x.IsDynamic && new Uri(x.CodeBase).AbsolutePath.Contains(path))
-				.ToArray();
-		}
-#else
 		private static TypeInfo GetTypeInfo(Type type)
 		{
 			return type.GetTypeInfo();
@@ -236,7 +220,6 @@ namespace Picton.Messaging
 				!string.Equals(library.Type, "package", StringComparison.OrdinalIgnoreCase) &&
 				!string.Equals(library.Type, "referenceassembly", StringComparison.OrdinalIgnoreCase);
 		}
-#endif
 
 		#endregion
 	}
