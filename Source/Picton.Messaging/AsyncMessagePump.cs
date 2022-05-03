@@ -1,13 +1,12 @@
 using App.Metrics;
+using Microsoft.Extensions.Logging;
 using Picton.Interfaces;
 using Picton.Managers;
-using Picton.Messaging.Logging;
 using Picton.Messaging.Utilities;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -21,13 +20,12 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
-		private static readonly ILog _logger = LogProvider.For<AsyncMessagePump>();
-
 		private readonly IQueueManager _queueManager;
 		private readonly IQueueManager _poisonQueueManager;
 		private readonly int _concurrentTasks;
 		private readonly TimeSpan? _visibilityTimeout;
 		private readonly int _maxDequeueCount;
+		private readonly ILogger _logger;
 		private readonly IMetrics _metrics;
 
 		private CancellationTokenSource _cancellationTokenSource;
@@ -56,7 +54,7 @@ namespace Picton.Messaging
 		/// <remarks>
 		/// When isPoison is set to true, you should copy this message to a poison queue because it will be deleted from the original queue.
 		/// </remarks>
-		public Action<CloudMessage, Exception, bool> OnError { get; set; } = (message, exception, isPoison) => _logger.ErrorException("An error occured when processing a message", exception);
+		public Action<CloudMessage, Exception, bool> OnError { get; set; }
 
 		/// <summary>
 		/// Gets or sets the logic to execute when queue is empty.
@@ -69,7 +67,7 @@ namespace Picton.Messaging
 		/// <remarks>
 		/// If this property is not set, the default logic is to pause for 1.5 seconds.
 		/// </remarks>
-		public Action<CancellationToken> OnQueueEmpty { get; set; } = (cancellationToken) => Task.Delay(1500, cancellationToken).Wait();
+		public Action<CancellationToken> OnQueueEmpty { get; set; }
 
 		#endregion
 
@@ -89,8 +87,8 @@ namespace Picton.Messaging
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
 		[ExcludeFromCodeCoverage]
-		public AsyncMessagePump(string connectionString, string queueName, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
-			: this(new QueueManager(connectionString, queueName), string.IsNullOrEmpty(poisonQueueName) ? null : new QueueManager(connectionString, poisonQueueName), concurrentTasks, visibilityTimeout, maxDequeueCount, metrics)
+		public AsyncMessagePump(string connectionString, string queueName, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+			: this(new QueueManager(connectionString, queueName), string.IsNullOrEmpty(poisonQueueName) ? null : new QueueManager(connectionString, poisonQueueName), concurrentTasks, visibilityTimeout, maxDequeueCount, logger, metrics)
 		{
 		}
 
@@ -103,17 +101,20 @@ namespace Picton.Messaging
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMessagePump(QueueManager queueManager, QueueManager poisonQueueManager, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
+		public AsyncMessagePump(QueueManager queueManager, QueueManager poisonQueueManager, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
 		{
 			if (concurrentTasks < 1) throw new ArgumentOutOfRangeException("Number of concurrent tasks must be greather than zero", nameof(concurrentTasks));
 			if (maxDequeueCount < 1) throw new ArgumentOutOfRangeException("Number of retries must be greather than zero", nameof(maxDequeueCount));
 
 			_queueManager = queueManager ?? throw new ArgumentNullException(nameof(queueManager));
+			_poisonQueueManager = poisonQueueManager;
 			_concurrentTasks = concurrentTasks;
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
+			_logger = logger;
 			_metrics = metrics ?? TurnOffMetrics();
-			_poisonQueueManager = poisonQueueManager;
+
+			InitDefaultActions();
 		}
 
 		#endregion
@@ -128,7 +129,7 @@ namespace Picton.Messaging
 		{
 			if (OnMessage == null) throw new ArgumentNullException(nameof(OnMessage));
 
-			_logger.Trace($"{nameof(AsyncMessagePump)} starting...");
+			_logger?.LogTrace("AsyncMessagePump starting...");
 
 			_cancellationTokenSource = new CancellationTokenSource();
 			_safeToExitHandle = new ManualResetEvent(false);
@@ -137,7 +138,7 @@ namespace Picton.Messaging
 
 			_cancellationTokenSource.Dispose();
 
-			_logger.Trace($"{nameof(AsyncMessagePump)} ready to exit");
+			_logger?.LogTrace("AsyncMessagePump ready to exit");
 			_safeToExitHandle.Set();
 		}
 
@@ -150,15 +151,21 @@ namespace Picton.Messaging
 			if (_cancellationTokenSource?.IsCancellationRequested ?? false) return;
 
 			// Stop the message pump
-			_logger.Trace($"{nameof(AsyncMessagePump)} stopping...");
+			_logger?.LogTrace("AsyncMessagePump stopping...");
 			if (_cancellationTokenSource != null) _cancellationTokenSource.Cancel();
 			if (_safeToExitHandle != null) _safeToExitHandle.WaitOne();
-			_logger.Trace($"{nameof(AsyncMessagePump)} stopped, exiting safely");
+			_logger?.LogTrace("AsyncMessagePump stopped, exiting safely");
 		}
 
 		#endregion
 
 		#region PRIVATE METHODS
+
+		private void InitDefaultActions()
+		{
+			OnError = (message, exception, isPoison) => _logger?.LogError(exception, "An error occured when processing a message");
+			OnQueueEmpty = (cancellationToken) => Task.Delay(1500, cancellationToken).Wait();
+		}
 
 		private IMetrics TurnOffMetrics()
 		{
@@ -184,9 +191,49 @@ namespace Picton.Messaging
 					// Fetch messages from the Azure queue when the number of items in the concurrent queue falls below an "acceptable" level.
 					if (!cancellationToken.IsCancellationRequested && queuedMessages.Count <= _concurrentTasks / 2)
 					{
-						await foreach (var message in FetchMessages(visibilityTimeout, cancellationToken))
+						IEnumerable<CloudMessage> messages = null;
+						using (_metrics.Measure.Timer.Time(Metrics.MessagesFetchingTimer))
 						{
-							queuedMessages.Enqueue(message);
+							try
+							{
+								messages = await _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, cancellationToken).ConfigureAwait(false);
+							}
+							catch (TaskCanceledException)
+							{
+								// The message pump is shutting down.
+								// This exception can be safely ignored.
+							}
+							catch (Exception e)
+							{
+								_logger?.LogError(e.GetBaseException(), "An error occured while fetching messages from the Azure queue. The error was caught and ignored.");
+							}
+						}
+
+						if (messages == null) return;
+
+						if (messages.Any())
+						{
+							var messagesCount = messages.Count();
+							_logger?.LogTrace("Fetched {messagesCount} message(s) from the queue.", messagesCount);
+
+							foreach (var message in messages)
+							{
+								queuedMessages.Enqueue(message);
+							}
+						}
+						else
+						{
+							_logger?.LogTrace("The queue is empty, no messages fetched.");
+							try
+							{
+								// The queue is empty
+								OnQueueEmpty?.Invoke(cancellationToken);
+								_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
+							}
+							catch (Exception e)
+							{
+								_logger?.LogError(e.GetBaseException(), "An error occured when handling an empty queue. The error was caught and ignored.");
+							}
 						}
 					}
 				},
@@ -210,7 +257,7 @@ namespace Picton.Messaging
 					}
 					catch (Exception e)
 					{
-						_logger.InfoException("An error occured while checking how many message are waiting in the Azure queue. The error was caught and ignored.", e.GetBaseException());
+						_logger?.LogError(e.GetBaseException(), "An error occured while checking how many message are waiting in the Azure queue. The error was caught and ignored.");
 					}
 				},
 				TimeSpan.FromMilliseconds(5000),
@@ -227,7 +274,7 @@ namespace Picton.Messaging
 					}
 					catch (Exception e)
 					{
-						_logger.InfoException("An error occured while checking how many message are waiting in the memory queue. The error was caught and ignored.", e.GetBaseException());
+						_logger?.LogError(e.GetBaseException(), "An error occured while checking how many message are waiting in the memory queue. The error was caught and ignored.");
 					}
 
 					return Task.CompletedTask;
@@ -316,60 +363,6 @@ namespace Picton.Messaging
 
 			// Task pump has been canceled, wait for the currently running tasks to complete
 			await Task.WhenAll(runningTasks.Values).UntilCancelled().ConfigureAwait(false);
-		}
-
-		private async IAsyncEnumerable<CloudMessage> FetchMessages(TimeSpan? visibilityTimeout = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-		{
-			if (!cancellationToken.IsCancellationRequested)
-			{
-				using (_metrics.Measure.Timer.Time(Metrics.MessagesFetchingTimer))
-				{
-					IEnumerable<CloudMessage> messages = null;
-
-					try
-					{
-						messages = await _queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, cancellationToken).ConfigureAwait(false);
-					}
-					catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
-					{
-						// The message pump is shutting down.
-						// This exception can be safely ignored.
-					}
-					catch (Exception e)
-					{
-						_logger.InfoException($"An error occured while fetching messages from the {_queueManager.QueueName} Azure queue. The error was caught and ignored.", e.GetBaseException());
-					}
-
-					if (messages != null && messages.Any())
-					{
-						_logger.Trace($"Fetched {messages.Count()} message(s) from the {_queueManager.QueueName} Azure queue.");
-
-						foreach (var message in messages)
-						{
-							yield return message;
-						}
-					}
-					else
-					{
-						_logger.Trace($"Queue {_queueManager.QueueName} is empty, no messages fetched.");
-						try
-						{
-							// The queue is empty
-							OnQueueEmpty?.Invoke(cancellationToken);
-							_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
-						}
-						catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
-						{
-							// The message pump is shutting down.
-							// This exception can be safely ignored.
-						}
-						catch (Exception e)
-						{
-							_logger.InfoException($"An error occured when handling an empty queue {_queueManager.QueueName}. The error was caught and ignored.", e.GetBaseException());
-						}
-					}
-				}
-			}
 		}
 	}
 

@@ -1,7 +1,7 @@
 using App.Metrics;
 using Microsoft.Extensions.DependencyModel;
+using Microsoft.Extensions.Logging;
 using Picton.Managers;
-using Picton.Messaging.Logging;
 using Picton.Messaging.Messages;
 using System;
 using System.Collections.Generic;
@@ -20,9 +20,9 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
-		private static readonly ILog _logger = LogProvider.For<AsyncMessagePumpWithHandlers>();
 		private static readonly IDictionary<Type, Type[]> _messageHandlers = GetMessageHandlers();
 
+		private readonly ILogger _logger;
 		private readonly AsyncMessagePump _messagePump;
 
 		#endregion
@@ -81,8 +81,8 @@ namespace Picton.Messaging
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
 		[ExcludeFromCodeCoverage]
-		public AsyncMessagePumpWithHandlers(string connectionString, string queueName, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
-			: this(new QueueManager(connectionString, queueName), string.IsNullOrEmpty(poisonQueueName) ? null : new QueueManager(connectionString, poisonQueueName), concurrentTasks, visibilityTimeout, maxDequeueCount, metrics)
+		public AsyncMessagePumpWithHandlers(string connectionString, string queueName, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+			: this(new QueueManager(connectionString, queueName), string.IsNullOrEmpty(poisonQueueName) ? null : new QueueManager(connectionString, poisonQueueName), concurrentTasks, visibilityTimeout, maxDequeueCount, logger, metrics)
 		{
 		}
 
@@ -95,9 +95,9 @@ namespace Picton.Messaging
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMessagePumpWithHandlers(QueueManager queueManager, QueueManager poisonQueueManager, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, IMetrics metrics = null)
+		public AsyncMessagePumpWithHandlers(QueueManager queueManager, QueueManager poisonQueueManager, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
 		{
-			_messagePump = new AsyncMessagePump(queueManager, poisonQueueManager, concurrentTasks, visibilityTimeout, maxDequeueCount, metrics)
+			_messagePump = new AsyncMessagePump(queueManager, poisonQueueManager, concurrentTasks, visibilityTimeout, maxDequeueCount, _logger, metrics)
 			{
 				OnMessage = (message, cancellationToken) =>
 				{

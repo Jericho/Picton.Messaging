@@ -17,7 +17,7 @@ namespace Picton.Messaging.UnitTests
 		{
 			Should.Throw<ArgumentNullException>(() =>
 			{
-				var messagePump = new AsyncMessagePump((QueueManager)null, null, 1, TimeSpan.FromMinutes(1), 1, null);
+				var messagePump = new AsyncMessagePump((QueueManager)null, null, 1, TimeSpan.FromMinutes(1), 1, null, null);
 			});
 		}
 
@@ -28,9 +28,9 @@ namespace Picton.Messaging.UnitTests
 			{
 				var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 				var mockQueueClient = MockUtils.GetMockQueueClient();
-				var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object);
+				var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object, false);
 
-				var messagePump = new AsyncMessagePump(queueManager, null, 0, TimeSpan.FromMinutes(1), 1, null);
+				var messagePump = new AsyncMessagePump(queueManager, null, 0, TimeSpan.FromMinutes(1), 1, null, null);
 			});
 		}
 
@@ -41,9 +41,9 @@ namespace Picton.Messaging.UnitTests
 			{
 				var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 				var mockQueueClient = MockUtils.GetMockQueueClient();
-				var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object);
+				var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object, false);
 
-				var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 0, null);
+				var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 0, null, null);
 			});
 		}
 
@@ -53,9 +53,9 @@ namespace Picton.Messaging.UnitTests
 			// Arrange
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 			var mockQueueClient = MockUtils.GetMockQueueClient();
-			var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object);
+			var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object, true);
 
-			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null);
+			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null, null);
 
 			// Act
 			Should.Throw<ArgumentNullException>(() => messagePump.Start());
@@ -67,9 +67,9 @@ namespace Picton.Messaging.UnitTests
 			// Arrange
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 			var mockQueueClient = MockUtils.GetMockQueueClient();
-			var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object);
+			var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object, true);
 
-			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null);
+			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null, null);
 
 			// Act
 			messagePump.Stop();
@@ -459,7 +459,7 @@ namespace Picton.Messaging.UnitTests
 
 			var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object);
 
-			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null)
+			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null, null)
 			{
 				OnMessage = (message, cancellationToken) =>
 				{
