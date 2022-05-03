@@ -19,7 +19,15 @@ namespace Picton.Messaging.UnitTests
 		{
 			var mockContainerUri = new Uri(BLOB_STORAGE_URL + containerName);
 			var blobContainerInfo = BlobsModelFactory.BlobContainerInfo(ETag.All, DateTimeOffset.UtcNow);
-			var mockBlobContainer = new Mock<BlobContainerClient>(MockBehavior.Strict, mockContainerUri, (BlobClientOptions)null);
+			var mockBlobContainer = new Mock<BlobContainerClient>(MockBehavior.Strict);
+
+			mockBlobContainer
+				.SetupGet(m => m.Name)
+				.Returns(containerName);
+
+			mockBlobContainer
+				.SetupGet(m => m.Uri)
+				.Returns(mockContainerUri);
 
 			mockBlobContainer
 				.Setup(c => c.CreateIfNotExists(It.IsAny<PublicAccessType>(), It.IsAny<IDictionary<string, string>>(), It.IsAny<BlobContainerEncryptionScopeOptions>(), It.IsAny<CancellationToken>()))
@@ -37,20 +45,34 @@ namespace Picton.Messaging.UnitTests
 			return mockBlobContainer;
 		}
 
+		internal static Mock<BlobClient> GetMockBlobClient(string blobName)
+		{
+			var mockBlobUri = new Uri(BLOB_STORAGE_URL + blobName);
+			var mockBlobClient = new Mock<BlobClient>(MockBehavior.Strict);
+
+			mockBlobClient
+				.SetupGet(m => m.Name)
+				.Returns(blobName);
+
+			mockBlobClient
+				.SetupGet(m => m.Uri)
+				.Returns(mockBlobUri);
+
+			return mockBlobClient;
+		}
+
 		internal static Mock<QueueClient> GetMockQueueClient(string queueName = "myqueue")
 		{
 			var mockQueueStorageUri = new Uri(QUEUE_STORAGE_URL + queueName);
-			var mockQueueClient = new Mock<QueueClient>(MockBehavior.Strict, mockQueueStorageUri, (QueueClientOptions)null);
+			var mockQueueClient = new Mock<QueueClient>(MockBehavior.Strict);
 
 			mockQueueClient
-				.SetupGet(q => q.MessageMaxBytes)
-				.Returns(int.MaxValue);
-			mockQueueClient
-				.SetupGet(q => q.MaxPeekableMessages)
-				.Returns(10);
+				.SetupGet(m => m.Uri)
+				.Returns(mockQueueStorageUri);
+
 			mockQueueClient
 				.Setup(c => c.CreateIfNotExists(It.IsAny<IDictionary<string, string>>(), It.IsAny<CancellationToken>()))
-				.Returns(new MockAzureResponse(200, "ok"))
+				.Returns((Response)null)
 				.Verifiable();
 
 			return mockQueueClient;

@@ -2,7 +2,7 @@ using System;
 
 namespace Picton.Messaging.IntegrationTests
 {
-	public static class ConsoleUtils
+	internal static class Utils
 	{
 		public static void CenterConsole()
 		{
@@ -23,10 +23,21 @@ namespace Picton.Messaging.IntegrationTests
 			var consoleWidth = consoleInfo.Right - consoleInfo.Left;
 			var consoleHeight = consoleInfo.Bottom - consoleInfo.Top;
 
-			var left = monitorInfo.Monitor.Left + (monitorWidth - consoleWidth) / 2;
-			var top = monitorInfo.Monitor.Top + (monitorHeight - consoleHeight) / 2;
+			var left = monitorInfo.Monitor.Left + ((monitorWidth - consoleWidth) / 2);
+			var top = monitorInfo.Monitor.Top + ((monitorHeight - consoleHeight) / 2);
 
 			NativeMethods.MoveWindow(hWin, left, top, consoleWidth, consoleHeight, false);
+		}
+
+		public static char Prompt(string prompt)
+		{
+			while (Console.KeyAvailable)
+			{
+				Console.ReadKey(false);
+			}
+			Console.Out.WriteLine(prompt);
+			var result = Console.ReadKey();
+			return result.KeyChar;
 		}
 	}
 }
