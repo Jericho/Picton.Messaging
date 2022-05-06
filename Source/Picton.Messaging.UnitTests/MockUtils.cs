@@ -67,6 +67,14 @@ namespace Picton.Messaging.UnitTests
 			var mockQueueClient = new Mock<QueueClient>(MockBehavior.Strict);
 
 			mockQueueClient
+				.SetupGet(m => m.MaxPeekableMessages)
+				.Returns(32);
+
+			mockQueueClient
+				.SetupGet(m => m.MessageMaxBytes)
+				.Returns(65536);
+
+			mockQueueClient
 				.SetupGet(m => m.Uri)
 				.Returns(mockQueueStorageUri);
 
