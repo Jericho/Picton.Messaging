@@ -7,7 +7,7 @@ namespace Picton.Messaging.IntegrationTests
 	{
 		private readonly ILogger _log;
 
-		public MyMessageHandler(ILogger<MyMessageHandler> log)
+		public MyMessageHandler(ILogger log)
 		{
 			_log = log;
 		}

@@ -116,7 +116,16 @@ namespace Picton.Messaging
 
 					foreach (var handlerType in handlers)
 					{
-						var handler = Activator.CreateInstance(handlerType);
+						object handler = null;
+						if (handlerType.GetConstructor(new[] { typeof(ILogger) }) != null)
+						{
+							handler = Activator.CreateInstance(handlerType, new[] { (object)logger });
+						}
+						else
+						{
+							handler = Activator.CreateInstance(handlerType);
+						}
+
 						var handlerMethod = handlerType.GetMethod("Handle", new[] { contentType });
 						handlerMethod.Invoke(handler, new[] { message.Content });
 					}
