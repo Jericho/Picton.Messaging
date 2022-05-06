@@ -78,7 +78,7 @@ namespace Picton.Messaging.IntegrationTests
 				// Run the integration tests
 				await RunAsyncMessagePumpTests(connectionString, queueName, numberOfMessages, metrics, cancellationToken).ConfigureAwait(false);
 				await RunAsyncMessagePumpWithHandlersTests(connectionString, queueName, numberOfMessages, metrics, cancellationToken).ConfigureAwait(false);
-				//await RunMultiTenantAsyncMessagePumpTests(connectionString, queueName, numberOfTenants, numberOfMessages, metrics, cancellationToken).ConfigureAwait(false);
+				await RunMultiTenantAsyncMessagePumpTests(connectionString, queueName, numberOfTenants, numberOfMessages, metrics, cancellationToken).ConfigureAwait(false);
 			}
 
 			// Prompt user to press a key in order to allow reading the log in the console
@@ -205,7 +205,7 @@ namespace Picton.Messaging.IntegrationTests
 				OnMessage = (tenantId, message, cancellationToken) =>
 				{
 					var messageContent = message.Content.ToString();
-					_logger.LogDebug($"{tenantId} - {messageContent}", tenantId, messageContent);
+					_logger.LogInformation($"{tenantId} - {messageContent}", tenantId, messageContent);
 				}
 			};
 
