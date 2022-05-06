@@ -20,7 +20,9 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
-		private static readonly IDictionary<Type, Type[]> _messageHandlers = GetMessageHandlers();
+		private static readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
+
+		private static IDictionary<Type, Type[]> _messageHandlers;
 
 		private readonly ILogger _logger;
 		private readonly AsyncMessagePump _messagePump;
@@ -120,6 +122,8 @@ namespace Picton.Messaging
 					}
 				}
 			};
+
+			DiscoverMessageHandlersIfNecessary(logger);
 		}
 
 		#endregion
@@ -146,9 +150,38 @@ namespace Picton.Messaging
 
 		#region PRIVATE METHODS
 
-		private static IDictionary<Type, Type[]> GetMessageHandlers()
+		private static void DiscoverMessageHandlersIfNecessary(ILogger logger)
 		{
-			_logger.Trace("Discovering message handlers.");
+			try
+			{
+				_lock.EnterUpgradeableReadLock();
+
+				if (_messageHandlers == null)
+				{
+					try
+					{
+						_lock.EnterWriteLock();
+
+						if (_messageHandlers == null)
+						{
+							_messageHandlers = GetMessageHandlers(null);
+						}
+					}
+					finally
+					{
+						if (_lock.IsWriteLockHeld) _lock.ExitWriteLock();
+					}
+				}
+			}
+			finally
+			{
+				if (_lock.IsUpgradeableReadLockHeld) _lock.ExitUpgradeableReadLock();
+			}
+		}
+
+		private static IDictionary<Type, Type[]> GetMessageHandlers(ILogger logger)
+		{
+			logger?.LogTrace("Discovering message handlers.");
 
 			var assemblies = GetLocalAssemblies();
 
