@@ -85,6 +85,7 @@ namespace Picton.Messaging
 		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poison' messages.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
+		/// <param name="logger">The logger.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
 		[ExcludeFromCodeCoverage]
 		public AsyncMessagePump(string connectionString, string queueName, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
@@ -100,6 +101,7 @@ namespace Picton.Messaging
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
+		/// <param name="logger">The logger.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
 		public AsyncMessagePump(QueueManager queueManager, QueueManager poisonQueueManager, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
 		{
