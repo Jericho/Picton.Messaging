@@ -153,19 +153,19 @@ namespace Picton.Messaging
 			var assemblies = GetLocalAssemblies();
 
 			var assembliesCount = assemblies.Length;
-			if (assembliesCount == 0) _logger.Trace($"Did not find any local assembly.");
-			else if (assembliesCount == 1) _logger.Trace("Found 1 local assembly.");
-			else _logger.Trace($"Found {assemblies.Count()} local assemblies.");
+			if (assembliesCount == 0) logger?.LogTrace($"Did not find any local assembly.");
+			else if (assembliesCount == 1) logger?.LogTrace("Found 1 local assembly.");
+			else logger?.LogTrace($"Found {assemblies.Count()} local assemblies.");
 
 			var typesWithMessageHandlerInterfaces = assemblies
 				.SelectMany(x => x.GetTypes())
-				.Where(t => !GetTypeInfo(t).IsInterface)
+				.Where(t => !t.GetTypeInfo().IsInterface)
 				.Select(type => new
 				{
 					Type = type,
 					MessageTypes = type
 						.GetInterfaces()
-							.Where(i => GetTypeInfo(i).IsGenericType)
+							.Where(i => i.GetTypeInfo().IsGenericType)
 							.Where(i => i.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
 							.SelectMany(i => i.GetGenericArguments())
 				})
@@ -173,9 +173,9 @@ namespace Picton.Messaging
 				.ToArray();
 
 			var classesCount = typesWithMessageHandlerInterfaces.Length;
-			if (classesCount == 0) _logger.Trace($"Did not find any class implementing the 'IMessageHandler' interface.");
-			else if (classesCount == 1) _logger.Trace("Found 1 class implementing the 'IMessageHandler' interface.");
-			else _logger.Trace($"Found {typesWithMessageHandlerInterfaces.Count()} classes implementing the 'IMessageHandler' interface.");
+			if (classesCount == 0) logger?.LogTrace("Did not find any class implementing the 'IMessageHandler' interface.");
+			else if (classesCount == 1) logger?.LogTrace("Found 1 class implementing the 'IMessageHandler' interface.");
+			else logger?.LogTrace($"Found {typesWithMessageHandlerInterfaces.Count()} classes implementing the 'IMessageHandler' interface.");
 
 			var oneTypePerMessageHandler = typesWithMessageHandlerInterfaces
 				.SelectMany(t => t.MessageTypes, (t, messageType) =>
@@ -192,11 +192,6 @@ namespace Picton.Messaging
 				.ToArray());
 
 			return messageHandlers;
-		}
-
-		private static TypeInfo GetTypeInfo(Type type)
-		{
-			return type.GetTypeInfo();
 		}
 
 		private static Assembly[] GetLocalAssemblies()
