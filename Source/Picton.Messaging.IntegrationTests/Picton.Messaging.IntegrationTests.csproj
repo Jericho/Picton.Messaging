@@ -14,11 +14,11 @@
   <ItemGroup>
     <PackageReference Include="App.Metrics.Datadog" Version="4.3.0" />
     <PackageReference Include="App.Metrics.Reporting.Http" Version="4.3.0" />
-    <PackageReference Include="Logzio.DotNet.NLog" Version="1.0.13" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="6.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.1" />
-    <PackageReference Include="NLog.Extensions.Logging" Version="1.7.4" />
+    <PackageReference Include="Logzio.DotNet.NLog" Version="1.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
+    <PackageReference Include="NLog.Extensions.Logging" Version="5.3.7" />
   </ItemGroup>
 
   <ItemGroup>
