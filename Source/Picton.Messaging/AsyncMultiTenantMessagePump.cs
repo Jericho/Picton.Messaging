@@ -1,5 +1,6 @@
 using App.Metrics;
 using Azure;
+using Azure.Storage.Blobs;
 using Azure.Storage.Queues;
 using Azure.Storage.Queues.Models;
 using Microsoft.Extensions.Logging;
@@ -25,7 +26,11 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
-		private readonly ConcurrentDictionary<string, (string QueueName, DateTime LastFetched, TimeSpan FetchDelay)> _queues = new ConcurrentDictionary<string, (string QueueName, DateTime LastFetched, TimeSpan FetchDelay)>();
+		private readonly Func<string, QueueManager> _queueManagerFactory;
+
+		private readonly ConcurrentDictionary<string, Lazy<(QueueManager QueueManager, DateTime LastFetched, TimeSpan FetchDelay)>> _tenantQueueManagers = new();
+		private readonly RoundRobinList<string> _tenantIds = new RoundRobinList<string>(Array.Empty<string>());
+
 		private readonly IQueueManager _poisonQueueManager;
 		private readonly string _connectionString;
 		private readonly string _queueNamePrefix;
@@ -92,12 +97,29 @@ namespace Picton.Messaging
 		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poison' messages.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
+		/// <param name="queueClientOptions">
+		/// Optional client options that define the transport pipeline
+		/// policies for authentication, retries, etc., that are applied to
+		/// every request to the queue.
+		/// </param>
+		/// <param name="blobClientOptions">
+		/// Optional client options that define the transport pipeline
+		/// policies for authentication, retries, etc., that are applied to
+		/// every request to the blob storage.
+		/// </param>
 		/// <param name="logger">The logger.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMultiTenantMessagePump(string connectionString, string queueNamePrefix, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+		public AsyncMultiTenantMessagePump(string connectionString, string queueNamePrefix, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, QueueClientOptions queueClientOptions = null, BlobClientOptions blobClientOptions = null, ILogger logger = null, IMetrics metrics = null)
 		{
 			if (concurrentTasks < 1) throw new ArgumentOutOfRangeException("Number of concurrent tasks must be greather than zero", nameof(concurrentTasks));
 			if (maxDequeueCount < 1) throw new ArgumentOutOfRangeException("Number of retries must be greather than zero", nameof(maxDequeueCount));
+
+			_queueManagerFactory = (tenantId) =>
+			{
+				var blobContainerClient = new BlobContainerClient(connectionString, $"{queueNamePrefix}{tenantId}-oversized-messages", blobClientOptions);
+				var queueClient = new QueueClient(connectionString, $"{queueNamePrefix}{tenantId}", queueClientOptions);
+				return new QueueManager(blobContainerClient, queueClient, true);
+			};
 
 			_connectionString = connectionString ?? throw new ArgumentNullException(connectionString);
 			_queueNamePrefix = queueNamePrefix ?? throw new ArgumentNullException(queueNamePrefix);
@@ -175,7 +197,7 @@ namespace Picton.Messaging
 		{
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlim(_concurrentTasks, _concurrentTasks);
-			var queuedMessages = new ConcurrentQueue<(string TenantId, string QueueName, CloudMessage Message)>();
+			var queuedMessages = new ConcurrentQueue<(string TenantId, CloudMessage Message)>();
 
 			// Define the task that discovers queues that follow the naming convention
 			RecurrentCancellableTask.StartNew(
@@ -191,7 +213,7 @@ namespace Picton.Messaging
 							{
 								if (!queue.Name.Equals(_queueNamePrefix, StringComparison.OrdinalIgnoreCase))
 								{
-									_ = _queues.GetOrAdd(queue.Name.TrimStart(_queueNamePrefix), tenantId => (queue.Name, DateTime.MinValue, TimeSpan.Zero));
+									_tenantIds.AddIfNotPresent(queue.Name.TrimStart(_queueNamePrefix));
 								}
 							}
 						}
@@ -206,7 +228,7 @@ namespace Picton.Messaging
 						_logger?.LogError(e.GetBaseException(), "An error occured while fetching the Azure queues that match the naming convention. The error was caught and ignored.");
 					}
 				},
-				TimeSpan.FromMilliseconds(5000),
+				TimeSpan.FromMilliseconds(15000),
 				cancellationToken,
 				TaskCreationOptions.LongRunning);
 
@@ -235,17 +257,16 @@ namespace Picton.Messaging
 				async () =>
 				{
 					var count = 0;
-					foreach (var dictionaryItem in _queues)
+					foreach (var kvp in _tenantQueueManagers)
 					{
-						var tenantId = dictionaryItem.Key;
-						(var queueName, var lastFetched, var fetchDelay) = dictionaryItem.Value;
+						var tenantId = kvp.Key;
+						(var queueManager, var lastFetched, var fetchDelay) = kvp.Value.Value;
 
 						try
 						{
-							var queueClient = new QueueClient(_connectionString, queueName);
-							var properties = await queueClient.GetPropertiesAsync(cancellationToken).ConfigureAwait(false);
+							var properties = await queueManager.GetPropertiesAsync(cancellationToken).ConfigureAwait(false);
 
-							count += properties.Value.ApproximateMessagesCount;
+							count += properties.ApproximateMessagesCount;
 						}
 						catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
 						{
@@ -255,7 +276,8 @@ namespace Picton.Messaging
 						catch (RequestFailedException rfe) when (rfe.ErrorCode == "QueueNotFound")
 						{
 							// The queue has been deleted
-							_queues.Remove(tenantId, out _);
+							_tenantIds.Remove(tenantId);
+							_tenantQueueManagers.Remove(tenantId, out _);
 						}
 						catch (Exception e)
 						{
@@ -305,9 +327,9 @@ namespace Picton.Messaging
 
 							using (_metrics.Measure.Timer.Time(Metrics.MessageProcessingTimer))
 							{
-								if (queuedMessages.TryDequeue(out (string TenantId, string QueueName, CloudMessage Message) result))
+								if (queuedMessages.TryDequeue(out (string TenantId, CloudMessage Message) result))
 								{
-									var queueManager = new QueueManager(_connectionString, result.QueueName);
+									var tenantInfo = GetTenantInfo(result.TenantId);
 
 									try
 									{
@@ -316,7 +338,7 @@ namespace Picton.Messaging
 
 										// Delete the processed message from the queue
 										// PLEASE NOTE: we use "CancellationToken.None" to ensure a processed message is deleted from the queue even when the message pump is shutting down
-										await queueManager.DeleteMessageAsync(result.Message, CancellationToken.None).ConfigureAwait(false);
+										await tenantInfo.QueueManager.DeleteMessageAsync(result.Message, CancellationToken.None).ConfigureAwait(false);
 									}
 									catch (Exception ex)
 									{
@@ -333,7 +355,7 @@ namespace Picton.Messaging
 												await _poisonQueueManager.AddMessageAsync(result.Message.Content, result.Message.Metadata, null, null, CancellationToken.None).ConfigureAwait(false);
 											}
 
-											await queueManager.DeleteMessageAsync(result.Message, CancellationToken.None).ConfigureAwait(false);
+											await tenantInfo.QueueManager.DeleteMessageAsync(result.Message, CancellationToken.None).ConfigureAwait(false);
 										}
 									}
 
@@ -370,25 +392,25 @@ namespace Picton.Messaging
 			await Task.WhenAll(runningTasks.Values).UntilCancelled().ConfigureAwait(false);
 		}
 
-		private async IAsyncEnumerable<(string TenantId, string QueueName, CloudMessage Message)> FetchMessages(TimeSpan? visibilityTimeout = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+		private async IAsyncEnumerable<(string TenantId, CloudMessage Message)> FetchMessages(TimeSpan? visibilityTimeout = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
 		{
-			var atLeastOneMessage = false;
+			var messageCount = 0;
+			var originalTenant = _tenantIds.Current;
 
 			using (_metrics.Measure.Timer.Time(Metrics.MessagesFetchingTimer))
 			{
-				foreach (var dictionaryItem in _queues)
+				do
 				{
-					var tenantId = dictionaryItem.Key;
-					(var queueName, var lastFetched, var fetchDelay) = dictionaryItem.Value;
+					var tenantId = _tenantIds.MoveToNextItem();
+					var tenantInfo = GetTenantInfo(tenantId);
 
-					if (!cancellationToken.IsCancellationRequested && lastFetched.Add(fetchDelay) < DateTime.UtcNow)
+					if (!cancellationToken.IsCancellationRequested && tenantInfo.LastFetched.Add(tenantInfo.FetchDelay) < DateTime.UtcNow)
 					{
 						IEnumerable<CloudMessage> messages = null;
 
 						try
 						{
-							var queueManager = new QueueManager(_connectionString, dictionaryItem.Value.QueueName, false);
-							messages = await queueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, cancellationToken).ConfigureAwait(false);
+							messages = await tenantInfo.QueueManager.GetMessagesAsync(_concurrentTasks, visibilityTimeout, cancellationToken).ConfigureAwait(false);
 						}
 						catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
 						{
@@ -398,7 +420,8 @@ namespace Picton.Messaging
 						catch (RequestFailedException rfe) when (rfe.ErrorCode == "QueueNotFound")
 						{
 							// The queue has been deleted
-							_queues.Remove(tenantId, out _);
+							_tenantIds.Remove(tenantId);
+							_tenantQueueManagers.Remove(tenantId, out _);
 						}
 						catch (Exception e)
 						{
@@ -407,50 +430,37 @@ namespace Picton.Messaging
 
 						if (messages != null && messages.Any())
 						{
-							atLeastOneMessage = true;
-
 							var messagesCount = messages.Count();
 							_logger?.LogTrace("Fetched {messagesCount} message(s) for tenant {tenantId}.", messagesCount, tenantId);
 
 							foreach (var message in messages)
 							{
-								yield return (tenantId, dictionaryItem.Value.QueueName, message);
+								Interlocked.Increment(ref messageCount);
+								yield return (tenantId, message);
 							}
 
 							// Reset the Fetch delay to zero to indicate that we can fetch more messages from this queue as soon as possible
-							_queues.TryUpdate(tenantId, (queueName, DateTime.UtcNow, TimeSpan.Zero), (queueName, lastFetched, fetchDelay));
+							_tenantQueueManagers[tenantId] = new Lazy<(QueueManager, DateTime, TimeSpan)>((tenantInfo.QueueManager, DateTime.UtcNow, TimeSpan.Zero));
 						}
 						else
 						{
 							_logger?.LogTrace("There are no messages for tenant {tenantId}.", tenantId);
-							try
-							{
-								// The queue is empty
-								_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
-							}
-							catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
-							{
-								// The message pump is shutting down.
-								// This exception can be safely ignored.
-							}
-							catch (RequestFailedException rfe) when (rfe.ErrorCode == "QueueNotFound")
-							{
-								// The queue has been deleted
-								_queues.Remove(tenantId, out _);
-							}
-							catch (Exception e)
-							{
-								_logger?.LogError(e.GetBaseException(), "An error occured when handling an empty queue for tenant {tenantId}. The error was caught and ignored.", tenantId);
-							}
+							_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
 
 							// Set a "resonable" fetch delay to ensure we don't query an empty queue too often
-							_queues.TryUpdate(tenantId, (queueName, DateTime.UtcNow, TimeSpan.FromSeconds(5)), (queueName, lastFetched, fetchDelay));
+							var delay = tenantInfo.FetchDelay.Add(TimeSpan.FromSeconds(5));
+							if (delay.TotalSeconds > 15) delay = TimeSpan.FromSeconds(15);
+
+							_tenantQueueManagers[tenantId] = new Lazy<(QueueManager, DateTime, TimeSpan)>((tenantInfo.QueueManager, DateTime.UtcNow, delay));
 						}
 					}
 				}
+
+				// Stop when we either retrieved the desired number of messages OR we have looped through all the known tenants
+				while (messageCount < _concurrentTasks && (string.IsNullOrEmpty(originalTenant) || originalTenant != _tenantIds.Current));
 			}
 
-			if (!atLeastOneMessage)
+			if (messageCount == 0)
 			{
 				_logger?.LogTrace("All tenant queues are empty, no messages fetched.");
 				try
@@ -469,6 +479,20 @@ namespace Picton.Messaging
 					_logger?.LogError(e.GetBaseException(), "An error occured when handling empty queues. The error was caught and ignored.");
 				}
 			}
+		}
+
+		private (QueueManager QueueManager, DateTime LastFetched, TimeSpan FetchDelay) GetTenantInfo(string tenantId)
+		{
+			var lazyQueueManager = _tenantQueueManagers.GetOrAdd(tenantId, tenantId =>
+			{
+				return new Lazy<(QueueManager, DateTime, TimeSpan)>(() =>
+				{
+					_tenantIds.AddIfNotPresent(tenantId);
+					return (_queueManagerFactory.Invoke(tenantId), DateTime.MinValue, TimeSpan.Zero);
+				});
+			});
+
+			return lazyQueueManager.Value;
 		}
 
 		#endregion

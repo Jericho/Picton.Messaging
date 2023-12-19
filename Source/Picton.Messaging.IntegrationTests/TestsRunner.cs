@@ -200,7 +200,7 @@ namespace Picton.Messaging.IntegrationTests
 			Stopwatch sw = null;
 
 			// Configure the message pump
-			var messagePump = new AsyncMultiTenantMessagePump(connectionString, queueNamePrefix, 10, null, TimeSpan.FromMinutes(1), 3, _logger, metrics)
+			var messagePump = new AsyncMultiTenantMessagePump(connectionString, queueNamePrefix, 10, null, TimeSpan.FromMinutes(1), 3, null, null, _logger, metrics)
 			{
 				OnMessage = (tenantId, message, cancellationToken) =>
 				{
