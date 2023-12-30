@@ -213,9 +213,16 @@ namespace Picton.Messaging
 							{
 								if (!queue.Name.Equals(_queueNamePrefix, StringComparison.OrdinalIgnoreCase))
 								{
-									_tenantIds.AddIfNotPresent(queue.Name.TrimStart(_queueNamePrefix));
+									_tenantIds.Add(queue.Name.TrimStart(_queueNamePrefix));
 								}
 							}
+						}
+
+						// Randomize where we start
+						if (_tenantIds.Current == null)
+						{
+							var randomIndex = RandomGenerator.Instance.GetInt32(0, _tenantIds.Count);
+							_tenantIds.ResetTo(randomIndex);
 						}
 					}
 					catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
@@ -487,7 +494,7 @@ namespace Picton.Messaging
 			{
 				return new Lazy<(QueueManager, DateTime, TimeSpan)>(() =>
 				{
-					_tenantIds.AddIfNotPresent(tenantId);
+					_tenantIds.Add(tenantId);
 					return (_queueManagerFactory.Invoke(tenantId), DateTime.MinValue, TimeSpan.Zero);
 				});
 			});

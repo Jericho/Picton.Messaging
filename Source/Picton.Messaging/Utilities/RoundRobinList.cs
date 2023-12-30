@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 
 namespace Picton.Messaging.Utilities
@@ -27,6 +28,8 @@ namespace Picton.Messaging.Utilities
 			}
 		}
 
+		public int Count => _linkedList.Count;
+
 		/// <summary>
 		/// Reset the Round Robin to point to the first item.
 		/// </summary>
@@ -52,6 +55,22 @@ namespace Picton.Messaging.Utilities
 			{
 				_lock.EnterWriteLock();
 				_current = _linkedList.Find(item);
+			}
+			finally
+			{
+				if (_lock.IsWriteLockHeld) _lock.ExitWriteLock();
+			}
+		}
+
+		/// <summary>
+		/// Reset the Round Robin to point to the item at the specified index.
+		/// </summary>
+		public void ResetTo(int index)
+		{
+			try
+			{
+				_lock.EnterWriteLock();
+				_current = _linkedList.Find(_linkedList.ElementAt(index));
 			}
 			finally
 			{
@@ -110,23 +129,6 @@ namespace Picton.Messaging.Utilities
 		}
 
 		public void Add(T item)
-		{
-			try
-			{
-				_lock.EnterWriteLock();
-
-				if (!_linkedList.Contains(item))
-				{
-					_linkedList.AddLast(item);
-				}
-			}
-			finally
-			{
-				if (_lock.IsWriteLockHeld) _lock.ExitWriteLock();
-			}
-		}
-
-		public void AddIfNotPresent(T item)
 		{
 			try
 			{
