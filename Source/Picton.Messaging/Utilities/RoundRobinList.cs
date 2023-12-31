@@ -7,7 +7,7 @@ namespace Picton.Messaging.Utilities
 {
 	internal class RoundRobinList<T>
 	{
-		private static readonly ReaderWriterLockSlim _lock = new();
+		private static readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
 		private readonly LinkedList<T> _linkedList;
 		private LinkedListNode<T> _current;
 

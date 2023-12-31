@@ -28,7 +28,7 @@ namespace Picton.Messaging
 
 		private readonly Func<string, QueueManager> _queueManagerFactory;
 
-		private readonly ConcurrentDictionary<string, Lazy<(QueueManager QueueManager, DateTime LastFetched, TimeSpan FetchDelay)>> _tenantQueueManagers = new();
+		private readonly ConcurrentDictionary<string, Lazy<(QueueManager QueueManager, DateTime LastFetched, TimeSpan FetchDelay)>> _tenantQueueManagers = new ConcurrentDictionary<string, Lazy<(QueueManager QueueManager, DateTime LastFetched, TimeSpan FetchDelay)>>();
 		private readonly RoundRobinList<string> _tenantIds = new RoundRobinList<string>(Array.Empty<string>());
 
 		private readonly IQueueManager _poisonQueueManager;
@@ -284,7 +284,7 @@ namespace Picton.Messaging
 						{
 							// The queue has been deleted
 							_tenantIds.Remove(tenantId);
-							_tenantQueueManagers.Remove(tenantId, out _);
+							_tenantQueueManagers.TryRemove(tenantId, out _);
 						}
 						catch (Exception e)
 						{
@@ -428,7 +428,7 @@ namespace Picton.Messaging
 						{
 							// The queue has been deleted
 							_tenantIds.Remove(tenantId);
-							_tenantQueueManagers.Remove(tenantId, out _);
+							_tenantQueueManagers.TryRemove(tenantId, out _);
 						}
 						catch (Exception e)
 						{
@@ -447,7 +447,7 @@ namespace Picton.Messaging
 							}
 
 							// Reset the Fetch delay to zero to indicate that we can fetch more messages from this queue as soon as possible
-							_tenantQueueManagers[tenantId] = new Lazy<(QueueManager, DateTime, TimeSpan)>((tenantInfo.QueueManager, DateTime.UtcNow, TimeSpan.Zero));
+							_tenantQueueManagers[tenantId] = new Lazy<(QueueManager, DateTime, TimeSpan)>(() => (tenantInfo.QueueManager, DateTime.UtcNow, TimeSpan.Zero));
 						}
 						else
 						{
@@ -458,7 +458,7 @@ namespace Picton.Messaging
 							var delay = tenantInfo.FetchDelay.Add(TimeSpan.FromSeconds(5));
 							if (delay.TotalSeconds > 15) delay = TimeSpan.FromSeconds(15);
 
-							_tenantQueueManagers[tenantId] = new Lazy<(QueueManager, DateTime, TimeSpan)>((tenantInfo.QueueManager, DateTime.UtcNow, delay));
+							_tenantQueueManagers[tenantId] = new Lazy<(QueueManager, DateTime, TimeSpan)>(() => (tenantInfo.QueueManager, DateTime.UtcNow, delay));
 						}
 					}
 				}
