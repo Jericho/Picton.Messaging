@@ -14,6 +14,8 @@
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -27,6 +29,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/Jericho/Picton.Messaging</PackageProjectUrl>
     <PackageIconUrl>https://github.com/identicons/jericho.png</PackageIconUrl>
+    <PackageIcon>PackageIcon.png</PackageIcon>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageTags>Picton Picton.Messaging Azure messaging</PackageTags>
     <PackageReleaseNotes></PackageReleaseNotes>
