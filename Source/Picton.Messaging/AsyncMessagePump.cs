@@ -28,9 +28,6 @@ namespace Picton.Messaging
 		private readonly ILogger _logger;
 		private readonly IMetrics _metrics;
 
-		private CancellationTokenSource _cancellationTokenSource;
-		private ManualResetEvent _safeToExitHandle;
-
 		#endregion
 
 		#region PROPERTIES
@@ -126,37 +123,16 @@ namespace Picton.Messaging
 		/// <summary>
 		/// Starts the message pump.
 		/// </summary>
+		/// <param name="cancellationToken">The cancellation token.</param>
 		/// <exception cref="System.ArgumentNullException">OnMessage.</exception>
-		public void Start()
+		/// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+		public async Task StartAsync(CancellationToken cancellationToken)
 		{
 			if (OnMessage == null) throw new ArgumentNullException(nameof(OnMessage));
 
 			_logger?.LogTrace("AsyncMessagePump starting...");
-
-			_cancellationTokenSource = new CancellationTokenSource();
-			_safeToExitHandle = new ManualResetEvent(false);
-
-			ProcessMessages(_visibilityTimeout, _cancellationTokenSource.Token).Wait();
-
-			_cancellationTokenSource.Dispose();
-
-			_logger?.LogTrace("AsyncMessagePump ready to exit");
-			_safeToExitHandle.Set();
-		}
-
-		/// <summary>
-		/// Stops the message pump.
-		/// </summary>
-		public void Stop()
-		{
-			// Don't attempt to stop the message pump if it's already in the process of stopping
-			if (_cancellationTokenSource?.IsCancellationRequested ?? false) return;
-
-			// Stop the message pump
+			await ProcessMessagesAsync(_visibilityTimeout, cancellationToken).ConfigureAwait(false);
 			_logger?.LogTrace("AsyncMessagePump stopping...");
-			if (_cancellationTokenSource != null) _cancellationTokenSource.Cancel();
-			if (_safeToExitHandle != null) _safeToExitHandle.WaitOne();
-			_logger?.LogTrace("AsyncMessagePump stopped, exiting safely");
 		}
 
 		#endregion
@@ -180,7 +156,7 @@ namespace Picton.Messaging
 			return metricsTurnedOff.Build();
 		}
 
-		private async Task ProcessMessages(TimeSpan? visibilityTimeout = null, CancellationToken cancellationToken = default)
+		private async Task ProcessMessagesAsync(TimeSpan? visibilityTimeout, CancellationToken cancellationToken)
 		{
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlim(_concurrentTasks, _concurrentTasks);
@@ -229,8 +205,8 @@ namespace Picton.Messaging
 							try
 							{
 								// The queue is empty
-								OnQueueEmpty?.Invoke(cancellationToken);
 								_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
+								OnQueueEmpty?.Invoke(cancellationToken);
 							}
 							catch (Exception e)
 							{

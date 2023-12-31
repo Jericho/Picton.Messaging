@@ -57,26 +57,64 @@ namespace WorkerRole1
 {
 	public class MyWorkerRole : RoleEntryPoint
 	{
-		private AsyncMessagePump _messagePump;
+		private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+		private readonly ManualResetEvent runCompleteEvent = new ManualResetEvent(false);
 
 		public override void Run()
 		{
-			Trace.TraceInformation("MyWorkerRole is running");
-			_messagePump.Start();
+			Trace.TraceInformation("WorkerRole is running");
+
+			try
+			{
+				this.RunAsync(this.cancellationTokenSource.Token).Wait();
+			}
+			finally
+			{
+				this.runCompleteEvent.Set();
+			}
 		}
 
 		public override bool OnStart()
 		{
-			var storageAccount = CloudStorageAccount.DevelopmentStorageAccount;
-			var queueName = "myqueue";
-			var poisonQueueName = "myqueue-poison";
+			// Use TLS 1.2 for Service Bus connections
+			ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
-			// Configure the message pump
-			_messagePump = new AsyncMessagePump(queueName, storageAccount, 25, poisonQueueName, TimeSpan.FromMinutes(1), 3)
+			// Set the maximum number of concurrent connections
+			ServicePointManager.DefaultConnectionLimit = 12;
+
+			// For information on handling configuration changes
+			// see the MSDN topic at https://go.microsoft.com/fwlink/?LinkId=166357.
+
+			bool result = base.OnStart();
+
+			Trace.TraceInformation("WorkerRole has been started");
+
+			return result;
+		}
+
+		public override void OnStop()
+		{
+			Trace.TraceInformation("WorkerRole is stopping");
+
+			this.cancellationTokenSource.Cancel();
+			this.runCompleteEvent.WaitOne();
+
+			base.OnStop();
+
+			Trace.TraceInformation("WorkerRole has stopped");
+		}
+
+		private async Task RunAsync(CancellationToken cancellationToken)
+		{
+			var connectionString = "<-- insert connection string for your Azure account -->";
+			var queueName = "<-- insert the name of your Azure queue -->";
+
+            // Configure the message pump
+			var messagePump = new AsyncMessagePump(connectionString, queueName, 10, null, TimeSpan.FromMinutes(1), 3)
 			{
-				OnMessage = (message, cancellationToken) =>
+            	OnMessage = (message, cancellationToken) =>
 				{
-					Debug.WriteLine(message.AsString);
+					Debug.WriteLine("Received message of type {message.Content.GetType()}");
 				},
 				OnError = (message, exception, isPoison) =>
 				{
@@ -84,17 +122,8 @@ namespace WorkerRole1
 				}
 			};
 
-			Trace.TraceInformation("MyWorkerRole started");
-
-			return base.OnStart();
-		}
-
-		public override void OnStop()
-		{
-			Trace.TraceInformation("MyWorkerRole is stopping");
-			_messagePump.Stop();
-			base.OnStop();
-			Trace.TraceInformation("MyWorkerRole has stopped");
+			// Start the message pump
+			await messagePump.StartAsync(cancellationToken);
 		}
 	}
 }

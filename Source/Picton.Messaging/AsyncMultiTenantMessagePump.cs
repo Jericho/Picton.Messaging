@@ -40,9 +40,6 @@ namespace Picton.Messaging
 		private readonly ILogger _logger;
 		private readonly IMetrics _metrics;
 
-		private CancellationTokenSource _cancellationTokenSource;
-		private ManualResetEvent _safeToExitHandle;
-
 		#endregion
 
 		#region PROPERTIES
@@ -140,37 +137,16 @@ namespace Picton.Messaging
 		/// <summary>
 		/// Starts the message pump.
 		/// </summary>
+		/// <param name="cancellationToken">The cancellation token.</param>
 		/// <exception cref="System.ArgumentNullException">OnMessage.</exception>
-		public void Start()
+		/// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+		public async Task StartAsync(CancellationToken cancellationToken)
 		{
 			if (OnMessage == null) throw new ArgumentNullException(nameof(OnMessage));
 
 			_logger?.LogTrace("AsyncMultiTenantMessagePump starting message pump...");
-
-			_cancellationTokenSource = new CancellationTokenSource();
-			_safeToExitHandle = new ManualResetEvent(false);
-
-			ProcessMessages(_visibilityTimeout, _cancellationTokenSource.Token).Wait();
-
-			_cancellationTokenSource.Dispose();
-
-			_logger?.LogTrace("AsyncMultiTenantMessagePump ready to exit");
-			_safeToExitHandle.Set();
-		}
-
-		/// <summary>
-		/// Stops the message pump.
-		/// </summary>
-		public void Stop()
-		{
-			// Don't attempt to stop the message pump if it's already in the process of stopping
-			if (_cancellationTokenSource?.IsCancellationRequested ?? false) return;
-
-			// Stop the message pump
+			await ProcessMessagesAsync(_visibilityTimeout, cancellationToken).ConfigureAwait(false);
 			_logger?.LogTrace("AsyncMultiTenantMessagePump stopping message pump...");
-			if (_cancellationTokenSource != null) _cancellationTokenSource.Cancel();
-			if (_safeToExitHandle != null) _safeToExitHandle.WaitOne();
-			_logger?.LogTrace("AsyncMultiTenantMessagePump stopped, exiting safely");
 		}
 
 		#endregion
@@ -193,7 +169,7 @@ namespace Picton.Messaging
 			return metricsTurnedOff.Build();
 		}
 
-		private async Task ProcessMessages(TimeSpan? visibilityTimeout = null, CancellationToken cancellationToken = default)
+		private async Task ProcessMessagesAsync(TimeSpan? visibilityTimeout, CancellationToken cancellationToken)
 		{
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlim(_concurrentTasks, _concurrentTasks);
@@ -399,7 +375,7 @@ namespace Picton.Messaging
 			await Task.WhenAll(runningTasks.Values).UntilCancelled().ConfigureAwait(false);
 		}
 
-		private async IAsyncEnumerable<(string TenantId, CloudMessage Message)> FetchMessages(TimeSpan? visibilityTimeout = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+		private async IAsyncEnumerable<(string TenantId, CloudMessage Message)> FetchMessages(TimeSpan? visibilityTimeout, [EnumeratorCancellation] CancellationToken cancellationToken)
 		{
 			var messageCount = 0;
 			var originalTenant = _tenantIds.Current;
@@ -464,7 +440,7 @@ namespace Picton.Messaging
 				}
 
 				// Stop when we either retrieved the desired number of messages OR we have looped through all the known tenants
-				while (messageCount < _concurrentTasks && (string.IsNullOrEmpty(originalTenant) || originalTenant != _tenantIds.Current));
+				while (messageCount < (_concurrentTasks * 2) && (string.IsNullOrEmpty(originalTenant) || originalTenant != _tenantIds.Current));
 			}
 
 			if (messageCount == 0)
@@ -473,8 +449,8 @@ namespace Picton.Messaging
 				try
 				{
 					// All queues are empty
-					OnEmpty?.Invoke(cancellationToken);
 					_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
+					OnEmpty?.Invoke(cancellationToken);
 				}
 				catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
 				{

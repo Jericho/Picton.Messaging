@@ -9,6 +9,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Picton.Messaging
 {
@@ -142,17 +143,12 @@ namespace Picton.Messaging
 		/// <summary>
 		/// Starts the message pump.
 		/// </summary>
-		public void Start()
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <exception cref="System.ArgumentNullException">OnMessage.</exception>
+		/// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+		public Task StartAsync(CancellationToken cancellationToken)
 		{
-			_messagePump.Start();
-		}
-
-		/// <summary>
-		/// Stops the message pump.
-		/// </summary>
-		public void Stop()
-		{
-			_messagePump.Stop();
+			return _messagePump.StartAsync(cancellationToken);
 		}
 
 		#endregion
