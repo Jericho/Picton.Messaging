@@ -1,20 +1,19 @@
-﻿using Picton.Messaging.Logging;
+using Microsoft.Extensions.Logging;
 using Picton.Messaging.Messages;
 
 namespace Picton.Messaging.IntegrationTests
 {
 	public class MyMessageHandler : IMessageHandler<MyMessage>
 	{
-		private readonly Logger _logger;
+		private readonly ILogger _log;
 
-		public MyMessageHandler()
+		public MyMessageHandler(ILogger log)
 		{
-			var logProvider = new ColoredConsoleLogProvider(Logging.LogLevel.Debug);
-			_logger = logProvider.GetLogger("MyMessageHandler");
+			_log = log;
 		}
 		public void Handle(MyMessage message)
 		{
-			_logger(Logging.LogLevel.Debug, () => message.MessageContent);
+			_log.LogInformation(message.MessageContent);
 		}
 	}
 }

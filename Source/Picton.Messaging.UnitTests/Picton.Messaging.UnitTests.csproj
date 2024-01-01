@@ -1,21 +1,36 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net461;net472;netcoreapp3.1</TargetFrameworks>
+    <TargetFrameworks>net48;net7.0</TargetFrameworks>
     <AssemblyName>Picton.Messaging.UnitTests</AssemblyName>
     <RootNamespace>Picton.Messaging.UnitTests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.4.0" />
-    <PackageReference Include="Moq" Version="4.13.1" />
-    <PackageReference Include="Shouldly" Version="3.0.2" />
-    <PackageReference Include="xunit" Version="2.4.1" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1">
+    <PackageReference Include="coverlet.msbuild" Version="6.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="Moq" Version="4.20.70" />
+    <PackageReference Include="Shouldly" Version="4.2.1" />
+    <PackageReference Include="xunit" Version="2.6.4" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.6">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
   </ItemGroup>
+
+  <!--
+  This is necesary because this unit test project is referenced by the BenchMark
+  project (which utilizes Benchmark.NET) and Benchmark.NET requires optimized references.
+  -->
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DefineConstants>$(DefineConstants);RELEASE;TRACE</DefineConstants>
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>portable</DebugType>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Picton.Messaging\Picton.Messaging.csproj" />

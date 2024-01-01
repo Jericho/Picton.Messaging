@@ -6,6 +6,7 @@ using Shouldly;
 using System;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Picton.Messaging.UnitTests
@@ -17,7 +18,7 @@ namespace Picton.Messaging.UnitTests
 		{
 			Should.Throw<ArgumentNullException>(() =>
 			{
-				var messagePump = new AsyncMessagePump((QueueManager)null, null, 1, TimeSpan.FromMinutes(1), 1, null);
+				var messagePump = new AsyncMessagePump((QueueManager)null, null, 1, TimeSpan.FromMinutes(1), 1, null, null);
 			});
 		}
 
@@ -28,9 +29,9 @@ namespace Picton.Messaging.UnitTests
 			{
 				var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 				var mockQueueClient = MockUtils.GetMockQueueClient();
-				var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object);
+				var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object, false);
 
-				var messagePump = new AsyncMessagePump(queueManager, null, 0, TimeSpan.FromMinutes(1), 1, null);
+				var messagePump = new AsyncMessagePump(queueManager, null, 0, TimeSpan.FromMinutes(1), 1, null, null);
 			});
 		}
 
@@ -41,9 +42,9 @@ namespace Picton.Messaging.UnitTests
 			{
 				var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 				var mockQueueClient = MockUtils.GetMockQueueClient();
-				var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object);
+				var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object, false);
 
-				var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 0, null);
+				var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 0, null, null);
 			});
 		}
 
@@ -53,33 +54,18 @@ namespace Picton.Messaging.UnitTests
 			// Arrange
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 			var mockQueueClient = MockUtils.GetMockQueueClient();
-			var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object);
+			var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object, true);
 
-			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null);
+			var cts = new CancellationTokenSource();
+
+			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null, null);
 
 			// Act
-			Should.Throw<ArgumentNullException>(() => messagePump.Start());
+			Should.ThrowAsync<ArgumentNullException>(() => messagePump.StartAsync(cts.Token));
 		}
 
 		[Fact]
-		public void Stopping_without_starting()
-		{
-			// Arrange
-			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
-			var mockQueueClient = MockUtils.GetMockQueueClient();
-			var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object);
-
-			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null);
-
-			// Act
-			messagePump.Stop();
-
-			// Nothing to assert.
-			// We simply want to make sure that no exception is thrown
-		}
-
-		[Fact]
-		public void No_message_processed_when_queue_is_empty()
+		public async Task No_message_processed_when_queue_is_empty()
 		{
 			// Arrange
 			var onMessageInvokeCount = 0;
@@ -88,6 +74,8 @@ namespace Picton.Messaging.UnitTests
 
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 			var mockQueueClient = MockUtils.GetMockQueueClient();
+
+			var cts = new CancellationTokenSource();
 
 			mockQueueClient
 				.Setup(q => q.GetPropertiesAsync(It.IsAny<CancellationToken>()))
@@ -112,34 +100,26 @@ namespace Picton.Messaging.UnitTests
 				OnError = (message, exception, isPoison) =>
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
+				},
+				OnQueueEmpty = cancellationToken =>
+				{
+					Interlocked.Increment(ref onQueueEmptyInvokeCount);
+					cts.Cancel();
 				}
-			};
-			messagePump.OnQueueEmpty = cancellationToken =>
-			{
-				Interlocked.Increment(ref onQueueEmptyInvokeCount);
-				messagePump.Stop();
 			};
 
 			// Act
-			messagePump.Start();
+			await messagePump.StartAsync(cts.Token);
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(0);
 			onQueueEmptyInvokeCount.ShouldBe(1);
 			onErrorInvokeCount.ShouldBe(0);
-
-			// You would expect the 'GetMessagesAsync' method to be invoked only once, but unfortunately we can't be sure.
-			// It will be invoked a small number of times (probably once or twice, maybe three times but not more than that).
-			// However we can't be more precise because we stop the message pump on another thread and 'GetMessagesAsync' may
-			// be invoked a few times while we wait for the message pump to stop.
-			//
-			// What this means is that there is no way to precisely assert the number of times the method has been invoked.
-			// The only thing we know for sure, is that 'GetMessagesAsync' has been invoked at least once
-			mockQueueClient.Verify(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.AtLeast(1));
+			mockQueueClient.Verify(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.Once());
 		}
 
 		[Fact]
-		public void Message_processed()
+		public async Task Message_processed()
 		{
 			// Arrange
 			var onMessageInvokeCount = 0;
@@ -151,6 +131,8 @@ namespace Picton.Messaging.UnitTests
 
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 			var mockQueueClient = MockUtils.GetMockQueueClient();
+
+			var cts = new CancellationTokenSource();
 
 			mockQueueClient
 				.Setup(q => q.GetPropertiesAsync(It.IsAny<CancellationToken>()))
@@ -209,27 +191,27 @@ namespace Picton.Messaging.UnitTests
 							cloudMessage = null;
 						}
 					}
+				},
+				OnQueueEmpty = cancellationToken =>
+				{
+					Interlocked.Increment(ref onQueueEmptyInvokeCount);
+					cts.Cancel();
 				}
-			};
-			messagePump.OnQueueEmpty = cancellationToken =>
-			{
-				Interlocked.Increment(ref onQueueEmptyInvokeCount);
-				messagePump.Stop();
 			};
 
 			// Act
-			messagePump.Start();
+			await messagePump.StartAsync(cts.Token);
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(1);
 			onQueueEmptyInvokeCount.ShouldBe(1);
 			onErrorInvokeCount.ShouldBe(0);
-			mockQueueClient.Verify(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.AtLeast(2));
+			mockQueueClient.Verify(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
 			mockQueueClient.Verify(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(1));
 		}
 
 		[Fact]
-		public void Poison_message_is_rejected()
+		public async Task Poison_message_is_rejected()
 		{
 			// Arrange
 			var onMessageInvokeCount = 0;
@@ -244,6 +226,8 @@ namespace Picton.Messaging.UnitTests
 
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 			var mockQueueClient = MockUtils.GetMockQueueClient();
+
+			var cts = new CancellationTokenSource();
 
 			mockQueueClient
 				.Setup(q => q.GetPropertiesAsync(It.IsAny<CancellationToken>()))
@@ -304,28 +288,28 @@ namespace Picton.Messaging.UnitTests
 							cloudMessage = null;
 						}
 					}
+				},
+				OnQueueEmpty = cancellationToken =>
+				{
+					Interlocked.Increment(ref onQueueEmptyInvokeCount);
+					cts.Cancel();
 				}
-			};
-			messagePump.OnQueueEmpty = cancellationToken =>
-			{
-				Interlocked.Increment(ref onQueueEmptyInvokeCount);
-				messagePump.Stop();
 			};
 
 			// Act
-			messagePump.Start();
+			await messagePump.StartAsync(cts.Token);
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(1);
 			onQueueEmptyInvokeCount.ShouldBe(1);
 			onErrorInvokeCount.ShouldBe(1);
 			isRejected.ShouldBeTrue();
-			mockQueueClient.Verify(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.AtLeast(2));
+			mockQueueClient.Verify(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
 			mockQueueClient.Verify(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(1));
 		}
 
 		[Fact]
-		public void Poison_message_is_moved()
+		public async Task Poison_message_is_moved()
 		{
 			// Arrange
 			var onMessageInvokeCount = 0;
@@ -341,6 +325,8 @@ namespace Picton.Messaging.UnitTests
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 			var mockQueueClient = MockUtils.GetMockQueueClient();
 			var mockPoisonQueueClient = MockUtils.GetMockQueueClient("my_poison_queue");
+
+			var cts = new CancellationTokenSource();
 
 			mockQueueClient
 				.Setup(q => q.GetPropertiesAsync(It.IsAny<CancellationToken>()))
@@ -411,29 +397,29 @@ namespace Picton.Messaging.UnitTests
 							cloudMessage = null;
 						}
 					}
+				},
+				OnQueueEmpty = cancellationToken =>
+				{
+					Interlocked.Increment(ref onQueueEmptyInvokeCount);
+					cts.Cancel();
 				}
-			};
-			messagePump.OnQueueEmpty = cancellationToken =>
-			{
-				Interlocked.Increment(ref onQueueEmptyInvokeCount);
-				messagePump.Stop();
 			};
 
 			// Act
-			messagePump.Start();
+			await messagePump.StartAsync(cts.Token);
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(1);
 			onQueueEmptyInvokeCount.ShouldBe(1);
 			onErrorInvokeCount.ShouldBe(1);
 			isRejected.ShouldBeTrue();
-			mockQueueClient.Verify(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.AtLeast(2));
+			mockQueueClient.Verify(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
 			mockQueueClient.Verify(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(1));
 			mockPoisonQueueClient.Verify(q => q.SendMessageAsync(It.IsAny<string>(), It.IsAny<TimeSpan?>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.Exactly(1));
 		}
 
 		[Fact]
-		public void Exceptions_in_OnQueueEmpty_are_ignored()
+		public async Task Exceptions_in_OnQueueEmpty_are_ignored()
 		{
 			// Arrange
 			var onMessageInvokeCount = 0;
@@ -445,6 +431,8 @@ namespace Picton.Messaging.UnitTests
 
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 			var mockQueueClient = MockUtils.GetMockQueueClient();
+
+			var cts = new CancellationTokenSource();
 
 			mockQueueClient
 				.Setup(q => q.GetPropertiesAsync(It.IsAny<CancellationToken>()))
@@ -459,7 +447,7 @@ namespace Picton.Messaging.UnitTests
 
 			var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object);
 
-			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null)
+			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null, null)
 			{
 				OnMessage = (message, cancellationToken) =>
 				{
@@ -468,34 +456,34 @@ namespace Picton.Messaging.UnitTests
 				OnError = (message, exception, isPoison) =>
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
-				}
-			};
-			messagePump.OnQueueEmpty = cancellationToken =>
-			{
-				Interlocked.Increment(ref onQueueEmptyInvokeCount);
-
-				// Simulate an exception (only the first time)
-				lock (lockObject)
+				},
+				OnQueueEmpty = cancellationToken =>
 				{
-					if (!exceptionSimulated)
-					{
-						exceptionSimulated = true;
-						throw new Exception("This dummy exception should be ignored");
-					}
-				}
+					Interlocked.Increment(ref onQueueEmptyInvokeCount);
 
-				// Stop the message pump
-				messagePump.Stop();
+					// Simulate an exception (only the first time)
+					lock (lockObject)
+					{
+						if (!exceptionSimulated)
+						{
+							exceptionSimulated = true;
+							throw new Exception("This dummy exception should be ignored");
+						}
+					}
+
+					// Stop the message pump
+					cts.Cancel();
+				}
 			};
 
 			// Act
-			messagePump.Start();
+			await messagePump.StartAsync(cts.Token);
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(0);
 			onQueueEmptyInvokeCount.ShouldBeGreaterThan(0);
 			onErrorInvokeCount.ShouldBe(0);
-			mockQueueClient.Verify(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.AtLeast(1));
+			mockQueueClient.Verify(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
 		}
 	}
 }

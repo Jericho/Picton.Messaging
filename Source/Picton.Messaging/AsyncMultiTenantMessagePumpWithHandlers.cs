@@ -1,7 +1,8 @@
 using App.Metrics;
+using Azure.Storage.Blobs;
+using Azure.Storage.Queues;
 using Microsoft.Extensions.DependencyModel;
 using Microsoft.Extensions.Logging;
-using Picton.Managers;
 using Picton.Messaging.Messages;
 using System;
 using System.Collections.Generic;
@@ -17,7 +18,7 @@ namespace Picton.Messaging
 	/// High performance message processor (also known as a message "pump") for Azure storage queues.
 	/// Designed to monitor an Azure storage queue and process the message as quickly and efficiently as possible.
 	/// </summary>
-	public class AsyncMessagePumpWithHandlers
+	public class AsyncMultiTenantMessagePumpWithHandlers
 	{
 		#region FIELDS
 
@@ -26,7 +27,7 @@ namespace Picton.Messaging
 		private static IDictionary<Type, Type[]> _messageHandlers;
 
 		private readonly ILogger _logger;
-		private readonly AsyncMessagePump _messagePump;
+		private readonly AsyncMultiTenantMessagePump _messagePump;
 
 		#endregion
 
@@ -37,33 +38,16 @@ namespace Picton.Messaging
 		/// </summary>
 		/// <example>
 		/// <code>
-		/// OnError = (message, exception, isPoison) => Trace.TraceError("An error occured: {0}", exception);
+		/// OnError = (tenantId, message, exception, isPoison) => Trace.TraceError("An error occured: {0}", exception);
 		/// </code>
 		/// </example>
 		/// <remarks>
 		/// When isPoison is set to true, you should copy this message to a poison queue because it will be deleted from the original queue.
 		/// </remarks>
-		public Action<CloudMessage, Exception, bool> OnError
+		public Action<string, CloudMessage, Exception, bool> OnError
 		{
 			get { return _messagePump.OnError; }
 			set { _messagePump.OnError = value; }
-		}
-
-		/// <summary>
-		/// Gets or sets the logic to execute when queue is empty.
-		/// </summary>
-		/// <example>
-		/// <code>
-		/// OnQueueEmpty = cancellationToken => Task.Delay(2500, cancellationToken).Wait();
-		/// </code>
-		/// </example>
-		/// <remarks>
-		/// If this property is not set, the default logic is to pause for 2 seconds.
-		/// </remarks>
-		public Action<CancellationToken> OnQueueEmpty
-		{
-			get { return _messagePump.OnQueueEmpty; }
-			set { _messagePump.OnQueueEmpty = value; }
 		}
 
 		#endregion
@@ -71,42 +55,37 @@ namespace Picton.Messaging
 		#region CONSTRUCTOR
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
+		/// Initializes a new instance of the <see cref="AsyncMultiTenantMessagePumpWithHandlers"/> class.
 		/// </summary>
 		/// <param name="connectionString">
 		/// A connection string includes the authentication information required for your application to access data in an Azure Storage account at runtime.
 		/// For more information, https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string.
 		/// </param>
-		/// <param name="queueName">Name of the queue.</param>
+		/// <param name="queueNamePrefix">Queues name prefix.</param>
 		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poinson' messages.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
+		/// <param name="queueClientOptions">
+		/// Optional client options that define the transport pipeline
+		/// policies for authentication, retries, etc., that are applied to
+		/// every request to the queue.
+		/// </param>
+		/// <param name="blobClientOptions">
+		/// Optional client options that define the transport pipeline
+		/// policies for authentication, retries, etc., that are applied to
+		/// every request to the blob storage.
+		/// </param>
 		/// <param name="logger">The logger.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
 		[ExcludeFromCodeCoverage]
-		public AsyncMessagePumpWithHandlers(string connectionString, string queueName, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
-			: this(new QueueManager(connectionString, queueName), string.IsNullOrEmpty(poisonQueueName) ? null : new QueueManager(connectionString, poisonQueueName), concurrentTasks, visibilityTimeout, maxDequeueCount, logger, metrics)
-		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
-		/// </summary>
-		/// <param name="queueManager">The queue manager.</param>
-		/// <param name="poisonQueueManager">The poison queue manager.</param>
-		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
-		/// <param name="visibilityTimeout">The visibility timeout.</param>
-		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		/// <param name="logger">The logger.</param>
-		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMessagePumpWithHandlers(QueueManager queueManager, QueueManager poisonQueueManager, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+		public AsyncMultiTenantMessagePumpWithHandlers(string connectionString, string queueNamePrefix, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, QueueClientOptions queueClientOptions = null, BlobClientOptions blobClientOptions = null, ILogger logger = null, IMetrics metrics = null)
 		{
 			_logger = logger;
 
-			_messagePump = new AsyncMessagePump(queueManager, poisonQueueManager, concurrentTasks, visibilityTimeout, maxDequeueCount, logger, metrics)
+			_messagePump = new AsyncMultiTenantMessagePump(connectionString, queueNamePrefix, concurrentTasks, poisonQueueName, visibilityTimeout, maxDequeueCount, queueClientOptions, blobClientOptions, logger, metrics)
 			{
-				OnMessage = (message, cancellationToken) =>
+				OnMessage = (tenantId, message, cancellationToken) =>
 				{
 					var contentType = message.Content.GetType();
 
@@ -167,10 +146,7 @@ namespace Picton.Messaging
 					{
 						_lock.EnterWriteLock();
 
-						if (_messageHandlers == null)
-						{
-							_messageHandlers = GetMessageHandlers(null);
-						}
+						_messageHandlers ??= GetMessageHandlers(null);
 					}
 					finally
 					{
@@ -193,7 +169,7 @@ namespace Picton.Messaging
 			var assembliesCount = assemblies.Length;
 			if (assembliesCount == 0) logger?.LogTrace($"Did not find any local assembly.");
 			else if (assembliesCount == 1) logger?.LogTrace("Found 1 local assembly.");
-			else logger?.LogTrace($"Found {assemblies.Count()} local assemblies.");
+			else logger?.LogTrace($"Found {assemblies.Length} local assemblies.");
 
 			var typesWithMessageHandlerInterfaces = assemblies
 				.SelectMany(x => x.GetTypes())
@@ -213,7 +189,7 @@ namespace Picton.Messaging
 			var classesCount = typesWithMessageHandlerInterfaces.Length;
 			if (classesCount == 0) logger?.LogTrace("Did not find any class implementing the 'IMessageHandler' interface.");
 			else if (classesCount == 1) logger?.LogTrace("Found 1 class implementing the 'IMessageHandler' interface.");
-			else logger?.LogTrace($"Found {typesWithMessageHandlerInterfaces.Count()} classes implementing the 'IMessageHandler' interface.");
+			else logger?.LogTrace($"Found {typesWithMessageHandlerInterfaces.Length} classes implementing the 'IMessageHandler' interface.");
 
 			var oneTypePerMessageHandler = typesWithMessageHandlerInterfaces
 				.SelectMany(t => t.MessageTypes, (t, messageType) =>
