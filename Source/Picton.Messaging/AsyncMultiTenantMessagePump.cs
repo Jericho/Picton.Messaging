@@ -450,7 +450,7 @@ namespace Picton.Messaging
 				try
 				{
 					// All queues are empty
-					_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
+					_metrics.Measure.Counter.Increment(Metrics.AllQueuesEmptyCounter);
 					OnEmpty?.Invoke(cancellationToken);
 				}
 				catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)

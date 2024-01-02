@@ -36,12 +36,21 @@ namespace Picton.Messaging
 		};
 
 		/// <summary>
-		/// Gets the counter indicating the number of times we attempted to fetch messages from the Azure queue but the queue was empty.
+		/// Gets the counter indicating the number of times we attempted to fetch messages from an Azure queue but it was empty.
 		/// </summary>
 		public static CounterOptions QueueEmptyCounter => new CounterOptions
 		{
 			Context = "Picton",
 			Name = "QueueEmptyCount"
+		};
+
+		/// <summary>
+		/// Gets the counter indicating the number of times we attempted to fetch messages from Azure but all the queues are empty.
+		/// </summary>
+		public static CounterOptions AllQueuesEmptyCounter => new CounterOptions
+		{
+			Context = "Picton",
+			Name = "AllQueuesEmptyCount"
 		};
 
 		/// <summary>
