@@ -264,7 +264,9 @@ namespace Picton.Messaging
 			// Define the task pump
 			var pumpTask = Task.Run(async () =>
 			{
-				while (!cancellationToken.IsCancellationRequested)
+				// We process messages until cancellation is requested.
+				// When cancellation is requested, we continue processing messages until the memory queue is drained.
+				while (!cancellationToken.IsCancellationRequested || !queuedMessages.IsEmpty)
 				{
 					await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
@@ -273,8 +275,6 @@ namespace Picton.Messaging
 						async () =>
 						{
 							var messageProcessed = false;
-
-							if (cancellationToken.IsCancellationRequested) return messageProcessed;
 
 							using (_metrics.Measure.Timer.Time(Metrics.MessageProcessingTimer))
 							{
@@ -331,7 +331,8 @@ namespace Picton.Messaging
 						{
 							semaphore.Release();
 							runningTasks.TryRemove(t, out Task taskToBeRemoved);
-						}, TaskContinuationOptions.ExecuteSynchronously)
+						},
+						TaskContinuationOptions.ExecuteSynchronously)
 					.IgnoreAwait();
 				}
 			});
