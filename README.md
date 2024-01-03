@@ -96,6 +96,7 @@ namespace WorkerRole1
 		{
 			Trace.TraceInformation("WorkerRole is stopping");
 
+            // Invoking "Cancel()" will cause the AsyncMessagePump to stop
 			this.cancellationTokenSource.Cancel();
 			this.runCompleteEvent.WaitOne();
 
