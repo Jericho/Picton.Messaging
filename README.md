@@ -55,78 +55,78 @@ using System.Diagnostics;
 
 namespace WorkerRole1
 {
-	public class MyWorkerRole : RoleEntryPoint
-	{
-		private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
-		private readonly ManualResetEvent runCompleteEvent = new ManualResetEvent(false);
+    public class MyWorkerRole : RoleEntryPoint
+    {
+        private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+        private readonly ManualResetEvent runCompleteEvent = new ManualResetEvent(false);
 
-		public override void Run()
-		{
-			Trace.TraceInformation("WorkerRole is running");
+        public override void Run()
+        {
+            Trace.TraceInformation("WorkerRole is running");
 
-			try
-			{
-				this.RunAsync(this.cancellationTokenSource.Token).Wait();
-			}
-			finally
-			{
-				this.runCompleteEvent.Set();
-			}
-		}
+            try
+            {
+                this.RunAsync(this.cancellationTokenSource.Token).Wait();
+            }
+            finally
+            {
+                this.runCompleteEvent.Set();
+            }
+        }
 
-		public override bool OnStart()
-		{
-			// Use TLS 1.2 for Service Bus connections
-			ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+        public override bool OnStart()
+        {
+            // Use TLS 1.2 for Service Bus connections
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
-			// Set the maximum number of concurrent connections
-			ServicePointManager.DefaultConnectionLimit = 12;
+            // Set the maximum number of concurrent connections
+            ServicePointManager.DefaultConnectionLimit = 12;
 
-			// For information on handling configuration changes
-			// see the MSDN topic at https://go.microsoft.com/fwlink/?LinkId=166357.
+            // For information on handling configuration changes
+            // see the MSDN topic at https://go.microsoft.com/fwlink/?LinkId=166357.
 
-			bool result = base.OnStart();
+            bool result = base.OnStart();
 
-			Trace.TraceInformation("WorkerRole has been started");
+            Trace.TraceInformation("WorkerRole has been started");
 
-			return result;
-		}
+            return result;
+        }
 
-		public override void OnStop()
-		{
-			Trace.TraceInformation("WorkerRole is stopping");
+        public override void OnStop()
+        {
+            Trace.TraceInformation("WorkerRole is stopping");
 
-			// Invoking "Cancel()" will cause the AsyncMessagePump to stop
-			this.cancellationTokenSource.Cancel();
-			this.runCompleteEvent.WaitOne();
+            // Invoking "Cancel()" will cause the AsyncMessagePump to stop
+            this.cancellationTokenSource.Cancel();
+            this.runCompleteEvent.WaitOne();
 
-			base.OnStop();
+            base.OnStop();
 
-			Trace.TraceInformation("WorkerRole has stopped");
-		}
+            Trace.TraceInformation("WorkerRole has stopped");
+        }
 
-		private async Task RunAsync(CancellationToken cancellationToken)
-		{
-			var connectionString = "<-- insert connection string for your Azure account -->";
-			var queueName = "<-- insert the name of your Azure queue -->";
+        private async Task RunAsync(CancellationToken cancellationToken)
+        {
+            var connectionString = "<-- insert connection string for your Azure account -->";
+            var queueName = "<-- insert the name of your Azure queue -->";
 
-			// Configure the message pump
-			var messagePump = new AsyncMessagePump(connectionString, queueName, 10, null, TimeSpan.FromMinutes(1), 3)
-			{
-				OnMessage = (message, cancellationToken) =>
-				{
-					Debug.WriteLine("Received message of type {message.Content.GetType()}");
-				},
-				OnError = (message, exception, isPoison) =>
-				{
-					Trace.TraceInformation("An error occured: {0}", exception);
-				}
-			};
+            // Configure the message pump
+            var messagePump = new AsyncMessagePump(connectionString, queueName, 10, null, TimeSpan.FromMinutes(1), 3)
+            {
+                OnMessage = (message, cancellationToken) =>
+                {
+                    Debug.WriteLine("Received message of type {message.Content.GetType()}");
+                },
+                OnError = (message, exception, isPoison) =>
+                {
+                    Trace.TraceInformation("An error occured: {0}", exception);
+                }
+            };
 
-			// Start the message pump
-			await messagePump.StartAsync(cancellationToken);
-		}
-	}
+            // Start the message pump
+            await messagePump.StartAsync(cancellationToken);
+        }
+    }
 }
 ```
 
