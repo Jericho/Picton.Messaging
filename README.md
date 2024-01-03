@@ -96,7 +96,7 @@ namespace WorkerRole1
 		{
 			Trace.TraceInformation("WorkerRole is stopping");
 
-            // Invoking "Cancel()" will cause the AsyncMessagePump to stop
+			// Invoking "Cancel()" will cause the AsyncMessagePump to stop
 			this.cancellationTokenSource.Cancel();
 			this.runCompleteEvent.WaitOne();
 
@@ -110,10 +110,10 @@ namespace WorkerRole1
 			var connectionString = "<-- insert connection string for your Azure account -->";
 			var queueName = "<-- insert the name of your Azure queue -->";
 
-            // Configure the message pump
+			// Configure the message pump
 			var messagePump = new AsyncMessagePump(connectionString, queueName, 10, null, TimeSpan.FromMinutes(1), 3)
 			{
-            	OnMessage = (message, cancellationToken) =>
+				OnMessage = (message, cancellationToken) =>
 				{
 					Debug.WriteLine("Received message of type {message.Content.GetType()}");
 				},
