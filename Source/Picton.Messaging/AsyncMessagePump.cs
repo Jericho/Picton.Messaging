@@ -294,7 +294,16 @@ namespace Picton.Messaging
 									catch (Exception ex)
 									{
 										var isPoison = message.DequeueCount >= _maxDequeueCount;
-										OnError?.Invoke(message, ex, isPoison);
+
+										try
+										{
+											OnError?.Invoke(message, ex, isPoison);
+										}
+										catch (Exception e)
+										{
+											_logger?.LogError(e.GetBaseException(), "An error occured when handling an exception. The error was caught and ignored.");
+										}
+
 										if (isPoison)
 										{
 											// PLEASE NOTE: we use "CancellationToken.None" to ensure a processed message is deleted from the queue and moved to poison queue even when the message pump is shutting down

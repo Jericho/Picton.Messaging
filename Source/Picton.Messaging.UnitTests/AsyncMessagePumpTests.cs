@@ -464,5 +464,89 @@ namespace Picton.Messaging.UnitTests
 			onErrorInvokeCount.ShouldBe(0);
 			mockQueueClient.Verify(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
 		}
+
+		[Fact]
+		public async Task Exceptions_in_OnError_are_ignored()
+		{
+			// Arrange
+			var onMessageInvokeCount = 0;
+			var onQueueEmptyInvokeCount = 0;
+			var onErrorInvokeCount = 0;
+
+			var lockObject = new Object();
+			var cloudMessage = QueuesModelFactory.QueueMessage("abc123", "xyz", "Hello World!", 0, null, DateTimeOffset.UtcNow, null);
+
+			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
+			var mockQueueClient = MockUtils.GetMockQueueClient();
+
+			var cts = new CancellationTokenSource();
+
+			mockQueueClient
+				.Setup(q => q.GetPropertiesAsync(It.IsAny<CancellationToken>()))
+				.ReturnsAsync((CancellationToken cancellationToken) =>
+				{
+					var messageCount = cloudMessage == null ? 0 : 1;
+					var queueProperties = QueuesModelFactory.QueueProperties(null, messageCount);
+					return Response.FromValue(queueProperties, new MockAzureResponse(200, "ok"));
+				});
+			mockQueueClient
+				.Setup(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
+				.ReturnsAsync((int? maxMessages, TimeSpan? visibilityTimeout, CancellationToken cancellationToken) =>
+				{
+					lock (lockObject)
+					{
+						if (cloudMessage != null)
+						{
+							// DequeueCount is a private property. Therefore we must use reflection to change its value
+							var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
+							dequeueCountProperty.SetValue(cloudMessage, cloudMessage.DequeueCount + 1);
+
+							return Response.FromValue(new[] { cloudMessage }, new MockAzureResponse(200, "ok"));
+						}
+					}
+					return Response.FromValue(Enumerable.Empty<QueueMessage>().ToArray(), new MockAzureResponse(200, "ok"));
+				});
+			mockQueueClient
+				.Setup(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+				.ReturnsAsync((string messageId, string popReceipt, CancellationToken cancellationToken) =>
+				{
+					lock (lockObject)
+					{
+						cloudMessage = null;
+					}
+					return new MockAzureResponse(200, "ok");
+				});
+
+			var queueManager = new QueueManager(mockBlobContainerClient.Object, mockQueueClient.Object);
+
+			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null)
+			{
+				OnMessage = (message, cancellationToken) =>
+				{
+					Interlocked.Increment(ref onMessageInvokeCount);
+					throw new Exception("Simulate a problem while processing the message in order to unit test the error handler");
+				},
+				OnError = (message, exception, isPoison) =>
+				{
+					Interlocked.Increment(ref onErrorInvokeCount);
+					throw new Exception("This dummy exception should be ignored");
+				},
+				OnQueueEmpty = cancellationToken =>
+				{
+					Interlocked.Increment(ref onQueueEmptyInvokeCount);
+					cts.Cancel();
+				}
+			};
+
+			// Act
+			await messagePump.StartAsync(cts.Token);
+
+			// Assert
+			onMessageInvokeCount.ShouldBe(3); // <-- message is retried three times
+			onErrorInvokeCount.ShouldBe(3); // <-- we throw a dummy exception every time the mesage is processed, until we give up and the message is moved to the poison queue
+			onQueueEmptyInvokeCount.ShouldBe(1);
+			mockQueueClient.Verify(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.Exactly(4));
+			mockQueueClient.Verify(q => q.DeleteMessageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(1));
+		}
 	}
 }
