@@ -293,7 +293,7 @@ namespace Picton.Messaging
 									}
 									catch (Exception ex)
 									{
-										var isPoison = message.DequeueCount > _maxDequeueCount;
+										var isPoison = message.DequeueCount >= _maxDequeueCount;
 										OnError?.Invoke(message, ex, isPoison);
 										if (isPoison)
 										{
