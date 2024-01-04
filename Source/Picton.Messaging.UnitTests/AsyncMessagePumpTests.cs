@@ -241,18 +241,15 @@ namespace Picton.Messaging.UnitTests
 				.Setup(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
 				.ReturnsAsync((int? maxMessages, TimeSpan? visibilityTimeout, CancellationToken cancellationToken) =>
 				{
-					if (cloudMessage != null)
+					lock (lockObject)
 					{
-						lock (lockObject)
+						if (cloudMessage != null)
 						{
-							if (cloudMessage != null)
-							{
-								// DequeueCount is a private property. Therefore we must use reflection to change its value
-								var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
-								dequeueCountProperty.SetValue(cloudMessage, retries + 1);   // intentionally set 'DequeueCount' to a value exceeding maxRetries to simulate a poison message
+							// DequeueCount is a private property. Therefore we must use reflection to change its value
+							var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
+							dequeueCountProperty.SetValue(cloudMessage, retries + 1);   // intentionally set 'DequeueCount' to a value exceeding maxRetries to simulate a poison message
 
-								return Response.FromValue(new[] { cloudMessage }, new MockAzureResponse(200, "ok"));
-							}
+							return Response.FromValue(new[] { cloudMessage }, new MockAzureResponse(200, "ok"));
 						}
 					}
 					return Response.FromValue(Enumerable.Empty<QueueMessage>().ToArray(), new MockAzureResponse(200, "ok"));
@@ -264,6 +261,7 @@ namespace Picton.Messaging.UnitTests
 					lock (lockObject)
 					{
 						cloudMessage = null;
+						isRejected = true;
 					}
 					return new MockAzureResponse(200, "ok");
 				});
@@ -280,14 +278,6 @@ namespace Picton.Messaging.UnitTests
 				OnError = (message, exception, isPoison) =>
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
-					if (isPoison)
-					{
-						lock (lockObject)
-						{
-							isRejected = true;
-							cloudMessage = null;
-						}
-					}
 				},
 				OnQueueEmpty = cancellationToken =>
 				{
@@ -340,18 +330,15 @@ namespace Picton.Messaging.UnitTests
 				.Setup(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
 				.ReturnsAsync((int? maxMessages, TimeSpan? visibilityTimeout, CancellationToken cancellationToken) =>
 				{
-					if (cloudMessage != null)
+					lock (lockObject)
 					{
-						lock (lockObject)
+						if (cloudMessage != null)
 						{
-							if (cloudMessage != null)
-							{
-								// DequeueCount is a private property. Therefore we must use reflection to change its value
-								var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
-								dequeueCountProperty.SetValue(cloudMessage, retries + 1);   // intentionally set 'DequeueCount' to a value exceeding maxRetries to simulate a poison message
+							// DequeueCount is a private property. Therefore we must use reflection to change its value
+							var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
+							dequeueCountProperty.SetValue(cloudMessage, retries + 1);   // intentionally set 'DequeueCount' to a value exceeding maxRetries to simulate a poison message
 
-								return Response.FromValue(new[] { cloudMessage }, new MockAzureResponse(200, "ok"));
-							}
+							return Response.FromValue(new[] { cloudMessage }, new MockAzureResponse(200, "ok"));
 						}
 					}
 					return Response.FromValue(Enumerable.Empty<QueueMessage>().ToArray(), new MockAzureResponse(200, "ok"));
@@ -363,6 +350,7 @@ namespace Picton.Messaging.UnitTests
 					lock (lockObject)
 					{
 						cloudMessage = null;
+						isRejected = true;
 					}
 					return new MockAzureResponse(200, "ok");
 				});
@@ -371,7 +359,6 @@ namespace Picton.Messaging.UnitTests
 				.Setup(q => q.SendMessageAsync(It.IsAny<string>(), It.IsAny<TimeSpan?>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
 				.ReturnsAsync((string messageText, TimeSpan? visibilityTimeout, TimeSpan? timeToLive, CancellationToken cancellationToken) =>
 				{
-					// Nothing to do. We just want to ensure this method is invoked.
 					var sendReceipt = QueuesModelFactory.SendReceipt("abc123", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(7), "xyz", DateTimeOffset.UtcNow);
 					return Response.FromValue(sendReceipt, new MockAzureResponse(200, "ok"));
 				});
@@ -389,14 +376,6 @@ namespace Picton.Messaging.UnitTests
 				OnError = (message, exception, isPoison) =>
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
-					if (isPoison)
-					{
-						lock (lockObject)
-						{
-							isRejected = true;
-							cloudMessage = null;
-						}
-					}
 				},
 				OnQueueEmpty = cancellationToken =>
 				{
@@ -481,7 +460,7 @@ namespace Picton.Messaging.UnitTests
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(0);
-			onQueueEmptyInvokeCount.ShouldBeGreaterThan(0);
+			onQueueEmptyInvokeCount.ShouldBe(2); // First time we throw an exception, second time we stop the message pump
 			onErrorInvokeCount.ShouldBe(0);
 			mockQueueClient.Verify(q => q.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
 		}
