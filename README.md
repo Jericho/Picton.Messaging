@@ -115,11 +115,14 @@ namespace WorkerRole1
             {
                 OnMessage = (message, cancellationToken) =>
                 {
-                    Debug.WriteLine("Received message of type {message.Content.GetType()}");
+                    // This is where you insert your custom logic to process a message
                 },
                 OnError = (message, exception, isPoison) =>
                 {
-                    Trace.TraceInformation("An error occured: {0}", exception);
+                    // Insert your custom error handling
+
+                    // Please note that the boolean "isPoison" parameter is an indication of
+                    // whether this message will be automatically moved to the poison queue.
                 }
             };
 
