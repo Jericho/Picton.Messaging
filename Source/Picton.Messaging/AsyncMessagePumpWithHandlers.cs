@@ -4,6 +4,7 @@ using Picton.Managers;
 using Picton.Messaging.Utilities;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -58,68 +59,7 @@ namespace Picton.Messaging
 		#region CONSTRUCTORS
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMessagePump"/> class.
-		/// </summary>
-		/// <param name="connectionString">
-		/// A connection string includes the authentication information required for your application to access data in an Azure Storage account at runtime.
-		/// For more information, https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string.
-		/// </param>
-		/// <param name="queueName">Name of the queue.</param>
-		/// <param name="options"></param>
-		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poison' messages.</param>
-		/// <param name="visibilityTimeout">The visibility timeout.</param>
-		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		/// <param name="logger">The logger.</param>
-		/// <param name="metrics">The system where metrics are published.</param>
-		[ExcludeFromCodeCoverage]
-		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, string queueName, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
-			: this(options, new QueueConfig(queueName, poisonQueueName, visibilityTimeout, maxDequeueCount), logger, metrics)
-		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMessagePump"/> class.
-		/// </summary>
-		/// <param name="options"></param>
-		/// <param name="queueConfig"></param>
-		/// <param name="logger">The logger.</param>
-		/// <param name="metrics">The system where metrics are published.</param>
-		[ExcludeFromCodeCoverage]
-		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, QueueConfig queueConfig, ILogger logger = null, IMetrics metrics = null)
-			: this(options, new[] { queueConfig }, logger, metrics)
-		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMultiQueueMessagePump"/> class.
-		/// </summary>
-		/// <param name="options"></param>
-		/// <param name="queueConfigs">The configuration options for each queue to be monitored.</param>
-		/// <param name="logger">The logger.</param>
-		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, IEnumerable<QueueConfig> queueConfigs, ILogger logger = null, IMetrics metrics = null)
-		{
-			_messagePump = new AsyncMessagePump(options, queueConfigs, logger, metrics);
-			_logger = logger;
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMultiQueueMessagePump"/> class.
-		/// </summary>
-		/// <param name="options"></param>
-		/// <param name="queueManager">The queue manager.</param>
-		/// <param name="poisonQueueManager">The poison queue manager.</param>
-		/// <param name="visibilityTimeout">The visibility timeout.</param>
-		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		/// <param name="logger">The logger.</param>
-		/// <param name="metrics">The system where metrics are published.</param>
-		internal AsyncMessagePumpWithHandlers(MessagePumpOptions options, QueueManager queueManager, QueueManager poisonQueueManager = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
-			: this(options, new[] { (queueManager, poisonQueueManager, visibilityTimeout, maxDequeueCount) }, logger, metrics)
-		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMultiQueueMessagePump"/> class.
+		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
 		/// </summary>
 		/// <param name="options"></param>
 		/// <param name="queueConfigs">The configuration options for each queue to be monitored.</param>
@@ -130,6 +70,73 @@ namespace Picton.Messaging
 			_messageHandlers = MessageHandlersDiscoverer.GetMessageHandlers(logger);
 			_messagePump = new AsyncMessagePump(options, queueConfigs, logger, metrics);
 			_logger = logger;
+
+		}
+
+		#endregion
+
+		#region STATIC METHODS
+
+		/// <summary>
+		/// Returns a message pump that will process messages in a single Azure storage queue.
+		/// </summary>
+		/// <param name="options"></param>
+		/// <param name="queueName">Name of the queue.</param>
+		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poison' messages.</param>
+		/// <param name="visibilityTimeout">The visibility timeout.</param>
+		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
+		/// <param name="logger">The logger.</param>
+		/// <param name="metrics">The system where metrics are published.</param>
+		/// <returns>The message pump.</returns>
+		public AsyncMessagePumpWithHandlers ForSingleQueue(MessagePumpOptions options, string queueName, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+		{
+			var queueConfig = new QueueConfig(queueName, poisonQueueName, visibilityTimeout, maxDequeueCount);
+
+			ValidateOptions(options);
+			ValidateQueueConfig(queueConfig);
+
+			return ForMultipleQueues(options, new[] { queueConfig }, logger, metrics);
+		}
+
+		/// <summary>
+		/// Returns a message pump that will process messages in a single Azure storage queue.
+		/// </summary>
+		/// <param name="options"></param>
+		/// <param name="queueConfig"></param>
+		/// <param name="logger">The logger.</param>
+		/// <param name="metrics">The system where metrics are published.</param>
+		/// <returns>The message pump.</returns>
+		public AsyncMessagePumpWithHandlers ForSingleQueue(MessagePumpOptions options, QueueConfig queueConfig, ILogger logger = null, IMetrics metrics = null)
+		{
+			ValidateOptions(options);
+			ValidateQueueConfig(queueConfig);
+
+			return ForMultipleQueues(options, new[] { queueConfig }, logger, metrics);
+		}
+
+		/// <summary>
+		/// Returns a message pump that will process messages in multiple Azure storage queues.
+		/// </summary>
+		/// <param name="options"></param>
+		/// <param name="queueConfigs"></param>
+		/// <param name="logger">The logger.</param>
+		/// <param name="metrics">The system where metrics are published.</param>
+		/// <returns>The message pump.</returns>
+		public AsyncMessagePumpWithHandlers ForMultipleQueues(MessagePumpOptions options, IEnumerable<QueueConfig> queueConfigs, ILogger logger = null, IMetrics metrics = null)
+		{
+			ValidateOptions(options);
+			ValidateQueueConfigs(queueConfigs);
+
+			var configs = queueConfigs
+				.Select(queueConfig =>
+				{
+					var queueManager = new QueueManager(options.ConnectionString, queueConfig.QueueName, true, options.QueueClientOptions, options.BlobClientOptions);
+					var poisonQueueManager = string.IsNullOrEmpty(queueConfig.PoisonQueueName) ? null : new QueueManager(options.ConnectionString, queueConfig.PoisonQueueName);
+					return (queueManager, poisonQueueManager, queueConfig.VisibilityTimeout, queueConfig.MaxDequeueCount);
+				})
+				.ToArray();
+
+			return new AsyncMessagePumpWithHandlers(options, configs, logger, metrics);
 		}
 
 		#endregion
@@ -173,6 +180,32 @@ namespace Picton.Messaging
 			};
 
 			return _messagePump.StartAsync(cancellationToken);
+		}
+
+		#endregion
+
+		#region PRIVATE METHODS
+
+		private void ValidateOptions(MessagePumpOptions options)
+		{
+			if (options == null) throw new ArgumentNullException(nameof(options));
+			if (string.IsNullOrEmpty(options.ConnectionString)) throw new ArgumentNullException(nameof(options.ConnectionString));
+			if (options.ConcurrentTasks < 1) throw new ArgumentOutOfRangeException(nameof(options.ConcurrentTasks), "Number of concurrent tasks must be greather than zero");
+		}
+
+		private void ValidateQueueConfig(QueueConfig queueConfig)
+		{
+			if (queueConfig == null) throw new ArgumentNullException(nameof(queueConfig));
+			if (string.IsNullOrEmpty(queueConfig.QueueName)) throw new ArgumentNullException(nameof(queueConfig.QueueName));
+			if (queueConfig.MaxDequeueCount < 1) throw new ArgumentOutOfRangeException(nameof(queueConfig.MaxDequeueCount), $"Number of retries for {queueConfig.QueueName} must be greater than zero.");
+		}
+
+		private void ValidateQueueConfigs(IEnumerable<QueueConfig> queueConfigs)
+		{
+			foreach (var queueConfig in queueConfigs)
+			{
+				ValidateQueueConfig(queueConfig);
+			}
 		}
 
 		#endregion
