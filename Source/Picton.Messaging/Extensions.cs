@@ -7,7 +7,7 @@ namespace Picton.Messaging
 	/// <summary>
 	/// Extension methods.
 	/// </summary>
-	public static class Extensions
+	internal static class Extensions
 	{
 		#region PUBLIC EXTENSION METHODS
 

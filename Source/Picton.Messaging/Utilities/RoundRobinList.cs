@@ -20,13 +20,11 @@ namespace Picton.Messaging.Utilities
 			_linkedList = new LinkedList<T>(list);
 		}
 
-		public T Current
-		{
-			get
-			{
-				return _current == default ? default : _current.Value;
-			}
-		}
+		public T Current => _current == default ? default : _current.Value;
+
+		public T Next => _current == default ? default : _current.Next.Value;
+
+		public T Previous => _current == default ? default : _current.Previous.Value;
 
 		public int Count => _linkedList.Count;
 
