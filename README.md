@@ -121,8 +121,21 @@ namespace WorkerRole1
                 {
                     // Insert your custom error handling
 
-                    // Please note that the boolean "isPoison" parameter is an indication of
-                    // whether this message will be automatically moved to the poison queue.
+                    // ==========================================================================
+                    // Important note regarding "isPoison":
+                    // --------------------------------------------------------------------------
+                    // this parameter indicates whether this message has exceeded the maximum
+                    // number of retries. 
+                    //
+                    // When you have configured the "poison queue name" and this parameter is
+                    // "true", the message is automatically copied to the poison queue and
+                    // removed from the original queue.
+                    // 
+                    // If you have not configured the "poison queue name" and this parameter is
+                    // "true", the message is automatically removed from the original queue and
+                    // you are responsible for storing the message. If you don't, this mesage 
+                    // will be lost.
+                    // ==========================================================================
                 }
             };
 
