@@ -1,13 +1,9 @@
 using App.Metrics;
-using Microsoft.Extensions.DependencyModel;
 using Microsoft.Extensions.Logging;
 using Picton.Managers;
-using Picton.Messaging.Messages;
+using Picton.Messaging.Utilities;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -15,18 +11,17 @@ namespace Picton.Messaging
 {
 	/// <summary>
 	/// High performance message processor (also known as a message "pump") for Azure storage queues.
-	/// Designed to monitor an Azure storage queue and process the message as quickly and efficiently as possible.
+	/// Designed to monitor either a single queue or a fixed list of queues and process messages as
+	/// quickly and efficiently as possible.
 	/// </summary>
 	public class AsyncMessagePumpWithHandlers
 	{
 		#region FIELDS
 
-		private static readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
-
 		private static IDictionary<Type, Type[]> _messageHandlers;
 
-		private readonly ILogger _logger;
 		private readonly AsyncMessagePump _messagePump;
+		private readonly ILogger _logger;
 
 		#endregion
 
@@ -43,97 +38,98 @@ namespace Picton.Messaging
 		/// <remarks>
 		/// When isPoison is set to true, you should copy this message to a poison queue because it will be deleted from the original queue.
 		/// </remarks>
-		public Action<CloudMessage, Exception, bool> OnError
-		{
-			get { return _messagePump.OnError; }
-			set { _messagePump.OnError = value; }
-		}
+		public Action<string, CloudMessage, Exception, bool> OnError { get; set; }
 
 		/// <summary>
-		/// Gets or sets the logic to execute when queue is empty.
+		/// Gets or sets the logic to execute when all queues are empty.
 		/// </summary>
 		/// <example>
 		/// <code>
-		/// OnQueueEmpty = cancellationToken => Task.Delay(2500, cancellationToken).Wait();
+		/// OnEmpty = cancellationToken => Task.Delay(2500, cancellationToken).Wait();
 		/// </code>
 		/// </example>
 		/// <remarks>
-		/// If this property is not set, the default logic is to pause for 2 seconds.
+		/// If this property is not set, the default logic is to do nothing.
 		/// </remarks>
-		public Action<CancellationToken> OnQueueEmpty
-		{
-			get { return _messagePump.OnQueueEmpty; }
-			set { _messagePump.OnQueueEmpty = value; }
-		}
+		public Action<CancellationToken> OnEmpty { get; set; }
 
 		#endregion
 
-		#region CONSTRUCTOR
+		#region CONSTRUCTORS
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
+		/// Initializes a new instance of the <see cref="AsyncMessagePump"/> class.
 		/// </summary>
 		/// <param name="connectionString">
 		/// A connection string includes the authentication information required for your application to access data in an Azure Storage account at runtime.
 		/// For more information, https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string.
 		/// </param>
 		/// <param name="queueName">Name of the queue.</param>
-		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
-		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poinson' messages.</param>
+		/// <param name="options"></param>
+		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poison' messages.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="logger">The logger.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
 		[ExcludeFromCodeCoverage]
-		public AsyncMessagePumpWithHandlers(string connectionString, string queueName, int concurrentTasks = 25, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
-			: this(new QueueManager(connectionString, queueName), string.IsNullOrEmpty(poisonQueueName) ? null : new QueueManager(connectionString, poisonQueueName), concurrentTasks, visibilityTimeout, maxDequeueCount, logger, metrics)
+		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, string queueName, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+			: this(options, new QueueConfig(queueName, poisonQueueName, visibilityTimeout, maxDequeueCount), logger, metrics)
 		{
 		}
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
+		/// Initializes a new instance of the <see cref="AsyncMessagePump"/> class.
 		/// </summary>
+		/// <param name="options"></param>
+		/// <param name="queueConfig"></param>
+		/// <param name="logger">The logger.</param>
+		/// <param name="metrics">The system where metrics are published.</param>
+		[ExcludeFromCodeCoverage]
+		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, QueueConfig queueConfig, ILogger logger = null, IMetrics metrics = null)
+			: this(options, new[] { queueConfig }, logger, metrics)
+		{
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="AsyncMultiQueueMessagePump"/> class.
+		/// </summary>
+		/// <param name="options"></param>
+		/// <param name="queueConfigs">The configuration options for each queue to be monitored.</param>
+		/// <param name="logger">The logger.</param>
+		/// <param name="metrics">The system where metrics are published.</param>
+		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, IEnumerable<QueueConfig> queueConfigs, ILogger logger = null, IMetrics metrics = null)
+		{
+			_messagePump = new AsyncMessagePump(options, queueConfigs, logger, metrics);
+			_logger = logger;
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="AsyncMultiQueueMessagePump"/> class.
+		/// </summary>
+		/// <param name="options"></param>
 		/// <param name="queueManager">The queue manager.</param>
 		/// <param name="poisonQueueManager">The poison queue manager.</param>
-		/// <param name="concurrentTasks">The number of concurrent tasks.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="logger">The logger.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMessagePumpWithHandlers(QueueManager queueManager, QueueManager poisonQueueManager, int concurrentTasks = 25, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+		internal AsyncMessagePumpWithHandlers(MessagePumpOptions options, QueueManager queueManager, QueueManager poisonQueueManager = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+			: this(options, new[] { (queueManager, poisonQueueManager, visibilityTimeout, maxDequeueCount) }, logger, metrics)
 		{
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="AsyncMultiQueueMessagePump"/> class.
+		/// </summary>
+		/// <param name="options"></param>
+		/// <param name="queueConfigs">The configuration options for each queue to be monitored.</param>
+		/// <param name="logger">The logger.</param>
+		/// <param name="metrics">The system where metrics are published.</param>
+		internal AsyncMessagePumpWithHandlers(MessagePumpOptions options, IEnumerable<(QueueManager QueueManager, QueueManager PoisonQueueManager, TimeSpan? VisibilityTimeout, int MaxDequeueCount)> queueConfigs, ILogger logger = null, IMetrics metrics = null)
+		{
+			_messageHandlers = MessageHandlersDiscoverer.GetMessageHandlers(logger);
+			_messagePump = new AsyncMessagePump(options, queueConfigs, logger, metrics);
 			_logger = logger;
-
-			_messagePump = new AsyncMessagePump(queueManager, poisonQueueManager, concurrentTasks, visibilityTimeout, maxDequeueCount, logger, metrics)
-			{
-				OnMessage = (message, cancellationToken) =>
-				{
-					var contentType = message.Content.GetType();
-
-					if (!_messageHandlers.TryGetValue(contentType, out Type[] handlers))
-					{
-						throw new Exception($"Received a message of type {contentType.FullName} but could not find a class implementing IMessageHandler<{contentType.FullName}>");
-					}
-
-					foreach (var handlerType in handlers)
-					{
-						object handler = null;
-						if (handlerType.GetConstructor(new[] { typeof(ILogger) }) != null)
-						{
-							handler = Activator.CreateInstance(handlerType, new[] { (object)logger });
-						}
-						else
-						{
-							handler = Activator.CreateInstance(handlerType);
-						}
-
-						var handlerMethod = handlerType.GetMethod("Handle", new[] { contentType });
-						handlerMethod.Invoke(handler, new[] { message.Content });
-					}
-				}
-			};
-
-			DiscoverMessageHandlersIfNecessary(logger);
 		}
 
 		#endregion
@@ -148,114 +144,35 @@ namespace Picton.Messaging
 		/// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
 		public Task StartAsync(CancellationToken cancellationToken)
 		{
+			_messagePump.OnEmpty = OnEmpty;
+			_messagePump.OnError = OnError;
+			_messagePump.OnMessage = (queueName, message, cancellationToken) =>
+			{
+				var contentType = message.Content.GetType();
+
+				if (!_messageHandlers.TryGetValue(contentType, out Type[] handlers))
+				{
+					throw new Exception($"Received a message of type {contentType.FullName} but could not find a class implementing IMessageHandler<{contentType.FullName}>");
+				}
+
+				foreach (var handlerType in handlers)
+				{
+					object handler = null;
+					if (handlerType.GetConstructor(new[] { typeof(ILogger) }) != null)
+					{
+						handler = Activator.CreateInstance(handlerType, new[] { (object)_logger });
+					}
+					else
+					{
+						handler = Activator.CreateInstance(handlerType);
+					}
+
+					var handlerMethod = handlerType.GetMethod("Handle", new[] { contentType });
+					handlerMethod.Invoke(handler, new[] { message.Content });
+				}
+			};
+
 			return _messagePump.StartAsync(cancellationToken);
-		}
-
-		#endregion
-
-		#region PRIVATE METHODS
-
-		private static void DiscoverMessageHandlersIfNecessary(ILogger logger)
-		{
-			try
-			{
-				_lock.EnterUpgradeableReadLock();
-
-				if (_messageHandlers == null)
-				{
-					try
-					{
-						_lock.EnterWriteLock();
-
-						if (_messageHandlers == null)
-						{
-							_messageHandlers = GetMessageHandlers(null);
-						}
-					}
-					finally
-					{
-						if (_lock.IsWriteLockHeld) _lock.ExitWriteLock();
-					}
-				}
-			}
-			finally
-			{
-				if (_lock.IsUpgradeableReadLockHeld) _lock.ExitUpgradeableReadLock();
-			}
-		}
-
-		private static IDictionary<Type, Type[]> GetMessageHandlers(ILogger logger)
-		{
-			logger?.LogTrace("Discovering message handlers.");
-
-			var assemblies = GetLocalAssemblies();
-
-			var assembliesCount = assemblies.Length;
-			if (assembliesCount == 0) logger?.LogTrace($"Did not find any local assembly.");
-			else if (assembliesCount == 1) logger?.LogTrace("Found 1 local assembly.");
-			else logger?.LogTrace($"Found {assemblies.Count()} local assemblies.");
-
-			var typesWithMessageHandlerInterfaces = assemblies
-				.SelectMany(x => x.GetTypes())
-				.Where(t => !t.GetTypeInfo().IsInterface)
-				.Select(type => new
-				{
-					Type = type,
-					MessageTypes = type
-						.GetInterfaces()
-							.Where(i => i.GetTypeInfo().IsGenericType)
-							.Where(i => i.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
-							.SelectMany(i => i.GetGenericArguments())
-				})
-				.Where(t => t.MessageTypes != null && t.MessageTypes.Any())
-				.ToArray();
-
-			var classesCount = typesWithMessageHandlerInterfaces.Length;
-			if (classesCount == 0) logger?.LogTrace("Did not find any class implementing the 'IMessageHandler' interface.");
-			else if (classesCount == 1) logger?.LogTrace("Found 1 class implementing the 'IMessageHandler' interface.");
-			else logger?.LogTrace($"Found {typesWithMessageHandlerInterfaces.Count()} classes implementing the 'IMessageHandler' interface.");
-
-			var oneTypePerMessageHandler = typesWithMessageHandlerInterfaces
-				.SelectMany(t => t.MessageTypes, (t, messageType) =>
-				new
-				{
-					t.Type,
-					MessageType = messageType
-				})
-				.ToArray();
-
-			var messageHandlers = oneTypePerMessageHandler
-				.GroupBy(h => h.MessageType)
-				.ToDictionary(group => group.Key, group => group.Select(t => t.Type)
-				.ToArray());
-
-			return messageHandlers;
-		}
-
-		private static Assembly[] GetLocalAssemblies()
-		{
-			var dependencies = DependencyContext.Default.RuntimeLibraries;
-
-			var assemblies = new List<Assembly>();
-			foreach (var library in dependencies)
-			{
-				if (IsCandidateLibrary(library))
-				{
-					var assembly = Assembly.Load(new AssemblyName(library.Name));
-					assemblies.Add(assembly);
-				}
-			}
-
-			return assemblies.ToArray();
-		}
-
-		private static bool IsCandidateLibrary(RuntimeLibrary library)
-		{
-			return !library.Name.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase) &&
-				!library.Name.StartsWith("System.", StringComparison.OrdinalIgnoreCase) &&
-				!library.Name.StartsWith("NetStandard.", StringComparison.OrdinalIgnoreCase) &&
-				!string.Equals(library.Type, "package", StringComparison.OrdinalIgnoreCase) &&
-				!string.Equals(library.Type, "referenceassembly", StringComparison.OrdinalIgnoreCase);
 		}
 
 		#endregion

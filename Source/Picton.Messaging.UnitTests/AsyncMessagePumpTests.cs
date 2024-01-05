@@ -16,9 +16,11 @@ namespace Picton.Messaging.UnitTests
 		[Fact]
 		public void Null_cloudQueue_throws()
 		{
+			var options = new MessagePumpOptions("bogus connection string", 1);
+
 			Should.Throw<ArgumentNullException>(() =>
 			{
-				var messagePump = new AsyncMessagePump((QueueManager)null, null, 1, TimeSpan.FromMinutes(1), 1, null, null);
+				var messagePump = new AsyncMessagePump(options, (QueueManager)null);
 			});
 		}
 
@@ -30,8 +32,9 @@ namespace Picton.Messaging.UnitTests
 				var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 				var mockQueueClient = MockUtils.GetMockQueueClient();
 				var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient, false);
+				var options = new MessagePumpOptions("bogus connection string", 0);
 
-				var messagePump = new AsyncMessagePump(queueManager, null, 0, TimeSpan.FromMinutes(1), 1, null, null);
+				var messagePump = new AsyncMessagePump(options, queueManager);
 			});
 		}
 
@@ -43,8 +46,9 @@ namespace Picton.Messaging.UnitTests
 				var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 				var mockQueueClient = MockUtils.GetMockQueueClient();
 				var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient, false);
+				var options = new MessagePumpOptions("bogus connection string", 0);
 
-				var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 0, null, null);
+				var messagePump = new AsyncMessagePump(options, queueManager, maxDequeueCount: 0);
 			});
 		}
 
@@ -55,10 +59,11 @@ namespace Picton.Messaging.UnitTests
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
 			var mockQueueClient = MockUtils.GetMockQueueClient();
 			var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient, true);
+			var options = new MessagePumpOptions("bogus connection string", 1);
 
 			var cts = new CancellationTokenSource();
 
-			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null, null);
+			var messagePump = new AsyncMessagePump(options, queueManager);
 
 			// Act
 			Should.ThrowAsync<ArgumentNullException>(() => messagePump.StartAsync(cts.Token));
@@ -69,7 +74,7 @@ namespace Picton.Messaging.UnitTests
 		{
 			// Arrange
 			var onMessageInvokeCount = 0;
-			var onQueueEmptyInvokeCount = 0;
+			var OnEmptyInvokeCount = 0;
 			var onErrorInvokeCount = 0;
 
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
@@ -89,20 +94,21 @@ namespace Picton.Messaging.UnitTests
 				.Returns(callInfo => Response.FromValue(Enumerable.Empty<QueueMessage>().ToArray(), new MockAzureResponse(200, "ok")));
 
 			var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient);
+			var options = new MessagePumpOptions("bogus connection string", 1);
 
-			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null)
+			var messagePump = new AsyncMessagePump(options, queueManager)
 			{
-				OnMessage = (message, cancellationToken) =>
+				OnMessage = (queueName, message, cancellationToken) =>
 				{
 					Interlocked.Increment(ref onMessageInvokeCount);
 				},
-				OnError = (message, exception, isPoison) =>
+				OnError = (queueName, message, exception, isPoison) =>
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
 				},
-				OnQueueEmpty = cancellationToken =>
+				OnEmpty = cancellationToken =>
 				{
-					Interlocked.Increment(ref onQueueEmptyInvokeCount);
+					Interlocked.Increment(ref OnEmptyInvokeCount);
 					cts.Cancel();
 				}
 			};
@@ -112,7 +118,7 @@ namespace Picton.Messaging.UnitTests
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(0);
-			onQueueEmptyInvokeCount.ShouldBe(1);
+			OnEmptyInvokeCount.ShouldBe(1);
 			onErrorInvokeCount.ShouldBe(0);
 		}
 
@@ -121,7 +127,7 @@ namespace Picton.Messaging.UnitTests
 		{
 			// Arrange
 			var onMessageInvokeCount = 0;
-			var onQueueEmptyInvokeCount = 0;
+			var OnEmptyInvokeCount = 0;
 			var onErrorInvokeCount = 0;
 
 			var lockObject = new Object();
@@ -154,7 +160,7 @@ namespace Picton.Messaging.UnitTests
 						{
 							if (cloudMessage != null)
 							{
-								// DequeueCount is a private property. Therefore we must use reflection to change its value
+								// DequeueCount is a read-only property but we can use reflection to change its value
 								var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
 								dequeueCountProperty.SetValue(cloudMessage, cloudMessage.DequeueCount + 1);
 
@@ -176,14 +182,15 @@ namespace Picton.Messaging.UnitTests
 				});
 
 			var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient);
+			var options = new MessagePumpOptions("bogus connection string", 1);
 
-			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null)
+			var messagePump = new AsyncMessagePump(options, queueManager)
 			{
-				OnMessage = (message, cancellationToken) =>
+				OnMessage = (queueName, message, cancellationToken) =>
 				{
 					Interlocked.Increment(ref onMessageInvokeCount);
 				},
-				OnError = (message, exception, isPoison) =>
+				OnError = (queueName, message, exception, isPoison) =>
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
 					if (isPoison)
@@ -194,9 +201,9 @@ namespace Picton.Messaging.UnitTests
 						}
 					}
 				},
-				OnQueueEmpty = cancellationToken =>
+				OnEmpty = cancellationToken =>
 				{
-					Interlocked.Increment(ref onQueueEmptyInvokeCount);
+					Interlocked.Increment(ref OnEmptyInvokeCount);
 					cts.Cancel();
 				}
 			};
@@ -206,7 +213,7 @@ namespace Picton.Messaging.UnitTests
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(1);
-			onQueueEmptyInvokeCount.ShouldBe(1);
+			OnEmptyInvokeCount.ShouldBe(1);
 			onErrorInvokeCount.ShouldBe(0);
 		}
 
@@ -215,7 +222,7 @@ namespace Picton.Messaging.UnitTests
 		{
 			// Arrange
 			var onMessageInvokeCount = 0;
-			var onQueueEmptyInvokeCount = 0;
+			var OnEmptyInvokeCount = 0;
 			var onErrorInvokeCount = 0;
 
 			var isRejected = false;
@@ -245,7 +252,7 @@ namespace Picton.Messaging.UnitTests
 					{
 						if (cloudMessage != null)
 						{
-							// DequeueCount is a private property. Therefore we must use reflection to change its value
+							// DequeueCount is a read-only property but we can use reflection to change its value
 							var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
 							dequeueCountProperty.SetValue(cloudMessage, retries + 1);   // intentionally set 'DequeueCount' to a value exceeding maxRetries to simulate a poison message
 
@@ -267,21 +274,22 @@ namespace Picton.Messaging.UnitTests
 				});
 
 			var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient);
+			var options = new MessagePumpOptions("bogus connection string", 1);
 
-			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null)
+			var messagePump = new AsyncMessagePump(options, queueManager)
 			{
-				OnMessage = (message, cancellationToken) =>
+				OnMessage = (queueName, message, cancellationToken) =>
 				{
 					Interlocked.Increment(ref onMessageInvokeCount);
 					throw new Exception("An error occured when attempting to process the message");
 				},
-				OnError = (message, exception, isPoison) =>
+				OnError = (queueName, message, exception, isPoison) =>
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
 				},
-				OnQueueEmpty = cancellationToken =>
+				OnEmpty = cancellationToken =>
 				{
-					Interlocked.Increment(ref onQueueEmptyInvokeCount);
+					Interlocked.Increment(ref OnEmptyInvokeCount);
 					cts.Cancel();
 				}
 			};
@@ -291,7 +299,7 @@ namespace Picton.Messaging.UnitTests
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(1);
-			onQueueEmptyInvokeCount.ShouldBe(1);
+			OnEmptyInvokeCount.ShouldBe(1);
 			onErrorInvokeCount.ShouldBe(1);
 			isRejected.ShouldBeTrue();
 		}
@@ -301,7 +309,7 @@ namespace Picton.Messaging.UnitTests
 		{
 			// Arrange
 			var onMessageInvokeCount = 0;
-			var onQueueEmptyInvokeCount = 0;
+			var OnEmptyInvokeCount = 0;
 			var onErrorInvokeCount = 0;
 
 			var isRejected = false;
@@ -332,7 +340,7 @@ namespace Picton.Messaging.UnitTests
 					{
 						if (cloudMessage != null)
 						{
-							// DequeueCount is a private property. Therefore we must use reflection to change its value
+							// DequeueCount is a read-only property but we can use reflection to change its value
 							var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
 							dequeueCountProperty.SetValue(cloudMessage, retries + 1);   // intentionally set 'DequeueCount' to a value exceeding maxRetries to simulate a poison message
 
@@ -363,21 +371,22 @@ namespace Picton.Messaging.UnitTests
 
 			var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient);
 			var poisonQueueManager = new QueueManager(mockBlobContainerClient, mockPoisonQueueClient);
+			var options = new MessagePumpOptions("bogus connection string", 1);
 
-			var messagePump = new AsyncMessagePump(queueManager, poisonQueueManager, 1, TimeSpan.FromMinutes(1), 3, null)
+			var messagePump = new AsyncMessagePump(options, queueManager, poisonQueueManager)
 			{
-				OnMessage = (message, cancellationToken) =>
+				OnMessage = (queueName, message, cancellationToken) =>
 				{
 					Interlocked.Increment(ref onMessageInvokeCount);
 					throw new Exception("An error occured when attempting to process the message");
 				},
-				OnError = (message, exception, isPoison) =>
+				OnError = (queueName, message, exception, isPoison) =>
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
 				},
-				OnQueueEmpty = cancellationToken =>
+				OnEmpty = cancellationToken =>
 				{
-					Interlocked.Increment(ref onQueueEmptyInvokeCount);
+					Interlocked.Increment(ref OnEmptyInvokeCount);
 					cts.Cancel();
 				}
 			};
@@ -387,17 +396,17 @@ namespace Picton.Messaging.UnitTests
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(1);
-			onQueueEmptyInvokeCount.ShouldBe(1);
+			OnEmptyInvokeCount.ShouldBe(1);
 			onErrorInvokeCount.ShouldBe(1);
 			isRejected.ShouldBeTrue();
 		}
 
 		[Fact]
-		public async Task Exceptions_in_OnQueueEmpty_are_ignored()
+		public async Task Exceptions_in_OnEmpty_are_ignored()
 		{
 			// Arrange
 			var onMessageInvokeCount = 0;
-			var onQueueEmptyInvokeCount = 0;
+			var OnEmptyInvokeCount = 0;
 			var onErrorInvokeCount = 0;
 
 			var exceptionSimulated = false;
@@ -420,20 +429,21 @@ namespace Picton.Messaging.UnitTests
 				.Returns(callInfo => Response.FromValue(Enumerable.Empty<QueueMessage>().ToArray(), new MockAzureResponse(200, "ok")));
 
 			var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient);
+			var options = new MessagePumpOptions("bogus connection string", 1);
 
-			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null, null)
+			var messagePump = new AsyncMessagePump(options, queueManager)
 			{
-				OnMessage = (message, cancellationToken) =>
+				OnMessage = (queueName, message, cancellationToken) =>
 				{
 					Interlocked.Increment(ref onMessageInvokeCount);
 				},
-				OnError = (message, exception, isPoison) =>
+				OnError = (queueName, message, exception, isPoison) =>
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
 				},
-				OnQueueEmpty = cancellationToken =>
+				OnEmpty = cancellationToken =>
 				{
-					Interlocked.Increment(ref onQueueEmptyInvokeCount);
+					Interlocked.Increment(ref OnEmptyInvokeCount);
 
 					// Simulate an exception (only the first time)
 					lock (lockObject)
@@ -455,7 +465,7 @@ namespace Picton.Messaging.UnitTests
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(0);
-			onQueueEmptyInvokeCount.ShouldBe(2); // First time we throw an exception, second time we stop the message pump
+			OnEmptyInvokeCount.ShouldBe(2); // First time we throw an exception, second time we stop the message pump
 			onErrorInvokeCount.ShouldBe(0);
 		}
 
@@ -464,7 +474,7 @@ namespace Picton.Messaging.UnitTests
 		{
 			// Arrange
 			var onMessageInvokeCount = 0;
-			var onQueueEmptyInvokeCount = 0;
+			var OnEmptyInvokeCount = 0;
 			var onErrorInvokeCount = 0;
 
 			var lockObject = new Object();
@@ -491,7 +501,7 @@ namespace Picton.Messaging.UnitTests
 					{
 						if (cloudMessage != null)
 						{
-							// DequeueCount is a private property. Therefore we must use reflection to change its value
+							// DequeueCount is a read-only property but we can use reflection to change its value
 							var dequeueCountProperty = cloudMessage.GetType().GetProperty("DequeueCount");
 							dequeueCountProperty.SetValue(cloudMessage, cloudMessage.DequeueCount + 1);
 
@@ -512,22 +522,23 @@ namespace Picton.Messaging.UnitTests
 				});
 
 			var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient);
+			var options = new MessagePumpOptions("bogus connection string", 1);
 
-			var messagePump = new AsyncMessagePump(queueManager, null, 1, TimeSpan.FromMinutes(1), 3, null)
+			var messagePump = new AsyncMessagePump(options, queueManager)
 			{
-				OnMessage = (message, cancellationToken) =>
+				OnMessage = (queueName, message, cancellationToken) =>
 				{
 					Interlocked.Increment(ref onMessageInvokeCount);
 					throw new Exception("Simulate a problem while processing the message in order to unit test the error handler");
 				},
-				OnError = (message, exception, isPoison) =>
+				OnError = (queueName, message, exception, isPoison) =>
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
 					throw new Exception("This dummy exception should be ignored");
 				},
-				OnQueueEmpty = cancellationToken =>
+				OnEmpty = cancellationToken =>
 				{
-					Interlocked.Increment(ref onQueueEmptyInvokeCount);
+					Interlocked.Increment(ref OnEmptyInvokeCount);
 					cts.Cancel();
 				}
 			};
@@ -537,8 +548,8 @@ namespace Picton.Messaging.UnitTests
 
 			// Assert
 			onMessageInvokeCount.ShouldBe(3); // <-- message is retried three times
-			onErrorInvokeCount.ShouldBe(3); // <-- we throw a dummy exception every time the mesage is processed, until we give up and the message is moved to the poison queue
-			onQueueEmptyInvokeCount.ShouldBe(1);
+			onErrorInvokeCount.ShouldBe(3); // <-- we throw a dummy exception every time the mesage is processed, until we give up and move the message to the poison queue
+			OnEmptyInvokeCount.ShouldBe(1);
 		}
 	}
 }
