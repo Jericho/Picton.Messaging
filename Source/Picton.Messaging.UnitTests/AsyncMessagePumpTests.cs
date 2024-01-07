@@ -14,46 +14,55 @@ namespace Picton.Messaging.UnitTests
 	public class AsyncMessagePumpTests
 	{
 		[Fact]
-		public void Null_cloudQueue_throws()
+		public void Throws_when_options_is_null()
 		{
+			// Arrange
+			var options = (MessagePumpOptions)null;
+
+			//Act
+			Should.Throw<ArgumentNullException>(() => new AsyncMessagePump(options));
+		}
+
+		[Fact]
+		public void Throws_when_zero_queues()
+		{
+			// Arrange
+			var cts = new CancellationTokenSource();
+
 			var options = new MessagePumpOptions("bogus connection string", 1);
+			var messagePump = new AsyncMessagePump(options);
 
-			Should.Throw<ArgumentNullException>(() =>
-			{
-				var messagePump = new AsyncMessagePump(options, (QueueManager)null);
-			});
+			// Act
+			Should.ThrowAsync<ArgumentNullException>(() => messagePump.StartAsync(cts.Token));
+
 		}
 
 		[Fact]
-		public void Number_of_concurrent_tasks_too_small_throws()
+		public void Throws_when_number_of_concurrent_tasks_too_small()
 		{
-			Should.Throw<ArgumentException>(() =>
-			{
-				var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
-				var mockQueueClient = MockUtils.GetMockQueueClient();
-				var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient, false);
-				var options = new MessagePumpOptions("bogus connection string", 0);
+			// Arrange
+			var options = new MessagePumpOptions("bogus connection string", 0);
 
-				var messagePump = new AsyncMessagePump(options, queueManager);
-			});
+			//Act
+			Should.Throw<ArgumentException>(() => new AsyncMessagePump(options));
 		}
 
 		[Fact]
-		public void DequeueCount_too_small_throws()
+		public void Throws_when_DequeueCount_too_small()
 		{
-			Should.Throw<ArgumentException>(() =>
-			{
-				var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
-				var mockQueueClient = MockUtils.GetMockQueueClient();
-				var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient, false);
-				var options = new MessagePumpOptions("bogus connection string", 0);
+			// Arrange
+			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
+			var mockQueueClient = MockUtils.GetMockQueueClient();
+			var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient, false);
+			var options = new MessagePumpOptions("bogus connection string", 1);
+			var messagePump = new AsyncMessagePump(options);
 
-				var messagePump = new AsyncMessagePump(options, queueManager, maxDequeueCount: 0);
-			});
+			// Act
+			Should.Throw<ArgumentOutOfRangeException>(() => messagePump.AddQueue(queueManager, null, null, 0));
 		}
 
 		[Fact]
-		public void Start_without_OnMessage_throws()
+		public void Throws_when_OnMessage_not_set()
 		{
 			// Arrange
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
@@ -63,7 +72,8 @@ namespace Picton.Messaging.UnitTests
 
 			var cts = new CancellationTokenSource();
 
-			var messagePump = new AsyncMessagePump(options, queueManager);
+			var messagePump = new AsyncMessagePump(options);
+			messagePump.AddQueue(queueManager, null, null, 3);
 
 			// Act
 			Should.ThrowAsync<ArgumentNullException>(() => messagePump.StartAsync(cts.Token));
@@ -96,7 +106,7 @@ namespace Picton.Messaging.UnitTests
 			var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient);
 			var options = new MessagePumpOptions("bogus connection string", 1);
 
-			var messagePump = new AsyncMessagePump(options, queueManager)
+			var messagePump = new AsyncMessagePump(options)
 			{
 				OnMessage = (queueName, message, cancellationToken) =>
 				{
@@ -112,6 +122,7 @@ namespace Picton.Messaging.UnitTests
 					cts.Cancel();
 				}
 			};
+			messagePump.AddQueue(queueManager, null, null, 3);
 
 			// Act
 			await messagePump.StartAsync(cts.Token);
@@ -184,7 +195,7 @@ namespace Picton.Messaging.UnitTests
 			var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient);
 			var options = new MessagePumpOptions("bogus connection string", 1);
 
-			var messagePump = new AsyncMessagePump(options, queueManager)
+			var messagePump = new AsyncMessagePump(options)
 			{
 				OnMessage = (queueName, message, cancellationToken) =>
 				{
@@ -207,6 +218,7 @@ namespace Picton.Messaging.UnitTests
 					cts.Cancel();
 				}
 			};
+			messagePump.AddQueue(queueManager, null, null, 3);
 
 			// Act
 			await messagePump.StartAsync(cts.Token);
@@ -276,7 +288,7 @@ namespace Picton.Messaging.UnitTests
 			var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient);
 			var options = new MessagePumpOptions("bogus connection string", 1);
 
-			var messagePump = new AsyncMessagePump(options, queueManager)
+			var messagePump = new AsyncMessagePump(options)
 			{
 				OnMessage = (queueName, message, cancellationToken) =>
 				{
@@ -293,6 +305,7 @@ namespace Picton.Messaging.UnitTests
 					cts.Cancel();
 				}
 			};
+			messagePump.AddQueue(queueManager, null, null, retries);
 
 			// Act
 			await messagePump.StartAsync(cts.Token);
@@ -373,7 +386,7 @@ namespace Picton.Messaging.UnitTests
 			var poisonQueueManager = new QueueManager(mockBlobContainerClient, mockPoisonQueueClient);
 			var options = new MessagePumpOptions("bogus connection string", 1);
 
-			var messagePump = new AsyncMessagePump(options, queueManager, poisonQueueManager)
+			var messagePump = new AsyncMessagePump(options)
 			{
 				OnMessage = (queueName, message, cancellationToken) =>
 				{
@@ -390,6 +403,7 @@ namespace Picton.Messaging.UnitTests
 					cts.Cancel();
 				}
 			};
+			messagePump.AddQueue(queueManager, poisonQueueManager, null, retries);
 
 			// Act
 			await messagePump.StartAsync(cts.Token);
@@ -431,7 +445,7 @@ namespace Picton.Messaging.UnitTests
 			var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient);
 			var options = new MessagePumpOptions("bogus connection string", 1);
 
-			var messagePump = new AsyncMessagePump(options, queueManager)
+			var messagePump = new AsyncMessagePump(options)
 			{
 				OnMessage = (queueName, message, cancellationToken) =>
 				{
@@ -459,6 +473,7 @@ namespace Picton.Messaging.UnitTests
 					cts.Cancel();
 				}
 			};
+			messagePump.AddQueue(queueManager, null, null, 3);
 
 			// Act
 			await messagePump.StartAsync(cts.Token);
@@ -524,7 +539,7 @@ namespace Picton.Messaging.UnitTests
 			var queueManager = new QueueManager(mockBlobContainerClient, mockQueueClient);
 			var options = new MessagePumpOptions("bogus connection string", 1);
 
-			var messagePump = new AsyncMessagePump(options, queueManager)
+			var messagePump = new AsyncMessagePump(options)
 			{
 				OnMessage = (queueName, message, cancellationToken) =>
 				{
@@ -542,6 +557,7 @@ namespace Picton.Messaging.UnitTests
 					cts.Cancel();
 				}
 			};
+			messagePump.AddQueue(queueManager, null, null, 3);
 
 			// Act
 			await messagePump.StartAsync(cts.Token);

@@ -15,7 +15,7 @@ namespace Picton.Messaging
 {
 	/// <summary>
 	/// High performance message processor (also known as a message "pump") for Azure storage queues.
-	/// Designed to monitor either a single queue or a fixed list of queues and process messages as
+	/// Designed to monitor either a single queue or a list of queues and process messages as
 	/// quickly and efficiently as possible.
 	/// </summary>
 	public class AsyncMessagePump
@@ -23,9 +23,9 @@ namespace Picton.Messaging
 		#region FIELDS
 
 		private readonly ConcurrentDictionary<string, (QueueConfig Config, QueueManager QueueManager, QueueManager PoisonQueueManager, DateTime LastFetched, TimeSpan FetchDelay)> _queueManagers = new ConcurrentDictionary<string, (QueueConfig Config, QueueManager QueueManager, QueueManager PoisonQueueManager, DateTime LastFetched, TimeSpan FetchDelay)>();
-		private readonly RoundRobinList<string> _queueNames;
+		private readonly RoundRobinList<string> _queueNames = new RoundRobinList<string>(Enumerable.Empty<string>());
 
-		private readonly MessagePumpOptions _mesagePumpOptions;
+		private readonly MessagePumpOptions _messagePumpOptions;
 		private readonly ILogger _logger;
 		private readonly IMetrics _metrics;
 
@@ -72,100 +72,51 @@ namespace Picton.Messaging
 		#region CONSTRUCTOR
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMultiQueueMessagePump"/> class.
+		/// Initializes a new instance of the <see cref="AsyncMessagePump"/> class.
 		/// </summary>
-		/// <param name="options"></param>
-		/// <param name="queueConfigs">The configuration options for each queue to be monitored.</param>
+		/// <param name="options">Options for the mesage pump.</param>
 		/// <param name="logger">The logger.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
-		internal AsyncMessagePump(MessagePumpOptions options, IEnumerable<(QueueManager QueueManager, QueueManager PoisonQueueManager, TimeSpan? VisibilityTimeout, int MaxDequeueCount)> queueConfigs, ILogger logger = null, IMetrics metrics = null)
+		public AsyncMessagePump(MessagePumpOptions options, ILogger logger = null, IMetrics metrics = null)
 		{
-			foreach (var queueConfig in queueConfigs)
-			{
-				var queueName = queueConfig.QueueManager.QueueName;
-				var poisonQueueName = queueConfig.PoisonQueueManager?.QueueName;
-				var config = new QueueConfig(queueName, poisonQueueName, queueConfig.VisibilityTimeout, queueConfig.MaxDequeueCount);
-				_queueManagers.TryAdd(queueName, (config, queueConfig.QueueManager, queueConfig.PoisonQueueManager, DateTime.MinValue, TimeSpan.Zero));
-			}
+			if (options == null) throw new ArgumentNullException(nameof(options));
+			if (string.IsNullOrEmpty(options.ConnectionString)) throw new ArgumentNullException(nameof(options.ConnectionString));
+			if (options.ConcurrentTasks < 1) throw new ArgumentOutOfRangeException(nameof(options.ConcurrentTasks), "Number of concurrent tasks must be greather than zero");
 
-			_queueNames = new RoundRobinList<string>(queueConfigs.Select(config => config.QueueManager.QueueName));
+			_messagePumpOptions = options;
 			_logger = logger;
 			_metrics = metrics ?? TurnOffMetrics();
-			_mesagePumpOptions = options;
 
 			InitDefaultActions();
-			RandomizeRoundRobinStart();
-		}
-
-		#endregion
-
-		#region STATIC METHODS
-
-		/// <summary>
-		/// Returns a message pump that will process messages in a single Azure storage queue.
-		/// </summary>
-		/// <param name="options"></param>
-		/// <param name="queueName">Name of the queue.</param>
-		/// <param name="poisonQueueName">Name of the queue where messages are automatically moved to when they fail to be processed after 'maxDequeueCount' attempts. You can indicate that you do not want messages to be automatically moved by leaving this value empty. In such a scenario, you are responsible for handling so called 'poison' messages.</param>
-		/// <param name="visibilityTimeout">The visibility timeout.</param>
-		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		/// <param name="logger">The logger.</param>
-		/// <param name="metrics">The system where metrics are published.</param>
-		/// <returns>The message pump.</returns>
-		public AsyncMessagePump ForSingleQueue(MessagePumpOptions options, string queueName, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
-		{
-			var queueConfig = new QueueConfig(queueName, poisonQueueName, visibilityTimeout, maxDequeueCount);
-
-			ValidateOptions(options);
-			ValidateQueueConfig(queueConfig);
-
-			return ForMultipleQueues(options, new[] { queueConfig }, logger, metrics);
-		}
-
-		/// <summary>
-		/// Returns a message pump that will process messages in a single Azure storage queue.
-		/// </summary>
-		/// <param name="options"></param>
-		/// <param name="queueConfig"></param>
-		/// <param name="logger">The logger.</param>
-		/// <param name="metrics">The system where metrics are published.</param>
-		/// <returns>The message pump.</returns>
-		public AsyncMessagePump ForSingleQueue(MessagePumpOptions options, QueueConfig queueConfig, ILogger logger = null, IMetrics metrics = null)
-		{
-			ValidateOptions(options);
-			ValidateQueueConfig(queueConfig);
-
-			return ForMultipleQueues(options, new[] { queueConfig }, logger, metrics);
-		}
-
-		/// <summary>
-		/// Returns a message pump that will process messages in multiple Azure storage queues.
-		/// </summary>
-		/// <param name="options"></param>
-		/// <param name="queueConfigs"></param>
-		/// <param name="logger">The logger.</param>
-		/// <param name="metrics">The system where metrics are published.</param>
-		/// <returns>The message pump.</returns>
-		public AsyncMessagePump ForMultipleQueues(MessagePumpOptions options, IEnumerable<QueueConfig> queueConfigs, ILogger logger = null, IMetrics metrics = null)
-		{
-			ValidateOptions(options);
-			ValidateQueueConfigs(queueConfigs);
-
-			var configs = queueConfigs
-				.Select(queueConfig =>
-				{
-					var queueManager = new QueueManager(options.ConnectionString, queueConfig.QueueName, true, options.QueueClientOptions, options.BlobClientOptions);
-					var poisonQueueManager = string.IsNullOrEmpty(queueConfig.PoisonQueueName) ? null : new QueueManager(options.ConnectionString, queueConfig.PoisonQueueName);
-					return (queueManager, poisonQueueManager, queueConfig.VisibilityTimeout, queueConfig.MaxDequeueCount);
-				})
-				.ToArray();
-
-			return new AsyncMessagePump(options, configs, logger, metrics);
 		}
 
 		#endregion
 
 		#region PUBLIC METHODS
+
+		public void AddQueue(string queueName, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
+		{
+			AddQueue(new QueueConfig(queueName, poisonQueueName, visibilityTimeout, maxDequeueCount));
+		}
+
+		public void AddQueue(QueueConfig queueConfig)
+		{
+			if (string.IsNullOrEmpty(queueConfig.QueueName)) throw new ArgumentNullException(nameof(queueConfig.QueueName));
+			if (queueConfig.MaxDequeueCount < 1) throw new ArgumentOutOfRangeException(nameof(queueConfig.MaxDequeueCount), "Number of retries must be greater than zero.");
+
+			var queueManager = new QueueManager(_messagePumpOptions.ConnectionString, queueConfig.QueueName, true, _messagePumpOptions.QueueClientOptions, _messagePumpOptions.BlobClientOptions);
+			var poisonQueueManager = string.IsNullOrEmpty(queueConfig.PoisonQueueName) ? null : new QueueManager(_messagePumpOptions.ConnectionString, queueConfig.PoisonQueueName, true, _messagePumpOptions.QueueClientOptions, _messagePumpOptions.BlobClientOptions);
+
+			AddQueue(queueManager, poisonQueueManager, queueConfig.VisibilityTimeout, queueConfig.MaxDequeueCount);
+		}
+
+		public void RemoveQueue(string queueName)
+		{
+			// Do not remove from _queuManagers because there could messages still in the memory queue that need to be processed
+			//_queueManagers.TryRemove(queueName, out _);
+
+			_queueNames.RemoveItem(queueName);
+		}
 
 		/// <summary>
 		/// Starts the message pump.
@@ -183,6 +134,22 @@ namespace Picton.Messaging
 
 		#region PRIVATE METHODS
 
+		// This internal method is primarily for unit testing purposes. It allows me to inject mocked queue managers
+		internal void AddQueue(QueueManager queueManager, QueueManager poisonQueueManager, TimeSpan? visibilityTimeout, int maxDequeueCount)
+		{
+			if (queueManager == null) throw new ArgumentNullException(nameof(queueManager));
+			if (string.IsNullOrEmpty(queueManager.QueueName)) throw new ArgumentNullException(nameof(queueManager.QueueName));
+			if (maxDequeueCount < 1) throw new ArgumentOutOfRangeException(nameof(maxDequeueCount), "Number of retries must be greater than zero.");
+
+			var queueConfig = new QueueConfig(queueManager.QueueName, poisonQueueManager?.QueueName, visibilityTimeout, maxDequeueCount);
+
+			_queueManagers.AddOrUpdate(
+				queueManager.QueueName,
+				(queueName) => (queueConfig, queueManager, poisonQueueManager, DateTime.MinValue, TimeSpan.Zero),
+				(queueName, oldConfig) => (queueConfig, queueManager, poisonQueueManager, oldConfig.LastFetched, oldConfig.FetchDelay));
+			_queueNames.AddItem(queueManager.QueueName);
+		}
+
 		private void InitDefaultActions()
 		{
 			OnError = (queueName, message, exception, isPoison) => _logger?.LogError(exception, "An error occured when processing a message in {queueName}", queueName);
@@ -199,32 +166,10 @@ namespace Picton.Messaging
 			return metricsTurnedOff.Build();
 		}
 
-		private void ValidateOptions(MessagePumpOptions options)
-		{
-			if (options == null) throw new ArgumentNullException(nameof(options));
-			if (string.IsNullOrEmpty(options.ConnectionString)) throw new ArgumentNullException(nameof(options.ConnectionString));
-			if (options.ConcurrentTasks < 1) throw new ArgumentOutOfRangeException(nameof(options.ConcurrentTasks), "Number of concurrent tasks must be greather than zero");
-		}
-
-		private void ValidateQueueConfig(QueueConfig queueConfig)
-		{
-			if (queueConfig == null) throw new ArgumentNullException(nameof(queueConfig));
-			if (string.IsNullOrEmpty(queueConfig.QueueName)) throw new ArgumentNullException(nameof(queueConfig.QueueName));
-			if (queueConfig.MaxDequeueCount < 1) throw new ArgumentOutOfRangeException(nameof(queueConfig.MaxDequeueCount), $"Number of retries for {queueConfig.QueueName} must be greater than zero.");
-		}
-
-		private void ValidateQueueConfigs(IEnumerable<QueueConfig> queueConfigs)
-		{
-			foreach (var queueConfig in queueConfigs)
-			{
-				ValidateQueueConfig(queueConfig);
-			}
-		}
-
 		private async Task ProcessMessagesAsync(CancellationToken cancellationToken)
 		{
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
-			var semaphore = new SemaphoreSlim(_mesagePumpOptions.ConcurrentTasks, _mesagePumpOptions.ConcurrentTasks);
+			var semaphore = new SemaphoreSlim(_messagePumpOptions.ConcurrentTasks, _messagePumpOptions.ConcurrentTasks);
 			var queuedMessages = new ConcurrentQueue<(string QueueName, CloudMessage Message)>();
 
 			// Define the task that fetches messages from the Azure queue
@@ -232,7 +177,7 @@ namespace Picton.Messaging
 				async () =>
 				{
 					// Fetch messages from Azure when the number of items in the concurrent queue falls below an "acceptable" level.
-					if (!cancellationToken.IsCancellationRequested && queuedMessages.Count <= _mesagePumpOptions.ConcurrentTasks / 2)
+					if (!cancellationToken.IsCancellationRequested && queuedMessages.Count <= _messagePumpOptions.ConcurrentTasks / 2)
 					{
 						await foreach (var message in FetchMessages(cancellationToken))
 						{
@@ -268,8 +213,7 @@ namespace Picton.Messaging
 						catch (RequestFailedException rfe) when (rfe.ErrorCode == "QueueNotFound")
 						{
 							// The queue has been deleted
-							_queueNames.Remove(queueName);
-							_queueManagers.TryRemove(queueName, out _);
+							RemoveQueue(queueName);
 						}
 						catch (Exception e)
 						{
@@ -352,6 +296,7 @@ namespace Picton.Messaging
 												{
 													result.Message.Metadata["PoisonExceptionMessage"] = ex.GetBaseException().Message;
 													result.Message.Metadata["PoisonExceptionDetails"] = ex.GetBaseException().ToString();
+													result.Message.Metadata["PoisonOriginalQueue"] = queueInfo.QueueManager.QueueName;
 
 													await queueInfo.PoisonQueueManager.AddMessageAsync(result.Message.Content, result.Message.Metadata, null, null, CancellationToken.None).ConfigureAwait(false);
 												}
@@ -365,7 +310,7 @@ namespace Picton.Messaging
 								}
 								else
 								{
-									_queueNames.Remove(result.QueueName);
+									_queueNames.RemoveItem(result.QueueName);
 								}
 							}
 
@@ -403,7 +348,12 @@ namespace Picton.Messaging
 		{
 			var messageCount = 0;
 
-			if (string.IsNullOrEmpty(_queueNames.Current)) _queueNames.Reset();
+			if (_queueNames.Count == 0)
+			{
+				_logger?.LogTrace("There are no tenant queues being monitored. Therefore no messages could be fetched.");
+				yield break;
+			}
+
 			var originalQueue = _queueNames.Current;
 
 			using (_metrics.Measure.Timer.Time(Metrics.MessagesFetchingTimer))
@@ -411,6 +361,7 @@ namespace Picton.Messaging
 				do
 				{
 					var queueName = _queueNames.MoveToNextItem();
+					originalQueue ??= queueName; // This is important because originalQueue will be null the very first time we fetch messages
 
 					if (_queueManagers.TryGetValue(queueName, out (QueueConfig Config, QueueManager QueueManager, QueueManager PoisonQueueManager, DateTime LastFetched, TimeSpan FetchDelay) queueInfo))
 					{
@@ -420,7 +371,7 @@ namespace Picton.Messaging
 
 							try
 							{
-								messages = await queueInfo.QueueManager.GetMessagesAsync(_mesagePumpOptions.ConcurrentTasks, queueInfo.Config.VisibilityTimeout, cancellationToken).ConfigureAwait(false);
+								messages = await queueInfo.QueueManager.GetMessagesAsync(_messagePumpOptions.ConcurrentTasks, queueInfo.Config.VisibilityTimeout, cancellationToken).ConfigureAwait(false);
 							}
 							catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
 							{
@@ -430,8 +381,7 @@ namespace Picton.Messaging
 							catch (RequestFailedException rfe) when (rfe.ErrorCode == "QueueNotFound")
 							{
 								// The queue has been deleted
-								_queueNames.Remove(queueName);
-								_queueManagers.TryRemove(queueName, out _);
+								RemoveQueue(queueName);
 							}
 							catch (Exception e)
 							{
@@ -467,12 +417,12 @@ namespace Picton.Messaging
 					}
 					else
 					{
-						_queueNames.Remove(queueName);
+						_queueNames.RemoveItem(queueName);
 					}
 				}
 
 				// Stop when we either retrieved the desired number of messages OR we have looped through all the queues
-				while (messageCount < (_mesagePumpOptions.ConcurrentTasks * 2) && originalQueue != _queueNames.Current);
+				while (messageCount < (_messagePumpOptions.ConcurrentTasks * 2) && originalQueue != _queueNames.Next);
 			}
 
 			if (messageCount == 0)
@@ -493,15 +443,6 @@ namespace Picton.Messaging
 				{
 					_logger?.LogError(e.GetBaseException(), "An error occured when handling empty queues. The error was caught and ignored.");
 				}
-			}
-		}
-
-		private void RandomizeRoundRobinStart()
-		{
-			if (_queueNames.Current == null)
-			{
-				var randomIndex = RandomGenerator.Instance.GetInt32(0, _queueNames.Count);
-				_queueNames.ResetTo(randomIndex);
 			}
 		}
 

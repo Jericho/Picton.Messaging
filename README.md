@@ -108,16 +108,17 @@ namespace WorkerRole1
         private async Task RunAsync(CancellationToken cancellationToken)
         {
             var connectionString = "<-- insert connection string for your Azure account -->";
-            var queueName = "<-- insert the name of your Azure queue -->";
+            var concurrentTask = 10; // <-- this is the max number of messages that can be processed at a time
 
             // Configure the message pump
-            var messagePump = new AsyncMessagePump(connectionString, queueName, 10, null, TimeSpan.FromMinutes(1), 3)
+            var options = new MessagePumpOptions(connectionString, concurrentTasks);
+            var messagePump = new AsyncMessagePump(options)
             {
-                OnMessage = (message, cancellationToken) =>
+                OnMessage = (queueName, message, cancellationToken) =>
                 {
                     // This is where you insert your custom logic to process a message
                 },
-                OnError = (message, exception, isPoison) =>
+                OnError = (queueName, message, exception, isPoison) =>
                 {
                     // Insert your custom error handling
 
@@ -127,17 +128,22 @@ namespace WorkerRole1
                     // this parameter indicates whether this message has exceeded the maximum
                     // number of retries. 
                     //
-                    // When you have configured the "poison queue name" and this parameter is
-                    // "true", the message is automatically copied to the poison queue and
-                    // removed from the original queue.
+                    // When you have configured the "poison queue name" for the given queue and 
+                    // this parameter is "true", the message is automatically copied to the poison
+                    // queue and removed from the original queue.
                     // 
-                    // If you have not configured the "poison queue name" and this parameter is
-                    // "true", the message is automatically removed from the original queue and
-                    // you are responsible for storing the message. If you don't, this mesage 
-                    // will be lost.
+                    // If you have not configured the "poison queue name" for the given queue and
+                    // this parameter is "true", the message is automatically removed from the
+                    // original queue and you are responsible for storing the message. If you don't,
+                    // this mesage will be lost.
                     // ==========================================================================
                 }
             };
+
+            // Replace the following samples with the queues you want to monitor
+            messagePump.AddQueue("myfirstqueue", "myfirstqueue-poison", TimeSpan.FromMinutes(1), 3);
+            messagePump.AddQueue("mysecondqueue", "mysecondqueue-poison", TimeSpan.FromMinutes(1), 3);
+            messagePump.AddQueue("mythirdqueue", "mythirdqueue-poison", TimeSpan.FromMinutes(1), 3);
 
             // Start the message pump
             await messagePump.StartAsync(cancellationToken);

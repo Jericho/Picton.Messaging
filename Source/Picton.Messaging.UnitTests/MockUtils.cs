@@ -65,6 +65,10 @@ namespace Picton.Messaging.UnitTests
 			var mockQueueClient = Substitute.For<QueueClient>();
 
 			mockQueueClient
+				.Name
+				.Returns(queueName);
+
+			mockQueueClient
 				.Uri
 				.Returns(mockQueueStorageUri);
 
