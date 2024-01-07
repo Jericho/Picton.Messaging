@@ -74,16 +74,32 @@ namespace Picton.Messaging
 
 		#region PUBLIC METHODS
 
+
+		/// <summary>
+		/// Add a queue to be monitored.
+		/// </summary>
+		/// <param name="queueName">The name of the queue.</param>
+		/// <param name="poisonQueueName">Optional. The name of the queue where poison messages are automatically moved.</param>
+		/// <param name="visibilityTimeout">Optional. Specifies the visibility timeout value. The default value is 30 seconds.</param>
+		/// <param name="maxDequeueCount">Optional. A nonzero integer value that specifies the number of time we try to process a message before giving up and declaring the message to be "poison". The default value is 3.</param>
 		public void AddQueue(string queueName, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
 		{
 			_messagePump.AddQueue(queueName, poisonQueueName, visibilityTimeout, maxDequeueCount);
 		}
 
+		/// <summary>
+		/// Add a queue to be monitored.
+		/// </summary>
+		/// <param name="queueConfig">Queue configuration.</param>
 		public void AddQueue(QueueConfig queueConfig)
 		{
 			_messagePump.AddQueue(queueConfig);
 		}
 
+		/// <summary>
+		/// Remove a queue from the list of queues that are monitored.
+		/// </summary>
+		/// <param name="queueName">The name of the queue.</param>
 		public void RemoveQueue(string queueName)
 		{
 			_messagePump.RemoveQueue(queueName);
