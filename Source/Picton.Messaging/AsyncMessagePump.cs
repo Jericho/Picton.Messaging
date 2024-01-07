@@ -28,6 +28,7 @@ namespace Picton.Messaging
 		private readonly MessagePumpOptions _messagePumpOptions;
 		private readonly ILogger _logger;
 		private readonly IMetrics _metrics;
+		private readonly bool _metricsTurnedOff;
 
 		#endregion
 
@@ -82,10 +83,12 @@ namespace Picton.Messaging
 			if (options == null) throw new ArgumentNullException(nameof(options));
 			if (string.IsNullOrEmpty(options.ConnectionString)) throw new ArgumentNullException(nameof(options.ConnectionString));
 			if (options.ConcurrentTasks < 1) throw new ArgumentOutOfRangeException(nameof(options.ConcurrentTasks), "Number of concurrent tasks must be greather than zero");
+			if (options.FetchMessagesInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options.FetchMessagesInterval), "Fetch messages interval must be greather than zero");
 
 			_messagePumpOptions = options;
 			_logger = logger;
 			_metrics = metrics ?? TurnOffMetrics();
+			_metricsTurnedOff = metrics == null;
 
 			InitDefaultActions();
 		}
@@ -200,66 +203,72 @@ namespace Picton.Messaging
 						}
 					}
 				},
-				TimeSpan.FromMilliseconds(500),
+				_messagePumpOptions.FetchMessagesInterval,
 				cancellationToken,
 				TaskCreationOptions.LongRunning);
 
 			// Define the task that checks how many messages are queued in Azure
-			RecurrentCancellableTask.StartNew(
-				async () =>
-				{
-					var count = 0;
-					foreach (var kvp in _queueManagers)
+			if (!_metricsTurnedOff && _messagePumpOptions.CountAzureMessagesInterval > TimeSpan.Zero)
+			{
+				RecurrentCancellableTask.StartNew(
+					async () =>
 					{
-						var queueName = kvp.Key;
-						(var queueConfig, var queueManager, var poisonQueueManager, var lastFetched, var fetchDelay) = kvp.Value;
+						var count = 0;
+						foreach (var kvp in _queueManagers)
+						{
+							var queueName = kvp.Key;
+							(var queueConfig, var queueManager, var poisonQueueManager, var lastFetched, var fetchDelay) = kvp.Value;
 
+							try
+							{
+								var properties = await queueManager.GetPropertiesAsync(cancellationToken).ConfigureAwait(false);
+
+								count += properties.ApproximateMessagesCount;
+							}
+							catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
+							{
+								// The message pump is shutting down.
+								// This exception can be safely ignored.
+							}
+							catch (RequestFailedException rfe) when (rfe.ErrorCode == "QueueNotFound")
+							{
+								// The queue has been deleted
+								RemoveQueue(queueName);
+							}
+							catch (Exception e)
+							{
+								_logger?.LogError(e.GetBaseException(), "An error occured while checking how many message are waiting in Azure. The error was caught and ignored.");
+							}
+						}
+
+						_metrics.Measure.Gauge.SetValue(Metrics.QueuedCloudMessagesGauge, count);
+					},
+					_messagePumpOptions.CountAzureMessagesInterval,
+					cancellationToken,
+					TaskCreationOptions.LongRunning);
+			}
+
+			// Define the task that checks how many messages are queued in memory
+			if (!_metricsTurnedOff && _messagePumpOptions.CountMemoryMessagesInterval > TimeSpan.Zero)
+			{
+				RecurrentCancellableTask.StartNew(
+					() =>
+					{
 						try
 						{
-							var properties = await queueManager.GetPropertiesAsync(cancellationToken).ConfigureAwait(false);
-
-							count += properties.ApproximateMessagesCount;
-						}
-						catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
-						{
-							// The message pump is shutting down.
-							// This exception can be safely ignored.
-						}
-						catch (RequestFailedException rfe) when (rfe.ErrorCode == "QueueNotFound")
-						{
-							// The queue has been deleted
-							RemoveQueue(queueName);
+							_metrics.Measure.Gauge.SetValue(Metrics.QueuedMemoryMessagesGauge, queuedMessages.Count);
 						}
 						catch (Exception e)
 						{
-							_logger?.LogError(e.GetBaseException(), "An error occured while checking how many message are waiting in Azure. The error was caught and ignored.");
+							_logger?.LogError(e.GetBaseException(), "An error occured while checking how many message are waiting in the memory queue. The error was caught and ignored.");
 						}
-					}
 
-					_metrics.Measure.Gauge.SetValue(Metrics.QueuedCloudMessagesGauge, count);
-				},
-				TimeSpan.FromMilliseconds(5000),
-				cancellationToken,
-				TaskCreationOptions.LongRunning);
-
-			// Define the task that checks how many messages are queued in memory
-			RecurrentCancellableTask.StartNew(
-				() =>
-				{
-					try
-					{
-						_metrics.Measure.Gauge.SetValue(Metrics.QueuedMemoryMessagesGauge, queuedMessages.Count);
-					}
-					catch (Exception e)
-					{
-						_logger?.LogError(e.GetBaseException(), "An error occured while checking how many message are waiting in the memory queue. The error was caught and ignored.");
-					}
-
-					return Task.CompletedTask;
-				},
-				TimeSpan.FromMilliseconds(5000),
-				cancellationToken,
-				TaskCreationOptions.LongRunning);
+						return Task.CompletedTask;
+					},
+					TimeSpan.FromMilliseconds(5000),
+					cancellationToken,
+					TaskCreationOptions.LongRunning);
+			}
 
 			// Define the task pump
 			var pumpTask = Task.Run(async () =>

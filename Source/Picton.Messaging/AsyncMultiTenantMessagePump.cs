@@ -29,8 +29,11 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
+		private static readonly TimeSpan _defaultDiscoverQueuesInterval = TimeSpan.FromSeconds(30);
+
 		private readonly MessagePumpOptions _messagePumpOptions;
 		private readonly string _queueNamePrefix;
+		private readonly TimeSpan _discoverQueuesInterval;
 		private readonly TimeSpan? _visibilityTimeout;
 		private readonly int _maxDequeueCount;
 		private readonly ILogger _logger;
@@ -83,19 +86,18 @@ namespace Picton.Messaging
 		/// </summary>
 		/// <param name="options">Options for the mesage pump.</param>
 		/// <param name="queueNamePrefix">The common prefix in the naming convention.</param>
+		/// <param name="discoverQueuesInterval">The frequency we check for queues in the Azure storage account matching the naming convention. Default is 30 seconds.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="logger">The logger.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMultiTenantMessagePump(MessagePumpOptions options, string queueNamePrefix, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+		public AsyncMultiTenantMessagePump(MessagePumpOptions options, string queueNamePrefix, TimeSpan? discoverQueuesInterval = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
 		{
-			if (options == null) throw new ArgumentNullException(nameof(options));
-			if (string.IsNullOrEmpty(options.ConnectionString)) throw new ArgumentNullException(nameof(options.ConnectionString));
-			if (options.ConcurrentTasks < 1) throw new ArgumentOutOfRangeException(nameof(options.ConcurrentTasks), "Number of concurrent tasks must be greather than zero");
-			if (string.IsNullOrEmpty(queueNamePrefix)) throw new ArgumentNullException(nameof(queueNamePrefix));
+			if (discoverQueuesInterval != null && discoverQueuesInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(discoverQueuesInterval), "The 'discover queues' interval must be greater than zero.");
 
 			_messagePumpOptions = options;
 			_queueNamePrefix = queueNamePrefix;
+			_discoverQueuesInterval = discoverQueuesInterval ?? _defaultDiscoverQueuesInterval;
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
 			_logger = logger;
@@ -156,7 +158,7 @@ namespace Picton.Messaging
 						_logger?.LogError(e.GetBaseException(), "An error occured while fetching the Azure queues that match the naming convention. The error was caught and ignored.");
 					}
 				},
-				TimeSpan.FromMilliseconds(30000),
+				_discoverQueuesInterval,
 				cancellationToken,
 				TaskCreationOptions.LongRunning);
 

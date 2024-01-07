@@ -208,7 +208,7 @@ namespace Picton.Messaging.IntegrationTests
 			// Configure the message pump
 			var cts = new CancellationTokenSource();
 			var options = new MessagePumpOptions(connectionString, concurrentTasks, null, null);
-			var messagePump = new AsyncMultiTenantMessagePump(options, queueNamePrefix, TimeSpan.FromMinutes(1), 3, _logger, metrics)
+			var messagePump = new AsyncMultiTenantMessagePump(options, queueNamePrefix, logger: _logger, metrics: metrics)
 			{
 				OnMessage = (tenantId, message, cancellationToken) =>
 				{

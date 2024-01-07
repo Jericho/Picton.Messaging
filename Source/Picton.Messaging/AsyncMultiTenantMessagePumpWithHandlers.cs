@@ -65,11 +65,12 @@ namespace Picton.Messaging
 		/// </summary>
 		/// <param name="options">Options for the mesage pump.</param>
 		/// <param name="queueNamePrefix">The common prefix in the naming convention.</param>
+		/// <param name="discoverQueuesInterval">The frequency we check for queues in the Azure storage account matching the naming convention. Default is 30 seconds.</param>
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="logger">The logger.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMultiTenantMessagePumpWithHandlers(MessagePumpOptions options, string queueNamePrefix, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+		public AsyncMultiTenantMessagePumpWithHandlers(MessagePumpOptions options, string queueNamePrefix, TimeSpan? discoverQueuesInterval = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
 		{
 			_messageHandlers = MessageHandlersDiscoverer.GetMessageHandlers(logger);
 
@@ -79,7 +80,7 @@ namespace Picton.Messaging
 			_maxDequeueCount = maxDequeueCount;
 			_logger = logger;
 
-			_messagePump = new AsyncMultiTenantMessagePump(options, queueNamePrefix, visibilityTimeout, maxDequeueCount, logger, metrics);
+			_messagePump = new AsyncMultiTenantMessagePump(options, queueNamePrefix, discoverQueuesInterval, visibilityTimeout, maxDequeueCount, logger, metrics);
 		}
 
 		#endregion
