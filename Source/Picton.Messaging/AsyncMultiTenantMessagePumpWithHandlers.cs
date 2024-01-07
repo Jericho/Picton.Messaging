@@ -18,10 +18,7 @@ namespace Picton.Messaging
 
 		private static IDictionary<Type, Type[]> _messageHandlers;
 
-		private readonly MessagePumpOptions _messagePumpOptions;
 		private readonly string _queueNamePrefix;
-		private readonly TimeSpan? _visibilityTimeout;
-		private readonly int _maxDequeueCount;
 		private readonly ILogger _logger;
 
 		private readonly AsyncMultiTenantMessagePump _messagePump;
@@ -74,10 +71,7 @@ namespace Picton.Messaging
 		{
 			_messageHandlers = MessageHandlersDiscoverer.GetMessageHandlers(logger);
 
-			_messagePumpOptions = options;
 			_queueNamePrefix = queueNamePrefix;
-			_visibilityTimeout = visibilityTimeout;
-			_maxDequeueCount = maxDequeueCount;
 			_logger = logger;
 
 			_messagePump = new AsyncMultiTenantMessagePump(options, queueNamePrefix, discoverQueuesInterval, visibilityTimeout, maxDequeueCount, logger, metrics);
@@ -109,17 +103,17 @@ namespace Picton.Messaging
 				foreach (var handlerType in handlers)
 				{
 					object handler = null;
-					if (handlerType.GetConstructor(new[] { typeof(ILogger) }) != null)
+					if (handlerType.GetConstructor([typeof(ILogger)]) != null)
 					{
-						handler = Activator.CreateInstance(handlerType, new[] { (object)_logger });
+						handler = Activator.CreateInstance(handlerType, [(object)_logger]);
 					}
 					else
 					{
 						handler = Activator.CreateInstance(handlerType);
 					}
 
-					var handlerMethod = handlerType.GetMethod("Handle", new[] { contentType });
-					handlerMethod.Invoke(handler, new[] { message.Content });
+					var handlerMethod = handlerType.GetMethod("Handle", [contentType]);
+					handlerMethod.Invoke(handler, [message.Content]);
 				}
 			};
 

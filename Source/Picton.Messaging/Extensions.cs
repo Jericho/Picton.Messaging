@@ -15,11 +15,9 @@ namespace Picton.Messaging
 		/// The purpose of this extension method is to avoid a Visual Studio warning about async calls that are not awaited.
 		/// </summary>
 		/// <param name="task">The task.</param>
-#pragma warning disable RECS0154 // Parameter is never used
 #pragma warning disable IDE0060 // Remove unused parameter
 		public static void IgnoreAwait(this Task task)
 #pragma warning restore IDE0060 // Remove unused parameter
-#pragma warning restore RECS0154 // Parameter is never used
 		{
 			// Intentionaly left blank.
 		}

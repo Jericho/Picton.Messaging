@@ -5,20 +5,15 @@ using System.Threading;
 
 namespace Picton.Messaging.Utilities
 {
-	internal class RoundRobinList<T>
+	/// <summary>
+	/// Initializes a new instance of the <see cref="RoundRobinList{T}"/> class.
+	/// </summary>
+	/// <param name="list">The items.</param>
+	internal class RoundRobinList<T>(IEnumerable<T> list)
 	{
-		private static readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
-		private readonly LinkedList<T> _linkedList;
+		private static readonly ReaderWriterLockSlim _lock = new();
+		private readonly LinkedList<T> _linkedList = new(list);
 		private LinkedListNode<T> _current;
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="RoundRobinList{T}"/> class.
-		/// </summary>
-		/// <param name="list">The items.</param>
-		public RoundRobinList(IEnumerable<T> list)
-		{
-			_linkedList = new LinkedList<T>(list);
-		}
 
 		public T Current
 		{
@@ -186,6 +181,10 @@ namespace Picton.Messaging.Utilities
 			}
 		}
 
+		/// <summary>
+		/// Add an item to the list.
+		/// </summary>
+		/// <param name="item">The item.</param>
 		public void AddItem(T item)
 		{
 			try

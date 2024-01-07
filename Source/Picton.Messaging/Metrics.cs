@@ -10,7 +10,7 @@ namespace Picton.Messaging
 		/// <summary>
 		/// Gets the counter indicating the number of messages processed by the message pump.
 		/// </summary>
-		public static CounterOptions MessagesProcessedCounter => new CounterOptions
+		public static CounterOptions MessagesProcessedCounter => new()
 		{
 			Context = "Picton",
 			Name = "MessagesProcessedCount",
@@ -20,7 +20,7 @@ namespace Picton.Messaging
 		/// <summary>
 		/// Gets the timer indicating the time it takes to process a message.
 		/// </summary>
-		public static TimerOptions MessageProcessingTimer => new TimerOptions
+		public static TimerOptions MessageProcessingTimer => new()
 		{
 			Context = "Picton",
 			Name = "MessageProcessingTime"
@@ -29,7 +29,7 @@ namespace Picton.Messaging
 		/// <summary>
 		/// Gets the timer indicating the time it takes to fetch a batch of messages from the Azure queue.
 		/// </summary>
-		public static TimerOptions MessagesFetchingTimer => new TimerOptions
+		public static TimerOptions MessagesFetchingTimer => new()
 		{
 			Context = "Picton",
 			Name = "MessagesFetchingTime"
@@ -38,7 +38,7 @@ namespace Picton.Messaging
 		/// <summary>
 		/// Gets the counter indicating the number of times we attempted to fetch messages from an Azure queue but it was empty.
 		/// </summary>
-		public static CounterOptions QueueEmptyCounter => new CounterOptions
+		public static CounterOptions QueueEmptyCounter => new()
 		{
 			Context = "Picton",
 			Name = "QueueEmptyCount"
@@ -47,7 +47,7 @@ namespace Picton.Messaging
 		/// <summary>
 		/// Gets the counter indicating the number of times we attempted to fetch messages from Azure but all the queues are empty.
 		/// </summary>
-		public static CounterOptions AllQueuesEmptyCounter => new CounterOptions
+		public static CounterOptions AllQueuesEmptyCounter => new()
 		{
 			Context = "Picton",
 			Name = "AllQueuesEmptyCount"
@@ -56,7 +56,7 @@ namespace Picton.Messaging
 		/// <summary>
 		/// Gets the gauge indicating the number of messages waiting in the Azure queue over time.
 		/// </summary>
-		public static GaugeOptions QueuedCloudMessagesGauge => new GaugeOptions
+		public static GaugeOptions QueuedCloudMessagesGauge => new()
 		{
 			Context = "Picton",
 			Name = "QueuedCloudMessages",
@@ -66,7 +66,7 @@ namespace Picton.Messaging
 		/// <summary>
 		/// Gets the gauge indicating the number of messages waiting in the memory queue over time.
 		/// </summary>
-		public static GaugeOptions QueuedMemoryMessagesGauge => new GaugeOptions
+		public static GaugeOptions QueuedMemoryMessagesGauge => new()
 		{
 			Context = "Picton",
 			Name = "QueuedMemoryMessages",

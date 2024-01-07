@@ -74,7 +74,6 @@ namespace Picton.Messaging
 
 		#region PUBLIC METHODS
 
-
 		/// <summary>
 		/// Add a queue to be monitored.
 		/// </summary>
@@ -127,17 +126,17 @@ namespace Picton.Messaging
 				foreach (var handlerType in handlers)
 				{
 					object handler = null;
-					if (handlerType.GetConstructor(new[] { typeof(ILogger) }) != null)
+					if (handlerType.GetConstructor([typeof(ILogger)]) != null)
 					{
-						handler = Activator.CreateInstance(handlerType, new[] { (object)_logger });
+						handler = Activator.CreateInstance(handlerType, [(object)_logger]);
 					}
 					else
 					{
 						handler = Activator.CreateInstance(handlerType);
 					}
 
-					var handlerMethod = handlerType.GetMethod("Handle", new[] { contentType });
-					handlerMethod.Invoke(handler, new[] { message.Content });
+					var handlerMethod = handlerType.GetMethod("Handle", [contentType]);
+					handlerMethod.Invoke(handler, [message.Content]);
 				}
 			};
 

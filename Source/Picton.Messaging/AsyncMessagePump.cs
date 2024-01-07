@@ -22,8 +22,8 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
-		private readonly ConcurrentDictionary<string, (QueueConfig Config, QueueManager QueueManager, QueueManager PoisonQueueManager, DateTime LastFetched, TimeSpan FetchDelay)> _queueManagers = new ConcurrentDictionary<string, (QueueConfig Config, QueueManager QueueManager, QueueManager PoisonQueueManager, DateTime LastFetched, TimeSpan FetchDelay)>();
-		private readonly RoundRobinList<string> _queueNames = new RoundRobinList<string>(Enumerable.Empty<string>());
+		private readonly ConcurrentDictionary<string, (QueueConfig Config, QueueManager QueueManager, QueueManager PoisonQueueManager, DateTime LastFetched, TimeSpan FetchDelay)> _queueManagers = new();
+		private readonly RoundRobinList<string> _queueNames = new(Enumerable.Empty<string>());
 
 		private readonly MessagePumpOptions _messagePumpOptions;
 		private readonly ILogger _logger;
@@ -130,8 +130,10 @@ namespace Picton.Messaging
 		/// <param name="queueName">The name of the queue.</param>
 		public void RemoveQueue(string queueName)
 		{
-			// Do not remove from _queuManagers because there could messages still in the memory queue that need to be processed
-			//_queueManagers.TryRemove(queueName, out _);
+			/*
+			 * Do not remove from _queuManagers because there could messages still in the memory queue that need to be processed
+			 * _queueManagers.TryRemove(queueName, out _);
+			 */
 
 			_queueNames.RemoveItem(queueName);
 		}

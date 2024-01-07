@@ -72,7 +72,7 @@ namespace Picton.Messaging.Utilities
 				}
 			}
 
-			return assemblies.ToArray();
+			return [.. assemblies];
 		}
 
 		private static bool IsCandidateLibrary(RuntimeLibrary library)
