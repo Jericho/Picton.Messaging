@@ -20,13 +20,73 @@ namespace Picton.Messaging.Utilities
 			_linkedList = new LinkedList<T>(list);
 		}
 
-		public T Current => _current == default ? default : _current.Value;
+		public T Current
+		{
+			get
+			{
+				try
+				{
+					_lock.EnterReadLock();
 
-		public T Next => _current == default ? default : _current.Next.Value;
+					return _current == default ? default : _current.Value;
+				}
+				finally
+				{
+					if (_lock.IsReadLockHeld) _lock.ExitReadLock();
+				}
+			}
+		}
 
-		public T Previous => _current == default ? default : _current.Previous.Value;
+		public T Next
+		{
+			get
+			{
+				try
+				{
+					_lock.EnterReadLock();
 
-		public int Count => _linkedList.Count;
+					return (_current == default || _current.Next == default) ? _linkedList.First.Value : _current.Next.Value;
+				}
+				finally
+				{
+					if (_lock.IsReadLockHeld) _lock.ExitReadLock();
+				}
+			}
+		}
+
+		public T Previous
+		{
+			get
+			{
+				try
+				{
+					_lock.EnterReadLock();
+
+					return (_current == default || _current.Previous == default) ? _linkedList.Last.Value : _current.Previous.Value;
+				}
+				finally
+				{
+					if (_lock.IsReadLockHeld) _lock.ExitReadLock();
+				}
+			}
+		}
+
+		public int Count
+		{
+			get
+			{
+				try
+				{
+					_lock.EnterReadLock();
+
+					return _linkedList.Count;
+				}
+				finally
+				{
+					if (_lock.IsReadLockHeld) _lock.ExitReadLock();
+				}
+			}
+		}
 
 		/// <summary>
 		/// Reset the Round Robin to point to the first item.
@@ -112,7 +172,7 @@ namespace Picton.Messaging.Utilities
 		/// Remove an item from the list.
 		/// </summary>
 		/// <returns>The item.</returns>
-		public bool Remove(T item)
+		public bool RemoveItem(T item)
 		{
 			try
 			{
@@ -126,7 +186,7 @@ namespace Picton.Messaging.Utilities
 			}
 		}
 
-		public void Add(T item)
+		public void AddItem(T item)
 		{
 			try
 			{
