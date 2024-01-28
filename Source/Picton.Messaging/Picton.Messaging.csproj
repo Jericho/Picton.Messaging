@@ -47,10 +47,12 @@
   <ItemGroup Condition=" $(TargetFramework.StartsWith('net4')) ">
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
+    <PackageReference Include="System.Threading.Channels" Version="8.*" />
   </ItemGroup>
 
   <ItemGroup Condition=" $(TargetFramework.StartsWith('netstandard')) ">
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="System.Threading.Channels" Version="8.*" />
   </ItemGroup>
 
   <ItemGroup>

@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace Picton.Messaging
@@ -190,19 +191,29 @@ namespace Picton.Messaging
 		{
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlim(_messagePumpOptions.ConcurrentTasks, _messagePumpOptions.ConcurrentTasks);
-			var queuedMessages = new ConcurrentQueue<(string QueueName, CloudMessage Message)>();
+			var channelOptions = new UnboundedChannelOptions() { SingleReader = false, SingleWriter = true };
+			var channel = Channel.CreateUnbounded<(string QueueName, CloudMessage Message)>(channelOptions);
+			var channelCompleted = false;
 
 			// Define the task that fetches messages from the Azure queue
 			RecurrentCancellableTask.StartNew(
 				async () =>
 				{
 					// Fetch messages from Azure when the number of items in the concurrent queue falls below an "acceptable" level.
-					if (!cancellationToken.IsCancellationRequested && queuedMessages.Count <= _messagePumpOptions.ConcurrentTasks / 2)
+					if (!cancellationToken.IsCancellationRequested &&
+						!channelCompleted &&
+						channel.Reader.Count <= _messagePumpOptions.ConcurrentTasks / 2)
 					{
 						await foreach (var message in FetchMessages(cancellationToken))
 						{
-							queuedMessages.Enqueue(message);
+							await channel.Writer.WriteAsync(message).ConfigureAwait(false);
 						}
+					}
+
+					// Mark the channel as "complete" which means that no more messages will be written to it
+					else if (!channelCompleted)
+					{
+						channelCompleted = channel.Writer.TryComplete();
 					}
 				},
 				_messagePumpOptions.FetchMessagesInterval,
@@ -258,7 +269,7 @@ namespace Picton.Messaging
 					{
 						try
 						{
-							_metrics.Measure.Gauge.SetValue(Metrics.QueuedMemoryMessagesGauge, queuedMessages.Count);
+							_metrics.Measure.Gauge.SetValue(Metrics.QueuedMemoryMessagesGauge, channel.Reader.Count);
 						}
 						catch (Exception e)
 						{
@@ -277,7 +288,7 @@ namespace Picton.Messaging
 			{
 				// We process messages until cancellation is requested.
 				// When cancellation is requested, we continue processing messages until the memory queue is drained.
-				while (!cancellationToken.IsCancellationRequested || !queuedMessages.IsEmpty)
+				while (!cancellationToken.IsCancellationRequested || channel.Reader.Count > 0)
 				{
 					await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
@@ -287,7 +298,7 @@ namespace Picton.Messaging
 						{
 							var messageProcessed = false;
 
-							if (queuedMessages.TryDequeue(out (string QueueName, CloudMessage Message) result))
+							if (channel.Reader.TryRead(out (string QueueName, CloudMessage Message) result))
 							{
 								if (_queueManagers.TryGetValue(result.QueueName, out (QueueConfig Config, QueueManager QueueManager, QueueManager PoisonQueueManager, DateTime LastFetched, TimeSpan FetchDelay) queueInfo))
 								{
