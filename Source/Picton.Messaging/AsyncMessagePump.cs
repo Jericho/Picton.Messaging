@@ -85,6 +85,8 @@ namespace Picton.Messaging
 			if (string.IsNullOrEmpty(options.ConnectionString)) throw new ArgumentNullException(nameof(options.ConnectionString));
 			if (options.ConcurrentTasks < 1) throw new ArgumentOutOfRangeException(nameof(options.ConcurrentTasks), "Number of concurrent tasks must be greather than zero");
 			if (options.FetchMessagesInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options.FetchMessagesInterval), "Fetch messages interval must be greather than zero");
+			if (options.EmptyQueueFetchDelay <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options.EmptyQueueFetchDelay), "Emnpty queue fetch delay must be greather than zero");
+			if (options.EmptyQueueMaxFetchDelay < options.EmptyQueueFetchDelay) throw new ArgumentOutOfRangeException(nameof(options.EmptyQueueMaxFetchDelay), "Max fetch delay can not be smaller than fetch delay");
 
 			_messagePumpOptions = options;
 			_logger = logger;
@@ -445,8 +447,8 @@ namespace Picton.Messaging
 								_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
 
 								// Set a "reasonable" fetch delay to ensure we don't query an empty queue too often
-								var delay = queueInfo.FetchDelay.Add(TimeSpan.FromSeconds(5));
-								if (delay.TotalSeconds > 15) delay = TimeSpan.FromSeconds(15);
+								var delay = queueInfo.FetchDelay.Add(_messagePumpOptions.EmptyQueueFetchDelay);
+								if (delay > _messagePumpOptions.EmptyQueueMaxFetchDelay) delay = _messagePumpOptions.EmptyQueueMaxFetchDelay;
 
 								_queueManagers[queueName] = (queueInfo.Config, queueInfo.QueueManager, queueInfo.PoisonQueueManager, DateTime.UtcNow, delay);
 							}

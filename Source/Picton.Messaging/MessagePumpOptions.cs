@@ -13,6 +13,8 @@ namespace Picton.Messaging
 		private static readonly TimeSpan _defaultFetchMessagesInterval = TimeSpan.FromSeconds(1);
 		private static readonly TimeSpan _defaultCountAzureMessagesInterval = TimeSpan.FromSeconds(5);
 		private static readonly TimeSpan _defaultCountMemoryMessagesInterval = TimeSpan.FromSeconds(5);
+		private static readonly TimeSpan _defaultEmptyQueueFetchDelay = TimeSpan.FromSeconds(5);
+		private static readonly TimeSpan _defaultMaxEmptyQueueFetchDelay = TimeSpan.FromSeconds(30);
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="MessagePumpOptions"/> class.
@@ -92,5 +94,25 @@ namespace Picton.Messaging
 		/// </summary>
 		/// <remarks>This setting is ignored if you don't specify the sytem where metrics are published.</remarks>
 		public TimeSpan CountMemoryMessagesInterval { get; set; } = _defaultCountMemoryMessagesInterval;
+
+		/// <summary>
+		/// Gets or sets the delay until the next time a given queue is checked for message when it is determined to be empty.
+		/// This delay is cumulative, which means that it will be doubled is a queue is found to be empty two times in a row,
+		/// it will be tripled if the queue is empty three times in a row, etc. This delay is capped at <see cref="EmptyQueueMaxFetchDelay"/>.
+		///
+		/// The delay is reset to zero when at lest one messages is found in the queue.
+		///
+		/// The pupose of the delay is to ensure we don't query a given queue too often when we know it to be empty.
+		/// 
+		/// Default value is 5 seconds.
+		/// </summary>
+		public TimeSpan EmptyQueueFetchDelay { get; set; } = _defaultEmptyQueueFetchDelay;
+
+		/// <summary>
+		/// Gets or sets the maximum delay until the next time a given queue is checked for message when it is determined to be empty.
+		///
+		/// Default value is 30 seconds.
+		/// </summary>
+		public TimeSpan EmptyQueueMaxFetchDelay { get; set; } = _defaultMaxEmptyQueueFetchDelay;
 	}
 }
