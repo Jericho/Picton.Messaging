@@ -204,7 +204,7 @@ namespace Picton.Messaging
 						!channelCompleted &&
 						channel.Reader.Count <= _messagePumpOptions.ConcurrentTasks / 2)
 					{
-						await foreach (var message in FetchMessages(cancellationToken))
+						await foreach (var message in FetchMessages(cancellationToken).ConfigureAwait(false))
 						{
 							await channel.Writer.WriteAsync(message).ConfigureAwait(false);
 						}
@@ -367,7 +367,7 @@ namespace Picton.Messaging
 						t =>
 						{
 							semaphore.Release();
-							runningTasks.TryRemove(t, out Task taskToBeRemoved);
+							runningTasks.TryRemove(t, out Task _);
 						},
 						TaskContinuationOptions.ExecuteSynchronously)
 					.IgnoreAwait();
@@ -387,7 +387,7 @@ namespace Picton.Messaging
 
 			if (_queueNames.Count == 0)
 			{
-				_logger?.LogTrace("There are no tenant queues being monitored. Therefore no messages could be fetched.");
+				_logger?.LogTrace("There are no queues being monitored. Therefore no messages could be fetched.");
 				yield break;
 			}
 
@@ -444,7 +444,7 @@ namespace Picton.Messaging
 								_logger?.LogTrace("There are no messages in {queueName}.", queueName);
 								_metrics.Measure.Counter.Increment(Metrics.QueueEmptyCounter);
 
-								// Set a "resonable" fetch delay to ensure we don't query an empty queue too often
+								// Set a "reasonable" fetch delay to ensure we don't query an empty queue too often
 								var delay = queueInfo.FetchDelay.Add(TimeSpan.FromSeconds(5));
 								if (delay.TotalSeconds > 15) delay = TimeSpan.FromSeconds(15);
 
