@@ -105,27 +105,27 @@ namespace Picton.Messaging.IntegrationTests
 
 			// Configure the message pump
 			Stopwatch sw = null;
+			var cts = new CancellationTokenSource();
 			var options = new MessagePumpOptions(connectionString, concurrentTasks, null, null);
 			var messagePump = new AsyncMessagePump(options, _logger, metrics)
 			{
 				OnMessage = (queueName, message, cancellationToken) =>
 				{
 					_logger.LogInformation("{messageContent}", message.Content.ToString());
+				},
+
+				// Stop the timer and the message pump when the queue is empty.
+				OnEmpty = cancellationToken =>
+				{
+					// Stop the timer
+					if (sw.IsRunning) sw.Stop();
+
+					// Stop the message pump
+					_logger.LogDebug("Asking the message pump to stop...");
+					cts.Cancel();
 				}
 			};
 			messagePump.AddQueue(queueName, null, TimeSpan.FromMinutes(1), 3);
-
-			// Stop the message pump when the queue is empty.
-			var cts = new CancellationTokenSource();
-			messagePump.OnEmpty = cancellationToken =>
-			{
-				// Stop the timer
-				if (sw.IsRunning) sw.Stop();
-
-				// Stop the message pump
-				_logger.LogDebug("Asking the message pump to stop...");
-				cts.Cancel();
-			};
 
 			// Start the message pump
 			sw = Stopwatch.StartNew();
@@ -158,6 +158,7 @@ namespace Picton.Messaging.IntegrationTests
 			var options = new MessagePumpOptions(connectionString, concurrentTasks, null, null);
 			var messagePump = new AsyncMessagePumpWithHandlers(options, _logger, metrics)
 			{
+				// Stop the timer and the message pump when the queue is empty.
 				OnEmpty = cancellationToken =>
 				{
 					// Stop the timer
@@ -207,8 +208,7 @@ namespace Picton.Messaging.IntegrationTests
 			{
 				OnMessage = (tenantId, message, cancellationToken) =>
 				{
-					var messageContent = message.Content.ToString();
-					_logger.LogInformation("{tenantId} - {messageContent}", tenantId, messageContent);
+					_logger.LogInformation("{tenantId} - {messageContent}", tenantId, message.Content.ToString());
 				},
 
 				// Stop the timer and the message pump when all tenant queues are empty.
