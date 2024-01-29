@@ -1,7 +1,5 @@
 using App.Metrics;
 using Azure;
-using Azure.Storage.Blobs;
-using Azure.Storage.Queues;
 using Microsoft.Extensions.Logging;
 using Picton.Managers;
 using Picton.Messaging.Utilities;
@@ -124,15 +122,8 @@ namespace Picton.Messaging
 			if (string.IsNullOrEmpty(queueConfig.QueueName)) throw new ArgumentNullException(nameof(queueConfig.QueueName));
 			if (queueConfig.MaxDequeueCount < 1) throw new ArgumentOutOfRangeException(nameof(queueConfig.MaxDequeueCount), "Number of retries must be greater than zero.");
 
-			// ----------------------------------------------------------------------------------------------------
-			// When Picton 9.2.0 is released, when can replace the following few lines with the following single line:
-			// var queueManager = new QueueManager(_messagePumpOptions.ConnectionString, queueConfig.QueueName, queueConfig.OversizedMessagesBlobStorageName, true, _messagePumpOptions.QueueClientOptions, _messagePumpOptions.BlobClientOptions);
-			var blobStorageName = string.IsNullOrEmpty(queueConfig.OversizedMessagesBlobStorageName) ? $"{queueConfig.QueueName}-oversize-messages" : queueConfig.OversizedMessagesBlobStorageName;
-			var blobClient = new BlobContainerClient(_messagePumpOptions.ConnectionString, blobStorageName, _messagePumpOptions.BlobClientOptions);
-			var queueClient = new QueueClient(_messagePumpOptions.ConnectionString, queueConfig.QueueName, _messagePumpOptions.QueueClientOptions);
-			var queueManager = new QueueManager(blobClient, queueClient, true);
-
-			var poisonQueueManager = string.IsNullOrEmpty(queueConfig.PoisonQueueName) ? null : new QueueManager(_messagePumpOptions.ConnectionString, queueConfig.PoisonQueueName, true, _messagePumpOptions.QueueClientOptions, _messagePumpOptions.BlobClientOptions);
+			var queueManager = new QueueManager(_messagePumpOptions.ConnectionString, queueConfig.QueueName, queueConfig.OversizedMessagesBlobStorageName, true, _messagePumpOptions.QueueClientOptions, _messagePumpOptions.BlobClientOptions);
+			var poisonQueueManager = string.IsNullOrEmpty(queueConfig.PoisonQueueName) ? null : new QueueManager(_messagePumpOptions.ConnectionString, queueConfig.PoisonQueueName, queueConfig.OversizedMessagesBlobStorageName, true, _messagePumpOptions.QueueClientOptions, _messagePumpOptions.BlobClientOptions);
 
 			AddQueue(queueManager, poisonQueueManager, queueConfig.VisibilityTimeout, queueConfig.MaxDequeueCount);
 		}
