@@ -138,7 +138,12 @@ namespace Picton.Messaging
 									!queue.Name.Equals($"{_queueNamePrefix}-poison", StringComparison.OrdinalIgnoreCase))
 								{
 									// AddQueue will make sure to add the queue only if it's not already in the round-robin list of queues.
-									_messagePump.AddQueue(queue.Name, $"{_queueNamePrefix}-poison", _visibilityTimeout, _maxDequeueCount);
+									_messagePump.AddQueue(
+										queue.Name,
+										$"{_queueNamePrefix}-poison", // All tenants share the same "poison" queue
+										_visibilityTimeout,
+										_maxDequeueCount,
+										$"{_queueNamePrefix}-oversize-messages"); // All tenants share the same "oversize messages" blob storage
 								}
 							}
 						}

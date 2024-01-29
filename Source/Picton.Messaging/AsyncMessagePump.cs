@@ -1,5 +1,7 @@
 using App.Metrics;
 using Azure;
+using Azure.Storage.Blobs;
+using Azure.Storage.Queues;
 using Microsoft.Extensions.Logging;
 using Picton.Managers;
 using Picton.Messaging.Utilities;
@@ -107,9 +109,10 @@ namespace Picton.Messaging
 		/// <param name="poisonQueueName">Optional. The name of the queue where poison messages are automatically moved.</param>
 		/// <param name="visibilityTimeout">Optional. Specifies the visibility timeout value. The default value is 30 seconds.</param>
 		/// <param name="maxDequeueCount">Optional. A nonzero integer value that specifies the number of time we try to process a message before giving up and declaring the message to be "poison". The default value is 3.</param>
-		public void AddQueue(string queueName, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3)
+		/// <param name="oversizeMessagesBlobStorageName">Name of the blob storage where messages that exceed the maximum size for a queue message are stored.</param>
+		public void AddQueue(string queueName, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, string oversizeMessagesBlobStorageName = null)
 		{
-			AddQueue(new QueueConfig(queueName, poisonQueueName, visibilityTimeout, maxDequeueCount));
+			AddQueue(new QueueConfig(queueName, poisonQueueName, visibilityTimeout, maxDequeueCount, oversizeMessagesBlobStorageName));
 		}
 
 		/// <summary>
@@ -121,7 +124,14 @@ namespace Picton.Messaging
 			if (string.IsNullOrEmpty(queueConfig.QueueName)) throw new ArgumentNullException(nameof(queueConfig.QueueName));
 			if (queueConfig.MaxDequeueCount < 1) throw new ArgumentOutOfRangeException(nameof(queueConfig.MaxDequeueCount), "Number of retries must be greater than zero.");
 
-			var queueManager = new QueueManager(_messagePumpOptions.ConnectionString, queueConfig.QueueName, true, _messagePumpOptions.QueueClientOptions, _messagePumpOptions.BlobClientOptions);
+			// ----------------------------------------------------------------------------------------------------
+			// When Picton 9.2.0 is released, when can replace the following few lines with the following single line:
+			// var queueManager = new QueueManager(_messagePumpOptions.ConnectionString, queueConfig.QueueName, queueConfig.OversizedMessagesBlobStorageName, true, _messagePumpOptions.QueueClientOptions, _messagePumpOptions.BlobClientOptions);
+			var blobStorageName = string.IsNullOrEmpty(queueConfig.OversizedMessagesBlobStorageName) ? $"{queueConfig.QueueName}-oversize-messages" : queueConfig.OversizedMessagesBlobStorageName;
+			var blobClient = new BlobContainerClient(_messagePumpOptions.ConnectionString, blobStorageName, _messagePumpOptions.BlobClientOptions);
+			var queueClient = new QueueClient(_messagePumpOptions.ConnectionString, queueConfig.QueueName, _messagePumpOptions.QueueClientOptions);
+			var queueManager = new QueueManager(blobClient, queueClient, true);
+
 			var poisonQueueManager = string.IsNullOrEmpty(queueConfig.PoisonQueueName) ? null : new QueueManager(_messagePumpOptions.ConnectionString, queueConfig.PoisonQueueName, true, _messagePumpOptions.QueueClientOptions, _messagePumpOptions.BlobClientOptions);
 
 			AddQueue(queueManager, poisonQueueManager, queueConfig.VisibilityTimeout, queueConfig.MaxDequeueCount);

@@ -141,9 +141,17 @@ namespace WorkerRole1
             };
 
             // Replace the following samples with the queues you want to monitor
-            messagePump.AddQueue("myfirstqueue", "myfirstqueue-poison", TimeSpan.FromMinutes(1), 3);
-            messagePump.AddQueue("mysecondqueue", "mysecondqueue-poison", TimeSpan.FromMinutes(1), 3);
-            messagePump.AddQueue("mythirdqueue", "mythirdqueue-poison", TimeSpan.FromMinutes(1), 3);
+            messagePump.AddQueue("queue01", "queue01-poison", TimeSpan.FromMinutes(1), 3, "queue01-oversize-messages");
+            messagePump.AddQueue("queue02", "queue02-poison", TimeSpan.FromMinutes(1), 3, "queue02-oversize-messages");
+            messagePump.AddQueue("queue03", "queue03-poison", TimeSpan.FromMinutes(1), 3, "queue03-oversize-messages");
+
+            // Queues can share the same poison queue
+            messagePump.AddQueue("queue04", "my-poison-queue", TimeSpan.FromMinutes(1), 3, "queue04-oversize-messages");
+            messagePump.AddQueue("queue05", "my-poison-queue", TimeSpan.FromMinutes(1), 3, "queue05-oversize-messages");
+
+            // Queues can also share the same blob storage for messages that exceed the max size
+            messagePump.AddQueue("queue06", "my-poison-queue", TimeSpan.FromMinutes(1), 3, "large-messages-blob");
+            messagePump.AddQueue("queue07", "my-poison-queue", TimeSpan.FromMinutes(1), 3, "large-messages-blob");
 
             // Start the message pump
             await messagePump.StartAsync(cancellationToken);
