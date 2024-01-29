@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Picton.Messaging.IntegrationTests
 {
-	internal class TestsRunner
+	internal class TestsRunner(ILogger<TestsRunner> logger)
 	{
 		private enum ResultCodes
 		{
@@ -19,12 +19,7 @@ namespace Picton.Messaging.IntegrationTests
 			Cancelled = 1223
 		}
 
-		private readonly ILogger _logger;
-
-		public TestsRunner(ILogger<TestsRunner> logger)
-		{
-			_logger = logger;
-		}
+		private readonly ILogger _logger = logger;
 
 		public async Task<int> RunAsync()
 		{
@@ -72,13 +67,12 @@ namespace Picton.Messaging.IntegrationTests
 			{
 				var connectionString = "UseDevelopmentStorage=true";
 				var queueName = "myqueue";
-				var numberOfMessages = 25;
-				var numberOfTenants = 5;
+				var concurrentTasks = 5;
 
 				// Run the integration tests
-				await RunAsyncMessagePumpTests(connectionString, queueName, numberOfMessages, metrics, cts.Token).ConfigureAwait(false);
-				await RunAsyncMessagePumpWithHandlersTests(connectionString, queueName, numberOfMessages, metrics, cts.Token).ConfigureAwait(false);
-				await RunMultiTenantAsyncMessagePumpTests(connectionString, queueName, numberOfTenants, numberOfMessages, metrics, cts.Token).ConfigureAwait(false);
+				await RunAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, 25, metrics, cts.Token).ConfigureAwait(false);
+				await RunAsyncMessagePumpWithHandlersTests(connectionString, queueName, concurrentTasks, 25, metrics, cts.Token).ConfigureAwait(false);
+				await RunMultiTenantAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, [6, 12, 18, 24], metrics, cts.Token).ConfigureAwait(false);
 			}
 
 			// Prompt user to press a key in order to allow reading the log in the console
@@ -93,7 +87,7 @@ namespace Picton.Messaging.IntegrationTests
 			return await Task.FromResult(resultCode);
 		}
 
-		private async Task RunAsyncMessagePumpTests(string connectionString, string queueName, int numberOfMessages, IMetrics metrics, CancellationToken cancellationToken)
+		private async Task RunAsyncMessagePumpTests(string connectionString, string queueName, int concurrentTasks, int numberOfMessages, IMetrics metrics, CancellationToken cancellationToken)
 		{
 			if (cancellationToken.IsCancellationRequested) return;
 
@@ -103,35 +97,35 @@ namespace Picton.Messaging.IntegrationTests
 			// Add messages to the queue
 			_logger.LogInformation("Adding {numberOfMessages} string messages to the {queueName} queue...", numberOfMessages, queueName);
 			var queueManager = new QueueManager(connectionString, queueName);
-			await queueManager.ClearAsync().ConfigureAwait(false);
+			await queueManager.ClearAsync(cancellationToken).ConfigureAwait(false);
 			for (var i = 0; i < numberOfMessages; i++)
 			{
-				await queueManager.AddMessageAsync($"Hello world {i}").ConfigureAwait(false);
+				await queueManager.AddMessageAsync($"Hello world {i}", cancellationToken: cancellationToken).ConfigureAwait(false);
 			}
 
-			// Process the messages
-			Stopwatch sw = null;
-
 			// Configure the message pump
-			var messagePump = new AsyncMessagePump(connectionString, queueName, 10, null, TimeSpan.FromMinutes(1), 3, _logger, metrics)
+			Stopwatch sw = null;
+			var cts = new CancellationTokenSource();
+			var options = new MessagePumpOptions(connectionString, concurrentTasks, null, null);
+			var messagePump = new AsyncMessagePump(options, _logger, metrics)
 			{
-				OnMessage = (message, cancellationToken) =>
+				OnMessage = (queueName, message, cancellationToken) =>
 				{
-					_logger.LogInformation(message.Content.ToString());
+					_logger.LogInformation("{messageContent}", message.Content.ToString());
+				},
+
+				// Stop the timer and the message pump when the queue is empty.
+				OnEmpty = cancellationToken =>
+				{
+					// Stop the timer
+					if (sw.IsRunning) sw.Stop();
+
+					// Stop the message pump
+					_logger.LogDebug("Asking the message pump to stop...");
+					cts.Cancel();
 				}
 			};
-
-			// Stop the message pump when the queue is empty.
-			var cts = new CancellationTokenSource();
-			messagePump.OnQueueEmpty = cancellationToken =>
-			{
-				// Stop the timer
-				if (sw.IsRunning) sw.Stop();
-
-				// Stop the message pump
-				_logger.LogDebug("Asking the message pump to stop...");
-				cts.Cancel();
-			};
+			messagePump.AddQueue(queueName, null, TimeSpan.FromMinutes(1), 3);
 
 			// Start the message pump
 			sw = Stopwatch.StartNew();
@@ -139,10 +133,10 @@ namespace Picton.Messaging.IntegrationTests
 			await messagePump.StartAsync(cts.Token).ConfigureAwait(false);
 
 			// Display summary
-			_logger.LogInformation($"\tDone in {sw.Elapsed.ToDurationString()}");
+			_logger.LogInformation("\tDone in {duration}", sw.Elapsed.ToDurationString());
 		}
 
-		private async Task RunAsyncMessagePumpWithHandlersTests(string connectionString, string queueName, int numberOfMessages, IMetrics metrics, CancellationToken cancellationToken)
+		private async Task RunAsyncMessagePumpWithHandlersTests(string connectionString, string queueName, int concurrentTasks, int numberOfMessages, IMetrics metrics, CancellationToken cancellationToken)
 		{
 			if (cancellationToken.IsCancellationRequested) return;
 
@@ -152,27 +146,30 @@ namespace Picton.Messaging.IntegrationTests
 			// Add messages to the queue
 			_logger.LogInformation("Adding {numberOfMessages} messages with handlers to the {queueName} queue...", numberOfMessages, queueName);
 			var queueManager = new QueueManager(connectionString, queueName);
-			await queueManager.ClearAsync().ConfigureAwait(false);
+			await queueManager.ClearAsync(cancellationToken).ConfigureAwait(false);
 			for (var i = 0; i < numberOfMessages; i++)
 			{
-				await queueManager.AddMessageAsync(new MyMessage { MessageContent = $"Hello world {i}" }).ConfigureAwait(false);
+				await queueManager.AddMessageAsync(new MyMessage { MessageContent = $"Hello world {i}" }, cancellationToken: cancellationToken).ConfigureAwait(false);
 			}
 
-			// Process the messages
-			Stopwatch sw = null;
-
 			// Configure the message pump
+			Stopwatch sw = null;
 			var cts = new CancellationTokenSource();
-			var messagePump = new AsyncMessagePumpWithHandlers(connectionString, queueName, 10, null, TimeSpan.FromMinutes(1), 3, _logger, metrics);
-			messagePump.OnQueueEmpty = cancellationToken =>
+			var options = new MessagePumpOptions(connectionString, concurrentTasks, null, null);
+			var messagePump = new AsyncMessagePumpWithHandlers(options, _logger, metrics)
 			{
-				// Stop the timer
-				if (sw.IsRunning) sw.Stop();
+				// Stop the timer and the message pump when the queue is empty.
+				OnEmpty = cancellationToken =>
+				{
+					// Stop the timer
+					if (sw.IsRunning) sw.Stop();
 
-				// Stop the message pump
-				_logger.LogDebug("Asking the message pump with handlers to stop...");
-				cts.Cancel();
+					// Stop the message pump
+					_logger.LogDebug("Asking the message pump with handlers to stop...");
+					cts.Cancel();
+				}
 			};
+			messagePump.AddQueue(queueName, null, TimeSpan.FromMinutes(1), 3);
 
 			// Start the message pump
 			sw = Stopwatch.StartNew();
@@ -180,10 +177,10 @@ namespace Picton.Messaging.IntegrationTests
 			await messagePump.StartAsync(cts.Token);
 
 			// Display summary
-			_logger.LogInformation($"\tDone in {sw.Elapsed.ToDurationString()}");
+			_logger.LogInformation("\tDone in {duration}", sw.Elapsed.ToDurationString());
 		}
 
-		private async Task RunMultiTenantAsyncMessagePumpTests(string connectionString, string queueNamePrefix, int numberOfTenants, int numberOfMessages, IMetrics metrics, CancellationToken cancellationToken)
+		private async Task RunMultiTenantAsyncMessagePumpTests(string connectionString, string queueNamePrefix, int concurrentTasks, int[] numberOfMessagesForTenant, IMetrics metrics, CancellationToken cancellationToken)
 		{
 			if (cancellationToken.IsCancellationRequested) return;
 
@@ -191,14 +188,13 @@ namespace Picton.Messaging.IntegrationTests
 			_logger.LogInformation("Testing AsyncMultiTenantMessagePump...");
 
 			// Add messages to the tenant queues
-			for (int i = 0; i < numberOfTenants; i++)
+			for (int i = 0; i < numberOfMessagesForTenant.Length; i++)
 			{
 				var queueManager = new QueueManager(connectionString, $"{queueNamePrefix}{i:00}");
-				await queueManager.ClearAsync().ConfigureAwait(false);
-				var numberOfMessagesForThisTenant = numberOfMessages * (i + 1); // Each tenant receives a different number of messages
-				for (var j = 0; j < numberOfMessagesForThisTenant; j++)
+				await queueManager.ClearAsync(cancellationToken).ConfigureAwait(false);
+				for (var j = 0; j < numberOfMessagesForTenant[i]; j++)
 				{
-					await queueManager.AddMessageAsync($"Hello world {j} to tenant {i:00}").ConfigureAwait(false);
+					await queueManager.AddMessageAsync($"Hello world {j:00} to tenant {i:00}", cancellationToken: cancellationToken).ConfigureAwait(false);
 				}
 			}
 
@@ -207,24 +203,24 @@ namespace Picton.Messaging.IntegrationTests
 
 			// Configure the message pump
 			var cts = new CancellationTokenSource();
-			var messagePump = new AsyncMultiTenantMessagePump(connectionString, queueNamePrefix, 10, null, TimeSpan.FromMinutes(1), 3, null, null, _logger, metrics)
+			var options = new MessagePumpOptions(connectionString, concurrentTasks, null, null);
+			var messagePump = new AsyncMultiTenantMessagePump(options, queueNamePrefix, logger: _logger, metrics: metrics)
 			{
 				OnMessage = (tenantId, message, cancellationToken) =>
 				{
-					var messageContent = message.Content.ToString();
-					_logger.LogInformation($"{tenantId} - {messageContent}", tenantId, messageContent);
+					_logger.LogInformation("{tenantId} - {messageContent}", tenantId, message.Content.ToString());
+				},
+
+				// Stop the timer and the message pump when all tenant queues are empty.
+				OnEmpty = cancellationToken =>
+				{
+					// Stop the timer
+					if (sw.IsRunning) sw.Stop();
+
+					// Stop the message pump
+					_logger.LogDebug("Asking the multi-tenant message pump to stop...");
+					cts.Cancel();
 				}
-			};
-
-			// Stop the message pump when all tenant queues are empty.
-			messagePump.OnEmpty = cancellationToken =>
-			{
-				// Stop the timer
-				if (sw.IsRunning) sw.Stop();
-
-				// Stop the message pump
-				_logger.LogDebug("Asking the multi-tenant message pump to stop...");
-				cts.Cancel();
 			};
 
 			// Start the message pump
@@ -233,7 +229,7 @@ namespace Picton.Messaging.IntegrationTests
 			await messagePump.StartAsync(cts.Token);
 
 			// Display summary
-			_logger.LogInformation($"\tDone in {sw.Elapsed.ToDurationString()}");
+			_logger.LogInformation("\tDone in {duration}", sw.Elapsed.ToDurationString());
 		}
 	}
 }

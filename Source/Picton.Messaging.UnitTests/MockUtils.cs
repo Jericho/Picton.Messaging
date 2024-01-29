@@ -2,7 +2,7 @@ using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Queues;
-using Moq;
+using NSubstitute;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,73 +15,74 @@ namespace Picton.Messaging.UnitTests
 		private static readonly string QUEUE_STORAGE_URL = "http://bogus:10001/devstoreaccount1/";
 		private static readonly string BLOB_STORAGE_URL = "http://bogus:10002/devstoreaccount1/";
 
-		internal static Mock<BlobContainerClient> GetMockBlobContainerClient(string containerName = "mycontainer", IEnumerable<Mock<BlobClient>> mockBlobClients = null)
+		internal static BlobContainerClient GetMockBlobContainerClient(string containerName = "mycontainer", IEnumerable<BlobClient> mockBlobClients = null)
 		{
 			var mockContainerUri = new Uri(BLOB_STORAGE_URL + containerName);
 			var blobContainerInfo = BlobsModelFactory.BlobContainerInfo(ETag.All, DateTimeOffset.UtcNow);
-			var mockBlobContainer = new Mock<BlobContainerClient>(MockBehavior.Strict);
+			var mockBlobContainer = Substitute.For<BlobContainerClient>();
 
 			mockBlobContainer
-				.SetupGet(m => m.Name)
+				.Name
 				.Returns(containerName);
 
 			mockBlobContainer
-				.SetupGet(m => m.Uri)
+				.Uri
 				.Returns(mockContainerUri);
 
 			mockBlobContainer
-				.Setup(c => c.CreateIfNotExists(It.IsAny<PublicAccessType>(), It.IsAny<IDictionary<string, string>>(), It.IsAny<BlobContainerEncryptionScopeOptions>(), It.IsAny<CancellationToken>()))
-				.Returns(Response.FromValue(blobContainerInfo, new MockAzureResponse(200, "ok")))
-				.Verifiable();
+				.CreateIfNotExists(Arg.Any<PublicAccessType>(), Arg.Any<IDictionary<string, string>>(), Arg.Any<BlobContainerEncryptionScopeOptions>(), Arg.Any<CancellationToken>())
+				.Returns(Response.FromValue(blobContainerInfo, new MockAzureResponse(200, "ok")));
 
-			foreach (var blobClient in mockBlobClients?.Select(m => m.Object) ?? Enumerable.Empty<BlobClient>())
+			foreach (var blobClient in mockBlobClients ?? Enumerable.Empty<BlobClient>())
 			{
 				mockBlobContainer
-					.Setup(c => c.GetBlobClient(blobClient.Name))
-					.Returns(blobClient)
-					.Verifiable();
+					.GetBlobClient(blobClient.Name)
+					.Returns(blobClient);
 			}
 
 			return mockBlobContainer;
 		}
 
-		internal static Mock<BlobClient> GetMockBlobClient(string blobName)
+		internal static BlobClient GetMockBlobClient(string blobName)
 		{
 			var mockBlobUri = new Uri(BLOB_STORAGE_URL + blobName);
-			var mockBlobClient = new Mock<BlobClient>(MockBehavior.Strict);
+			var mockBlobClient = Substitute.For<BlobClient>();
 
 			mockBlobClient
-				.SetupGet(m => m.Name)
+				.Name
 				.Returns(blobName);
 
 			mockBlobClient
-				.SetupGet(m => m.Uri)
+				.Uri
 				.Returns(mockBlobUri);
 
 			return mockBlobClient;
 		}
 
-		internal static Mock<QueueClient> GetMockQueueClient(string queueName = "myqueue")
+		internal static QueueClient GetMockQueueClient(string queueName = "myqueue")
 		{
 			var mockQueueStorageUri = new Uri(QUEUE_STORAGE_URL + queueName);
-			var mockQueueClient = new Mock<QueueClient>(MockBehavior.Strict);
+			var mockQueueClient = Substitute.For<QueueClient>();
 
 			mockQueueClient
-				.SetupGet(m => m.MaxPeekableMessages)
-				.Returns(32);
+				.Name
+				.Returns(queueName);
 
 			mockQueueClient
-				.SetupGet(m => m.MessageMaxBytes)
-				.Returns(65536);
-
-			mockQueueClient
-				.SetupGet(m => m.Uri)
+				.Uri
 				.Returns(mockQueueStorageUri);
 
 			mockQueueClient
-				.Setup(c => c.CreateIfNotExists(It.IsAny<IDictionary<string, string>>(), It.IsAny<CancellationToken>()))
-				.Returns((Response)null)
-				.Verifiable();
+				.MessageMaxBytes
+				.Returns(65536);
+
+			mockQueueClient
+				.MaxPeekableMessages
+				.Returns(32);
+
+			mockQueueClient
+				.CreateIfNotExists(Arg.Any<IDictionary<string, string>>(), Arg.Any<CancellationToken>())
+				.Returns((Response)null);
 
 			return mockQueueClient;
 		}

@@ -5,30 +5,83 @@ using System.Threading;
 
 namespace Picton.Messaging.Utilities
 {
-	internal class RoundRobinList<T>
+	/// <summary>
+	/// Initializes a new instance of the <see cref="RoundRobinList{T}"/> class.
+	/// </summary>
+	/// <param name="list">The items.</param>
+	internal class RoundRobinList<T>(IEnumerable<T> list)
 	{
-		private static readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
-		private readonly LinkedList<T> _linkedList;
+		private static readonly ReaderWriterLockSlim _lock = new();
+		private readonly LinkedList<T> _linkedList = new(list);
 		private LinkedListNode<T> _current;
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="RoundRobinList{T}"/> class.
-		/// </summary>
-		/// <param name="list">The items.</param>
-		public RoundRobinList(IEnumerable<T> list)
-		{
-			_linkedList = new LinkedList<T>(list);
-		}
 
 		public T Current
 		{
 			get
 			{
-				return _current == default ? default : _current.Value;
+				try
+				{
+					_lock.EnterReadLock();
+
+					return _current == default ? default : _current.Value;
+				}
+				finally
+				{
+					if (_lock.IsReadLockHeld) _lock.ExitReadLock();
+				}
 			}
 		}
 
-		public int Count => _linkedList.Count;
+		public T Next
+		{
+			get
+			{
+				try
+				{
+					_lock.EnterReadLock();
+
+					return (_current == default || _current.Next == default) ? _linkedList.First.Value : _current.Next.Value;
+				}
+				finally
+				{
+					if (_lock.IsReadLockHeld) _lock.ExitReadLock();
+				}
+			}
+		}
+
+		public T Previous
+		{
+			get
+			{
+				try
+				{
+					_lock.EnterReadLock();
+
+					return (_current == default || _current.Previous == default) ? _linkedList.Last.Value : _current.Previous.Value;
+				}
+				finally
+				{
+					if (_lock.IsReadLockHeld) _lock.ExitReadLock();
+				}
+			}
+		}
+
+		public int Count
+		{
+			get
+			{
+				try
+				{
+					_lock.EnterReadLock();
+
+					return _linkedList.Count;
+				}
+				finally
+				{
+					if (_lock.IsReadLockHeld) _lock.ExitReadLock();
+				}
+			}
+		}
 
 		/// <summary>
 		/// Reset the Round Robin to point to the first item.
@@ -114,7 +167,7 @@ namespace Picton.Messaging.Utilities
 		/// Remove an item from the list.
 		/// </summary>
 		/// <returns>The item.</returns>
-		public bool Remove(T item)
+		public bool RemoveItem(T item)
 		{
 			try
 			{
@@ -128,7 +181,11 @@ namespace Picton.Messaging.Utilities
 			}
 		}
 
-		public void Add(T item)
+		/// <summary>
+		/// Add an item to the list.
+		/// </summary>
+		/// <param name="item">The item.</param>
+		public void AddItem(T item)
 		{
 			try
 			{
