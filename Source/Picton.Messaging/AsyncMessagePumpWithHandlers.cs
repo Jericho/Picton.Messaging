@@ -118,6 +118,28 @@ namespace Picton.Messaging
 		}
 
 		/// <summary>
+		/// Add queues that meet the specified RegEx pattern.
+		/// </summary>
+		/// <remarks>
+		/// All the queues that match the specified pattern will share the same poison queue if you specify the name of the poison queue.
+		/// If you omit this value, each queue will get their own poison queue.
+		///
+		/// Similarly, all the queues that match the specified pattern will share the same oversize messages storage if you specify the name of the blob storage container.
+		/// If you omit this value, each queue will get their own blob container.
+		/// </remarks>
+		/// <param name="queueNamePattern">The RegEx pattern.</param>
+		/// <param name="poisonQueueName">Optional. The name of the queue where poison messages are automatically moved.</param>
+		/// <param name="visibilityTimeout">Optional. Specifies the visibility timeout value. The default value is 30 seconds.</param>
+		/// <param name="maxDequeueCount">Optional. A nonzero integer value that specifies the number of time we try to process a message before giving up and declaring the message to be "poison". The default value is 3.</param>
+		/// <param name="oversizeMessagesBlobStorageName">Name of the blob storage where messages that exceed the maximum size for a queue message are stored.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <returns>The async task.</returns>
+		public Task AddQueuesByPatternAsync(string queueNamePattern, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, string oversizeMessagesBlobStorageName = null, CancellationToken cancellationToken = default)
+		{
+			return _messagePump.AddQueuesByPatternAsync(queueNamePattern, poisonQueueName, visibilityTimeout, maxDequeueCount, oversizeMessagesBlobStorageName, cancellationToken);
+		}
+
+		/// <summary>
 		/// Starts the message pump.
 		/// </summary>
 		/// <param name="cancellationToken">The cancellation token.</param>
