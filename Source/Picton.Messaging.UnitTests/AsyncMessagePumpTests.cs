@@ -116,7 +116,7 @@ namespace Picton.Messaging.UnitTests
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
 				},
-				OnEmpty = cancellationToken =>
+				OnAllQueuesEmpty = cancellationToken =>
 				{
 					Interlocked.Increment(ref OnEmptyInvokeCount);
 					cts.Cancel();
@@ -212,7 +212,7 @@ namespace Picton.Messaging.UnitTests
 						}
 					}
 				},
-				OnEmpty = cancellationToken =>
+				OnAllQueuesEmpty = cancellationToken =>
 				{
 					Interlocked.Increment(ref OnEmptyInvokeCount);
 					cts.Cancel();
@@ -299,7 +299,7 @@ namespace Picton.Messaging.UnitTests
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
 				},
-				OnEmpty = cancellationToken =>
+				OnAllQueuesEmpty = cancellationToken =>
 				{
 					Interlocked.Increment(ref OnEmptyInvokeCount);
 					cts.Cancel();
@@ -397,7 +397,7 @@ namespace Picton.Messaging.UnitTests
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
 				},
-				OnEmpty = cancellationToken =>
+				OnAllQueuesEmpty = cancellationToken =>
 				{
 					Interlocked.Increment(ref OnEmptyInvokeCount);
 					cts.Cancel();
@@ -455,7 +455,7 @@ namespace Picton.Messaging.UnitTests
 				{
 					Interlocked.Increment(ref onErrorInvokeCount);
 				},
-				OnEmpty = cancellationToken =>
+				OnAllQueuesEmpty = cancellationToken =>
 				{
 					Interlocked.Increment(ref OnEmptyInvokeCount);
 
@@ -551,7 +551,7 @@ namespace Picton.Messaging.UnitTests
 					Interlocked.Increment(ref onErrorInvokeCount);
 					throw new Exception("This dummy exception should be ignored");
 				},
-				OnEmpty = cancellationToken =>
+				OnAllQueuesEmpty = cancellationToken =>
 				{
 					Interlocked.Increment(ref OnEmptyInvokeCount);
 					cts.Cancel();
