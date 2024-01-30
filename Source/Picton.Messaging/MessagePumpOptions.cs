@@ -103,7 +103,7 @@ namespace Picton.Messaging
 		/// The delay is reset to zero when at lest one messages is found in the queue.
 		///
 		/// The pupose of the delay is to ensure we don't query a given queue too often when we know it to be empty.
-		/// 
+		///
 		/// Default value is 5 seconds.
 		/// </summary>
 		public TimeSpan EmptyQueueFetchDelay { get; set; } = _defaultEmptyQueueFetchDelay;

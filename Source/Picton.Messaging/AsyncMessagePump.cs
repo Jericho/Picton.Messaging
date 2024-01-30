@@ -349,6 +349,13 @@ namespace Picton.Messaging
 							{
 								if (_queueManagers.TryGetValue(result.QueueName, out (QueueConfig Config, QueueManager QueueManager, QueueManager PoisonQueueManager, DateTime LastFetched, TimeSpan FetchDelay) queueInfo))
 								{
+									if (result.Message.InsertedOn.HasValue)
+									{
+										var elapsed = DateTimeOffset.UtcNow.Subtract(result.Message.InsertedOn.Value);
+										var messageWaitTime = (long)elapsed.TotalSeconds;
+										_metrics.Measure.Timer.Time(Metrics.MessageWaitBeforeProcessTimer, messageWaitTime);
+									}
+
 									using (_metrics.Measure.Timer.Time(Metrics.MessageProcessingTimer))
 									{
 										try
