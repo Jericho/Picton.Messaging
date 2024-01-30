@@ -10,6 +10,7 @@ namespace Picton.Messaging
 	public record MessagePumpOptions
 	{
 		private const int _defaultConcurrentTasks = 25;
+		private const int _defaultFetchCount = 10;
 		private static readonly TimeSpan _defaultFetchMessagesInterval = TimeSpan.FromSeconds(1);
 		private static readonly TimeSpan _defaultCountAzureMessagesInterval = TimeSpan.FromSeconds(5);
 		private static readonly TimeSpan _defaultCountMemoryMessagesInterval = TimeSpan.FromSeconds(5);
@@ -53,6 +54,11 @@ namespace Picton.Messaging
 		/// Gets or sets the number of concurrent tasks. In other words: the number of messages that can be processed at a time.
 		/// </summary>
 		public int ConcurrentTasks { get; set; } = _defaultConcurrentTasks;
+
+		/// <summary>
+		/// Gets or sets the number of messages fetched per queue.
+		/// </summary>
+		public int FetchCount { get; set; } = _defaultFetchCount;
 
 		/// <summary>
 		/// Gets or sets the optional client options that define the transport

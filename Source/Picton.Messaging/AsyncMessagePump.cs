@@ -475,7 +475,7 @@ namespace Picton.Messaging
 
 							try
 							{
-								messages = await queueInfo.QueueManager.GetMessagesAsync(_messagePumpOptions.ConcurrentTasks, queueInfo.Config.VisibilityTimeout, cancellationToken).ConfigureAwait(false);
+								messages = await queueInfo.QueueManager.GetMessagesAsync(_messagePumpOptions.FetchCount, queueInfo.Config.VisibilityTimeout, cancellationToken).ConfigureAwait(false);
 							}
 							catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
 							{
