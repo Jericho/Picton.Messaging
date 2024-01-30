@@ -41,17 +41,30 @@ namespace Picton.Messaging
 		public Action<string, CloudMessage, Exception, bool> OnError { get; set; }
 
 		/// <summary>
-		/// Gets or sets the logic to execute when all queues are empty.
+		/// Gets or sets the logic to execute when a queue is empty.
 		/// </summary>
 		/// <example>
 		/// <code>
-		/// OnEmpty = cancellationToken => Task.Delay(2500, cancellationToken).Wait();
+		/// OnQueueEmpty = (queueName, cancellationToken) => _logger.LogInformation("Queue {queueName} is empty", queueName);
 		/// </code>
 		/// </example>
 		/// <remarks>
 		/// If this property is not set, the default logic is to do nothing.
 		/// </remarks>
-		public Action<CancellationToken> OnEmpty { get; set; }
+		public Action<string, CancellationToken> OnQueueEmpty { get; set; }
+
+		/// <summary>
+		/// Gets or sets the logic to execute when all queues are empty.
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// OnAllQueuesEmpty = (cancellationToken) => _logger.LogInformation("All queues are empty");
+		/// </code>
+		/// </example>
+		/// <remarks>
+		/// If this property is not set, the default logic is to do nothing.
+		/// </remarks>
+		public Action<CancellationToken> OnAllQueuesEmpty { get; set; }
 
 		#endregion
 
@@ -112,7 +125,8 @@ namespace Picton.Messaging
 		/// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
 		public Task StartAsync(CancellationToken cancellationToken)
 		{
-			_messagePump.OnEmpty = OnEmpty;
+			_messagePump.OnQueueEmpty = OnQueueEmpty;
+			_messagePump.OnAllQueuesEmpty = OnAllQueuesEmpty;
 			_messagePump.OnError = OnError;
 			_messagePump.OnMessage = (queueName, message, cancellationToken) =>
 			{

@@ -61,17 +61,30 @@ namespace Picton.Messaging
 		public Action<string, CloudMessage, Exception, bool> OnError { get; set; }
 
 		/// <summary>
-		/// Gets or sets the logic to execute when all queues are empty.
+		/// Gets or sets the logic to execute when a queue is empty.
 		/// </summary>
 		/// <example>
 		/// <code>
-		/// OnEmpty = cancellationToken => Task.Delay(2500, cancellationToken).Wait();
+		/// OnQueueEmpty = (queueName, cancellationToken) => _logger.LogInformation("Queue {queueName} is empty", queueName);
 		/// </code>
 		/// </example>
 		/// <remarks>
 		/// If this property is not set, the default logic is to do nothing.
 		/// </remarks>
-		public Action<CancellationToken> OnEmpty { get; set; }
+		public Action<string, CancellationToken> OnQueueEmpty { get; set; }
+
+		/// <summary>
+		/// Gets or sets the logic to execute when all queues are empty.
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// OnAllQueuesEmpty = cancellationToken => _logger.LogInformation("All queues are empty");
+		/// </code>
+		/// </example>
+		/// <remarks>
+		/// If this property is not set, the default logic is to do nothing.
+		/// </remarks>
+		public Action<CancellationToken> OnAllQueuesEmpty { get; set; }
 
 		#endregion
 
@@ -503,6 +516,8 @@ namespace Picton.Messaging
 								if (delay > _messagePumpOptions.EmptyQueueMaxFetchDelay) delay = _messagePumpOptions.EmptyQueueMaxFetchDelay;
 
 								_queueManagers[queueName] = (queueInfo.Config, queueInfo.QueueManager, queueInfo.PoisonQueueManager, DateTime.UtcNow, delay);
+
+								OnQueueEmpty?.Invoke(queueName, cancellationToken);
 							}
 						}
 					}
@@ -523,7 +538,7 @@ namespace Picton.Messaging
 				{
 					// All queues are empty
 					_metrics.Measure.Counter.Increment(Metrics.AllQueuesEmptyCounter);
-					OnEmpty?.Invoke(cancellationToken);
+					OnAllQueuesEmpty?.Invoke(cancellationToken);
 				}
 				catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
 				{
