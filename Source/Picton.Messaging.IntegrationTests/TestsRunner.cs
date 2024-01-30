@@ -5,6 +5,7 @@ using Picton.Managers;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,6 +24,9 @@ namespace Picton.Messaging.IntegrationTests
 
 		public async Task<int> RunAsync()
 		{
+			ServicePointManager.DefaultConnectionLimit = 1000;
+			ServicePointManager.UseNagleAlgorithm = false;
+
 			// Configure Console
 			var cts = new CancellationTokenSource();
 			Console.CancelKeyPress += (s, e) =>
