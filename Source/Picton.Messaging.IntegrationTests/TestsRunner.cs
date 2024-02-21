@@ -20,7 +20,7 @@ namespace Picton.Messaging.IntegrationTests
 			Cancelled = 1223
 		}
 
-		private readonly ILogger _logger = logger;
+		private readonly ILogger<TestsRunner> _logger = logger;
 
 		public async Task<int> RunAsync()
 		{
