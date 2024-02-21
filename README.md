@@ -8,7 +8,7 @@
 
 ## About
 
-Picton.Messaging is a C# library containing a high performance message processor (also known as a message "pump") designed to process messages from an Azure storage queue as efficiently as possible.
+Picton.Messaging is a C# library containing a high performance message processor (also known as a message "pump") designed to process messages from Azure storage queues as efficiently as possible.
 
 I created Picton.Mesaging because I needed a way to process a large volume of messages from Azure storage queues as quickly and efficiently as possible. I searched for a long time, but I could never find a solution that met all my requirements.
 
@@ -26,6 +26,8 @@ The sample code that Daniel shared during his webinars was very generic and not 
   - second, reduce the number of concurrent message processing tasks. This is the most important improvement introduced in the Picton library (in my humble opinion!). Daniel's sample code uses ``SemaphoreSlim`` to act as a "gatekeeper" and to limit the number of tasks that be be executed concurently. However, the number of "slots" permitted by the semaphore must be predetermined and is fixed. Picton eliminates this restriction and allows this number to be dynamically increased and decreased based on the presence or abscence of messages in the queue.
 
 In December 2017 version 2.0 was released with a much more efficient method of fetching messages from the Azure queue: there is now a dedicated task for this pupose instead of allowing each individual concurent task to fetch their own messages. This means that the logic to increase/decrease the number of available slots in the SemaphoreSlim is no longer necessary and has ben removed.
+
+In January 2024 version 9.0 was released with two major new features: the message pump is now able to monitor multiple queues and also a specialized version of the message pump was added to monitor queues that follow a naming convention. Additionaly, this specialized message pump queries the Azure storage at regular interval to detect if new queues have been created. This is, in my opinion, an ideal solution when you have a multi-tenant solution with one queue for each tenant.
 
 
 ## Nuget
@@ -66,7 +68,7 @@ namespace WorkerRole1
 
             try
             {
-                this.RunAsync(this.cancellationTokenSource.Token).Wait();
+                this.RunAsync(this.cancellationTokenSource.Token).Wait(); // <-- The cancellation token is important because it will be used to stop the message pump
             }
             finally
             {
@@ -153,8 +155,11 @@ namespace WorkerRole1
             messagePump.AddQueue("queue06", "my-poison-queue", TimeSpan.FromMinutes(1), 3, "large-messages-blob");
             messagePump.AddQueue("queue07", "my-poison-queue", TimeSpan.FromMinutes(1), 3, "large-messages-blob");
 
+            // You can add queues that match a given RegEx pattern
+            await messagePump.AddQueuesByPatternAsync("myqueue*", "my-poison-queue", TimeSpan.FromMinutes(1), 3, "large-messages-blob", cancellationToken).ConfigureAwait(false);
+
             // Start the message pump
-            await messagePump.StartAsync(cancellationToken);
+            await messagePump.StartAsync(cancellationToken); // <-- Specifying the cancellation token is particularly important because that's how you later communicate to the message pump that you want it to stop
         }
     }
 }
