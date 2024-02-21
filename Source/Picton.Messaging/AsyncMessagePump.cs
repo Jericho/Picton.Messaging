@@ -255,7 +255,7 @@ namespace Picton.Messaging
 			var channel = Channel.CreateUnbounded<(string QueueName, CloudMessage Message)>(channelOptions);
 			var channelCompleted = false;
 
-			// Define the task that fetches messages from the Azure queue
+			// Define the task that fetches messages from Azure
 			RecurrentCancellableTask.StartNew(
 				async () =>
 				{
@@ -271,7 +271,7 @@ namespace Picton.Messaging
 					}
 
 					// Mark the channel as "complete" which means that no more messages will be written to it
-					else if (!channelCompleted)
+					else if (cancellationToken.IsCancellationRequested && !channelCompleted)
 					{
 						channelCompleted = channel.Writer.TryComplete();
 					}

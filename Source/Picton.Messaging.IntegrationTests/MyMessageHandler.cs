@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Picton.Messaging.Messages;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Picton.Messaging.IntegrationTests
 {
@@ -11,9 +13,12 @@ namespace Picton.Messaging.IntegrationTests
 		{
 			_log = log;
 		}
-		public void Handle(MyMessage message)
+
+		public Task HandleAsync(MyMessage message, CancellationToken cancellationToken)
 		{
-			_log.LogInformation(message.MessageContent);
+			_log?.LogInformation(message.MessageContent);
+
+			return Task.CompletedTask;
 		}
 	}
 }

@@ -150,7 +150,7 @@ namespace Picton.Messaging
 			_messagePump.OnQueueEmpty = OnQueueEmpty;
 			_messagePump.OnAllQueuesEmpty = OnAllQueuesEmpty;
 			_messagePump.OnError = OnError;
-			_messagePump.OnMessage = (queueName, message, cancellationToken) =>
+			_messagePump.OnMessage = async (queueName, message, cancellationToken) =>
 			{
 				var contentType = message.Content.GetType();
 
@@ -187,28 +187,6 @@ namespace Picton.Messaging
 		internal void AddQueue(QueueManager queueManager, QueueManager poisonQueueManager, TimeSpan? visibilityTimeout, int maxDequeueCount)
 		{
 			_messagePump.AddQueue(queueManager, poisonQueueManager, visibilityTimeout, maxDequeueCount);
-		}
-
-		private void ValidateOptions(MessagePumpOptions options)
-		{
-			if (options == null) throw new ArgumentNullException(nameof(options));
-			if (string.IsNullOrEmpty(options.ConnectionString)) throw new ArgumentNullException(nameof(options.ConnectionString));
-			if (options.ConcurrentTasks < 1) throw new ArgumentOutOfRangeException(nameof(options.ConcurrentTasks), "Number of concurrent tasks must be greather than zero");
-		}
-
-		private void ValidateQueueConfig(QueueConfig queueConfig)
-		{
-			if (queueConfig == null) throw new ArgumentNullException(nameof(queueConfig));
-			if (string.IsNullOrEmpty(queueConfig.QueueName)) throw new ArgumentNullException(nameof(queueConfig.QueueName));
-			if (queueConfig.MaxDequeueCount < 1) throw new ArgumentOutOfRangeException(nameof(queueConfig.MaxDequeueCount), $"Number of retries for {queueConfig.QueueName} must be greater than zero.");
-		}
-
-		private void ValidateQueueConfigs(IEnumerable<QueueConfig> queueConfigs)
-		{
-			foreach (var queueConfig in queueConfigs)
-			{
-				ValidateQueueConfig(queueConfig);
-			}
 		}
 
 		#endregion

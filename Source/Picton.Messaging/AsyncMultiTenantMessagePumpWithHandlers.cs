@@ -105,7 +105,7 @@ namespace Picton.Messaging
 			_messagePump.OnQueueEmpty = (queueName, cancellationToken) => OnQueueEmpty?.Invoke(queueName.TrimStart(_queueNamePrefix), cancellationToken);
 			_messagePump.OnAllQueuesEmpty = OnAllQueuesEmpty;
 			_messagePump.OnError = (queueName, message, exception, isPoison) => OnError?.Invoke(queueName.TrimStart(_queueNamePrefix), message, exception, isPoison);
-			_messagePump.OnMessage = (queueName, message, cancellationToken) =>
+			_messagePump.OnMessage = async (queueName, message, cancellationToken) =>
 			{
 				var contentType = message.Content.GetType();
 
