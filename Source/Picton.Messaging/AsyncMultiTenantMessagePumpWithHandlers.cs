@@ -2,7 +2,6 @@ using App.Metrics;
 using Microsoft.Extensions.Logging;
 using Picton.Messaging.Utilities;
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,11 +15,9 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
-		private static IDictionary<Type, Type[]> _messageHandlers;
-
 		private readonly string _queueNamePrefix;
 		private readonly ILogger _logger;
-
+		private readonly CloudMessageHandler _cloudMessageHandler;
 		private readonly AsyncMultiTenantMessagePump _messagePump;
 
 		#endregion
@@ -81,12 +78,26 @@ namespace Picton.Messaging
 		/// <param name="logger">The logger.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
 		public AsyncMultiTenantMessagePumpWithHandlers(MessagePumpOptions options, string queueNamePrefix, TimeSpan? discoverQueuesInterval = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+			: this(options, null, queueNamePrefix, discoverQueuesInterval, visibilityTimeout, maxDequeueCount, logger, metrics)
 		{
-			_messageHandlers = MessageHandlersDiscoverer.GetMessageHandlers(logger);
+		}
 
+		/// <summary>
+		/// Initializes a new instance of the <see cref="AsyncMultiTenantMessagePumpWithHandlers"/> class.
+		/// </summary>
+		/// <param name="options">Options for the mesage pump.</param>
+		/// <param name="serviceProvider">DI.</param>
+		/// <param name="queueNamePrefix">The common prefix in the naming convention.</param>
+		/// <param name="discoverQueuesInterval">The frequency we check for queues in the Azure storage account matching the naming convention. Default is 30 seconds.</param>
+		/// <param name="visibilityTimeout">The visibility timeout.</param>
+		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
+		/// <param name="logger">The logger.</param>
+		/// <param name="metrics">The system where metrics are published.</param>
+		public AsyncMultiTenantMessagePumpWithHandlers(MessagePumpOptions options, IServiceProvider serviceProvider, string queueNamePrefix, TimeSpan? discoverQueuesInterval = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+		{
 			_queueNamePrefix = queueNamePrefix;
 			_logger = logger;
-
+			_cloudMessageHandler = new CloudMessageHandler(serviceProvider);
 			_messagePump = new AsyncMultiTenantMessagePump(options, queueNamePrefix, discoverQueuesInterval, visibilityTimeout, maxDequeueCount, logger, metrics);
 		}
 
@@ -107,28 +118,7 @@ namespace Picton.Messaging
 			_messagePump.OnError = (queueName, message, exception, isPoison) => OnError?.Invoke(queueName.TrimStart(_queueNamePrefix), message, exception, isPoison);
 			_messagePump.OnMessage = async (queueName, message, cancellationToken) =>
 			{
-				var contentType = message.Content.GetType();
-
-				if (!_messageHandlers.TryGetValue(contentType, out Type[] handlers))
-				{
-					throw new Exception($"Received a message of type {contentType.FullName} but could not find a class implementing IMessageHandler<{contentType.FullName}>");
-				}
-
-				foreach (var handlerType in handlers)
-				{
-					object handler = null;
-					if (handlerType.GetConstructor([typeof(ILogger)]) != null)
-					{
-						handler = Activator.CreateInstance(handlerType, [(object)_logger]);
-					}
-					else
-					{
-						handler = Activator.CreateInstance(handlerType);
-					}
-
-					var handlerMethod = handlerType.GetMethod("Handle", [contentType]);
-					handlerMethod.Invoke(handler, [message.Content]);
-				}
+				await _cloudMessageHandler.HandleMessageAsync(message, cancellationToken).ConfigureAwait(false);
 			};
 
 			return _messagePump.StartAsync(cancellationToken);

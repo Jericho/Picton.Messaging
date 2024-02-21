@@ -1,16 +1,62 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyModel;
 using Microsoft.Extensions.Logging;
 using Picton.Messaging.Messages;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Picton.Messaging.Utilities
 {
-	internal static class MessageHandlersDiscoverer
+	internal class CloudMessageHandler
 	{
-		public static IDictionary<Type, Type[]> GetMessageHandlers(ILogger logger)
+		private static ConcurrentDictionary<Type, Type[]> _messageHandlerTypes = GetMessageHandlers(null);
+		private static ConcurrentDictionary<Type, Lazy<object>> _messageHandlerInstances = new();
+
+		private readonly IServiceProvider _serviceProvider;
+		private readonly ILogger _logger;
+
+		public CloudMessageHandler(IServiceProvider serviceProvider = null)
+		{
+			_serviceProvider = serviceProvider;
+		}
+
+		public async Task HandleMessageAsync(CloudMessage message, CancellationToken cancellationToken)
+		{
+			var contentType = message.Content.GetType();
+
+			if (!_messageHandlerTypes.TryGetValue(contentType, out Type[] handlerTypes))
+			{
+				throw new Exception($"Received a message of type {contentType.FullName} but could not find a class implementing IMessageHandler<{contentType.FullName}>");
+			}
+
+			foreach (var handlerType in handlerTypes)
+			{
+				// Get the message handler from cache or instantiate a new one
+				var handler = _messageHandlerInstances.GetOrAdd(handlerType, type => new Lazy<object>(() =>
+				{
+					// Let the DI service provider resolve the dependencies expected by the type constructor OR
+					// invoke the parameterless constructor when the DI service provider was not provided
+					var newHandlerInstance = _serviceProvider != null ?
+						ActivatorUtilities.CreateInstance(_serviceProvider, type) :
+						Activator.CreateInstance(type);
+
+					// Return the newly created instance
+					return newHandlerInstance;
+				})).Value;
+
+				// Invoke the "HandleAsync" method asynchronously
+				var handlerMethod = handlerType.GetMethod("HandleAsync", [contentType, typeof(CancellationToken)]);
+				var result = (Task)handlerMethod.Invoke(handler, [message.Content, cancellationToken]);
+				await result.ConfigureAwait(false);
+			}
+		}
+
+		private static ConcurrentDictionary<Type, Type[]> GetMessageHandlers(ILogger logger)
 		{
 			logger?.LogTrace("Discovering message handlers.");
 
@@ -52,10 +98,11 @@ namespace Picton.Messaging.Utilities
 
 			var messageHandlers = oneTypePerMessageHandler
 				.GroupBy(h => h.MessageType)
-				.ToDictionary(group => group.Key, group => group.Select(t => t.Type)
-				.ToArray());
+				.ToDictionary(
+					group => group.Key,
+					group => group.Select(t => t.Type).ToArray());
 
-			return messageHandlers;
+			return new ConcurrentDictionary<Type, Type[]>(messageHandlers);
 		}
 
 		private static Assembly[] GetLocalAssemblies()

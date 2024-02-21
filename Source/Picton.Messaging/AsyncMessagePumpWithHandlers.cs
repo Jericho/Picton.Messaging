@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Picton.Managers;
 using Picton.Messaging.Utilities;
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,10 +17,9 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
-		private static IDictionary<Type, Type[]> _messageHandlers;
-
-		private readonly AsyncMessagePump _messagePump;
 		private readonly ILogger _logger;
+		private readonly CloudMessageHandler _cloudMessageHandler;
+		private readonly AsyncMessagePump _messagePump;
 
 		#endregion
 
@@ -77,10 +75,22 @@ namespace Picton.Messaging
 		/// <param name="logger">The logger.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
 		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, ILogger logger = null, IMetrics metrics = null)
+			: this(options, null, logger, metrics)
 		{
-			_messageHandlers = MessageHandlersDiscoverer.GetMessageHandlers(logger);
-			_messagePump = new AsyncMessagePump(options, logger, metrics);
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
+		/// </summary>
+		/// <param name="options">Options for the mesage pump.</param>
+		/// <param name="serviceProvider">DI.</param>
+		/// <param name="logger">The logger.</param>
+		/// <param name="metrics">The system where metrics are published.</param>
+		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, IServiceProvider serviceProvider, ILogger logger = null, IMetrics metrics = null)
+		{
 			_logger = logger;
+			_cloudMessageHandler = new CloudMessageHandler(serviceProvider);
+			_messagePump = new AsyncMessagePump(options, logger, metrics);
 		}
 
 		#endregion
@@ -152,28 +162,7 @@ namespace Picton.Messaging
 			_messagePump.OnError = OnError;
 			_messagePump.OnMessage = async (queueName, message, cancellationToken) =>
 			{
-				var contentType = message.Content.GetType();
-
-				if (!_messageHandlers.TryGetValue(contentType, out Type[] handlers))
-				{
-					throw new Exception($"Received a message of type {contentType.FullName} but could not find a class implementing IMessageHandler<{contentType.FullName}>");
-				}
-
-				foreach (var handlerType in handlers)
-				{
-					object handler = null;
-					if (handlerType.GetConstructor([typeof(ILogger)]) != null)
-					{
-						handler = Activator.CreateInstance(handlerType, [(object)_logger]);
-					}
-					else
-					{
-						handler = Activator.CreateInstance(handlerType);
-					}
-
-					var handlerMethod = handlerType.GetMethod("Handle", [contentType]);
-					handlerMethod.Invoke(handler, [message.Content]);
-				}
+				await _cloudMessageHandler.HandleMessageAsync(message, cancellationToken).ConfigureAwait(false);
 			};
 
 			return _messagePump.StartAsync(cancellationToken);

@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace Picton.Messaging.IntegrationTests
 {
-	internal class TestsRunner(ILogger<TestsRunner> logger)
+	internal class TestsRunner(ILogger<TestsRunner> logger, IServiceProvider serviceProvider)
 	{
 		private enum ResultCodes
 		{
@@ -21,6 +21,7 @@ namespace Picton.Messaging.IntegrationTests
 		}
 
 		private readonly ILogger<TestsRunner> _logger = logger;
+		private readonly IServiceProvider _serviceProvider = serviceProvider;
 
 		public async Task<int> RunAsync()
 		{
@@ -157,7 +158,7 @@ namespace Picton.Messaging.IntegrationTests
 			Stopwatch sw = null;
 			var cts = new CancellationTokenSource();
 			var options = new MessagePumpOptions(connectionString, concurrentTasks, null, null);
-			var messagePump = new AsyncMessagePumpWithHandlers(options, _logger, metrics)
+			var messagePump = new AsyncMessagePumpWithHandlers(options, _serviceProvider, _logger, metrics)
 			{
 				// Stop the message pump when there are no more messages to process.
 				OnAllQueuesEmpty = cancellationToken =>
