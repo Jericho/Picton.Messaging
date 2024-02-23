@@ -71,21 +71,6 @@ namespace Picton.Messaging
 		/// Initializes a new instance of the <see cref="AsyncMultiTenantMessagePumpWithHandlers"/> class.
 		/// </summary>
 		/// <param name="options">Options for the mesage pump.</param>
-		/// <param name="queueNamePrefix">The common prefix in the naming convention.</param>
-		/// <param name="discoverQueuesInterval">The frequency we check for queues in the Azure storage account matching the naming convention. Default is 30 seconds.</param>
-		/// <param name="visibilityTimeout">The visibility timeout.</param>
-		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
-		/// <param name="logger">The logger.</param>
-		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMultiTenantMessagePumpWithHandlers(MessagePumpOptions options, string queueNamePrefix, TimeSpan? discoverQueuesInterval = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
-			: this(options, null, queueNamePrefix, discoverQueuesInterval, visibilityTimeout, maxDequeueCount, logger, metrics)
-		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMultiTenantMessagePumpWithHandlers"/> class.
-		/// </summary>
-		/// <param name="options">Options for the mesage pump.</param>
 		/// <param name="serviceProvider">DI.</param>
 		/// <param name="queueNamePrefix">The common prefix in the naming convention.</param>
 		/// <param name="discoverQueuesInterval">The frequency we check for queues in the Azure storage account matching the naming convention. Default is 30 seconds.</param>

@@ -72,17 +72,6 @@ namespace Picton.Messaging
 		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
 		/// </summary>
 		/// <param name="options">Options for the mesage pump.</param>
-		/// <param name="logger">The logger.</param>
-		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, ILogger logger = null, IMetrics metrics = null)
-			: this(options, null, logger, metrics)
-		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
-		/// </summary>
-		/// <param name="options">Options for the mesage pump.</param>
 		/// <param name="serviceProvider">DI.</param>
 		/// <param name="logger">The logger.</param>
 		/// <param name="metrics">The system where metrics are published.</param>

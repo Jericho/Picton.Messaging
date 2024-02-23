@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace Picton.Messaging.IntegrationTests
 {
-	internal class TestsRunner(ILogger<TestsRunner> logger, IServiceProvider serviceProvider)
+	internal class TestsRunner
 	{
 		private enum ResultCodes
 		{
@@ -20,8 +20,14 @@ namespace Picton.Messaging.IntegrationTests
 			Cancelled = 1223
 		}
 
-		private readonly ILogger<TestsRunner> _logger = logger;
-		private readonly IServiceProvider _serviceProvider = serviceProvider;
+		private readonly ILogger<TestsRunner> _logger;
+		private readonly IServiceProvider _serviceProvider;
+
+		public TestsRunner(ILogger<TestsRunner> logger, IServiceProvider serviceProvider)
+		{
+			_logger = logger;
+			_serviceProvider = serviceProvider;
+		}
 
 		public async Task<int> RunAsync()
 		{
