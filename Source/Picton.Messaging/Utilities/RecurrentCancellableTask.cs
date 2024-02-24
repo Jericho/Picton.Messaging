@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,7 +10,7 @@ namespace Picton.Messaging.Utilities
 	/// <remarks>
 	/// From a <a href="https://stackoverflow.com/a/35308832/153084">StackOverflow discussion</a>.
 	/// </remarks>
-	public static class RecurrentCancellableTask
+	internal static class RecurrentCancellableTask
 	{
 		/// <summary>
 		/// Starts a new task in a recurrent manner repeating it according to the polling interval.

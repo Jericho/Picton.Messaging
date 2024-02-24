@@ -1,4 +1,7 @@
-﻿namespace Picton.Messaging.Messages
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Picton.Messaging.Messages
 {
 	/// <summary>
 	/// Message handler interface.
@@ -8,9 +11,11 @@
 		where T : IMessage
 	{
 		/// <summary>
-		/// Handles the specified message.
+		/// Handles the specified message asynchronously.
 		/// </summary>
 		/// <param name="message">The message.</param>
-		void Handle(T message);
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <returns>The async task.</returns>
+		Task HandleAsync(T message, CancellationToken cancellationToken);
 	}
 }

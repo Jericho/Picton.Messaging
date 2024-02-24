@@ -12,9 +12,18 @@ namespace Picton.Messaging
 		/// </summary>
 		public static CounterOptions MessagesProcessedCounter => new()
 		{
-			Context = "Picton",
+			Context = "Picton.Messaging",
 			Name = "MessagesProcessedCount",
 			MeasurementUnit = Unit.Items
+		};
+
+		/// <summary>
+		/// Gets the timer indicating how long a message was in queue, waiting to be processed.
+		/// </summary>
+		public static TimerOptions MessageWaitBeforeProcessTimer => new()
+		{
+			Context = "Picton.Messaging",
+			Name = "MessageWaitBeforeProcessTimer"
 		};
 
 		/// <summary>
@@ -22,7 +31,7 @@ namespace Picton.Messaging
 		/// </summary>
 		public static TimerOptions MessageProcessingTimer => new()
 		{
-			Context = "Picton",
+			Context = "Picton.Messaging",
 			Name = "MessageProcessingTime"
 		};
 
@@ -31,7 +40,7 @@ namespace Picton.Messaging
 		/// </summary>
 		public static TimerOptions MessagesFetchingTimer => new()
 		{
-			Context = "Picton",
+			Context = "Picton.Messaging",
 			Name = "MessagesFetchingTime"
 		};
 
@@ -40,7 +49,7 @@ namespace Picton.Messaging
 		/// </summary>
 		public static CounterOptions QueueEmptyCounter => new()
 		{
-			Context = "Picton",
+			Context = "Picton.Messaging",
 			Name = "QueueEmptyCount"
 		};
 
@@ -49,7 +58,7 @@ namespace Picton.Messaging
 		/// </summary>
 		public static CounterOptions AllQueuesEmptyCounter => new()
 		{
-			Context = "Picton",
+			Context = "Picton.Messaging",
 			Name = "AllQueuesEmptyCount"
 		};
 
@@ -58,7 +67,7 @@ namespace Picton.Messaging
 		/// </summary>
 		public static GaugeOptions QueuedCloudMessagesGauge => new()
 		{
-			Context = "Picton",
+			Context = "Picton.Messaging",
 			Name = "QueuedCloudMessages",
 			MeasurementUnit = Unit.Items
 		};
@@ -68,7 +77,7 @@ namespace Picton.Messaging
 		/// </summary>
 		public static GaugeOptions QueuedMemoryMessagesGauge => new()
 		{
-			Context = "Picton",
+			Context = "Picton.Messaging",
 			Name = "QueuedMemoryMessages",
 			MeasurementUnit = Unit.Items
 		};

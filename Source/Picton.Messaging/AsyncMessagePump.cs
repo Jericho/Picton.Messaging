@@ -61,17 +61,30 @@ namespace Picton.Messaging
 		public Action<string, CloudMessage, Exception, bool> OnError { get; set; }
 
 		/// <summary>
-		/// Gets or sets the logic to execute when all queues are empty.
+		/// Gets or sets the logic to execute when a queue is empty.
 		/// </summary>
 		/// <example>
 		/// <code>
-		/// OnEmpty = cancellationToken => Task.Delay(2500, cancellationToken).Wait();
+		/// OnQueueEmpty = (queueName, cancellationToken) => _logger.LogInformation("Queue {queueName} is empty", queueName);
 		/// </code>
 		/// </example>
 		/// <remarks>
 		/// If this property is not set, the default logic is to do nothing.
 		/// </remarks>
-		public Action<CancellationToken> OnEmpty { get; set; }
+		public Action<string, CancellationToken> OnQueueEmpty { get; set; }
+
+		/// <summary>
+		/// Gets or sets the logic to execute when all queues are empty.
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// OnAllQueuesEmpty = cancellationToken => _logger.LogInformation("All queues are empty");
+		/// </code>
+		/// </example>
+		/// <remarks>
+		/// If this property is not set, the default logic is to do nothing.
+		/// </remarks>
+		public Action<CancellationToken> OnAllQueuesEmpty { get; set; }
 
 		#endregion
 
@@ -242,7 +255,7 @@ namespace Picton.Messaging
 			var channel = Channel.CreateUnbounded<(string QueueName, CloudMessage Message)>(channelOptions);
 			var channelCompleted = false;
 
-			// Define the task that fetches messages from the Azure queue
+			// Define the task that fetches messages from Azure
 			RecurrentCancellableTask.StartNew(
 				async () =>
 				{
@@ -258,7 +271,7 @@ namespace Picton.Messaging
 					}
 
 					// Mark the channel as "complete" which means that no more messages will be written to it
-					else if (!channelCompleted)
+					else if (cancellationToken.IsCancellationRequested && !channelCompleted)
 					{
 						channelCompleted = channel.Writer.TryComplete();
 					}
@@ -349,6 +362,13 @@ namespace Picton.Messaging
 							{
 								if (_queueManagers.TryGetValue(result.QueueName, out (QueueConfig Config, QueueManager QueueManager, QueueManager PoisonQueueManager, DateTime LastFetched, TimeSpan FetchDelay) queueInfo))
 								{
+									if (result.Message.InsertedOn.HasValue)
+									{
+										var elapsed = DateTimeOffset.UtcNow.Subtract(result.Message.InsertedOn.Value);
+										var messageWaitTime = (long)elapsed.TotalSeconds;
+										_metrics.Measure.Timer.Time(Metrics.MessageWaitBeforeProcessTimer, messageWaitTime);
+									}
+
 									using (_metrics.Measure.Timer.Time(Metrics.MessageProcessingTimer))
 									{
 										try
@@ -455,7 +475,7 @@ namespace Picton.Messaging
 
 							try
 							{
-								messages = await queueInfo.QueueManager.GetMessagesAsync(_messagePumpOptions.ConcurrentTasks, queueInfo.Config.VisibilityTimeout, cancellationToken).ConfigureAwait(false);
+								messages = await queueInfo.QueueManager.GetMessagesAsync(_messagePumpOptions.FetchCount, queueInfo.Config.VisibilityTimeout, cancellationToken).ConfigureAwait(false);
 							}
 							catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
 							{
@@ -496,6 +516,8 @@ namespace Picton.Messaging
 								if (delay > _messagePumpOptions.EmptyQueueMaxFetchDelay) delay = _messagePumpOptions.EmptyQueueMaxFetchDelay;
 
 								_queueManagers[queueName] = (queueInfo.Config, queueInfo.QueueManager, queueInfo.PoisonQueueManager, DateTime.UtcNow, delay);
+
+								OnQueueEmpty?.Invoke(queueName, cancellationToken);
 							}
 						}
 					}
@@ -516,7 +538,7 @@ namespace Picton.Messaging
 				{
 					// All queues are empty
 					_metrics.Measure.Counter.Increment(Metrics.AllQueuesEmptyCounter);
-					OnEmpty?.Invoke(cancellationToken);
+					OnAllQueuesEmpty?.Invoke(cancellationToken);
 				}
 				catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
 				{

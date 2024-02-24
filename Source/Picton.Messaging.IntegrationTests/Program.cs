@@ -23,6 +23,7 @@ namespace Picton.Messaging.IntegrationTests
 		{
 			services
 				.AddLogging(loggingBuilder => loggingBuilder.AddNLog(GetNLogConfiguration()))
+				.AddPictonMessageHandlers()
 				.AddTransient<TestsRunner>();
 		}
 

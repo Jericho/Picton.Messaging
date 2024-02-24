@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Picton.Managers;
 using Picton.Messaging.Utilities;
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,10 +17,9 @@ namespace Picton.Messaging
 	{
 		#region FIELDS
 
-		private static IDictionary<Type, Type[]> _messageHandlers;
-
-		private readonly AsyncMessagePump _messagePump;
 		private readonly ILogger _logger;
+		private readonly CloudMessageHandler _cloudMessageHandler;
+		private readonly AsyncMessagePump _messagePump;
 
 		#endregion
 
@@ -41,17 +39,30 @@ namespace Picton.Messaging
 		public Action<string, CloudMessage, Exception, bool> OnError { get; set; }
 
 		/// <summary>
-		/// Gets or sets the logic to execute when all queues are empty.
+		/// Gets or sets the logic to execute when a queue is empty.
 		/// </summary>
 		/// <example>
 		/// <code>
-		/// OnEmpty = cancellationToken => Task.Delay(2500, cancellationToken).Wait();
+		/// OnQueueEmpty = (queueName, cancellationToken) => _logger.LogInformation("Queue {queueName} is empty", queueName);
 		/// </code>
 		/// </example>
 		/// <remarks>
 		/// If this property is not set, the default logic is to do nothing.
 		/// </remarks>
-		public Action<CancellationToken> OnEmpty { get; set; }
+		public Action<string, CancellationToken> OnQueueEmpty { get; set; }
+
+		/// <summary>
+		/// Gets or sets the logic to execute when all queues are empty.
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// OnAllQueuesEmpty = (cancellationToken) => _logger.LogInformation("All queues are empty");
+		/// </code>
+		/// </example>
+		/// <remarks>
+		/// If this property is not set, the default logic is to do nothing.
+		/// </remarks>
+		public Action<CancellationToken> OnAllQueuesEmpty { get; set; }
 
 		#endregion
 
@@ -61,13 +72,14 @@ namespace Picton.Messaging
 		/// Initializes a new instance of the <see cref="AsyncMessagePumpWithHandlers"/> class.
 		/// </summary>
 		/// <param name="options">Options for the mesage pump.</param>
+		/// <param name="serviceProvider">DI.</param>
 		/// <param name="logger">The logger.</param>
 		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, ILogger logger = null, IMetrics metrics = null)
+		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, IServiceProvider serviceProvider, ILogger logger = null, IMetrics metrics = null)
 		{
-			_messageHandlers = MessageHandlersDiscoverer.GetMessageHandlers(logger);
-			_messagePump = new AsyncMessagePump(options, logger, metrics);
 			_logger = logger;
+			_cloudMessageHandler = new CloudMessageHandler(serviceProvider);
+			_messagePump = new AsyncMessagePump(options, logger, metrics);
 		}
 
 		#endregion
@@ -105,6 +117,28 @@ namespace Picton.Messaging
 		}
 
 		/// <summary>
+		/// Add queues that meet the specified RegEx pattern.
+		/// </summary>
+		/// <remarks>
+		/// All the queues that match the specified pattern will share the same poison queue if you specify the name of the poison queue.
+		/// If you omit this value, each queue will get their own poison queue.
+		///
+		/// Similarly, all the queues that match the specified pattern will share the same oversize messages storage if you specify the name of the blob storage container.
+		/// If you omit this value, each queue will get their own blob container.
+		/// </remarks>
+		/// <param name="queueNamePattern">The RegEx pattern.</param>
+		/// <param name="poisonQueueName">Optional. The name of the queue where poison messages are automatically moved.</param>
+		/// <param name="visibilityTimeout">Optional. Specifies the visibility timeout value. The default value is 30 seconds.</param>
+		/// <param name="maxDequeueCount">Optional. A nonzero integer value that specifies the number of time we try to process a message before giving up and declaring the message to be "poison". The default value is 3.</param>
+		/// <param name="oversizeMessagesBlobStorageName">Name of the blob storage where messages that exceed the maximum size for a queue message are stored.</param>
+		/// <param name="cancellationToken">The cancellation token.</param>
+		/// <returns>The async task.</returns>
+		public Task AddQueuesByPatternAsync(string queueNamePattern, string poisonQueueName = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, string oversizeMessagesBlobStorageName = null, CancellationToken cancellationToken = default)
+		{
+			return _messagePump.AddQueuesByPatternAsync(queueNamePattern, poisonQueueName, visibilityTimeout, maxDequeueCount, oversizeMessagesBlobStorageName, cancellationToken);
+		}
+
+		/// <summary>
 		/// Starts the message pump.
 		/// </summary>
 		/// <param name="cancellationToken">The cancellation token.</param>
@@ -112,32 +146,12 @@ namespace Picton.Messaging
 		/// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
 		public Task StartAsync(CancellationToken cancellationToken)
 		{
-			_messagePump.OnEmpty = OnEmpty;
+			_messagePump.OnQueueEmpty = OnQueueEmpty;
+			_messagePump.OnAllQueuesEmpty = OnAllQueuesEmpty;
 			_messagePump.OnError = OnError;
-			_messagePump.OnMessage = (queueName, message, cancellationToken) =>
+			_messagePump.OnMessage = async (queueName, message, cancellationToken) =>
 			{
-				var contentType = message.Content.GetType();
-
-				if (!_messageHandlers.TryGetValue(contentType, out Type[] handlers))
-				{
-					throw new Exception($"Received a message of type {contentType.FullName} but could not find a class implementing IMessageHandler<{contentType.FullName}>");
-				}
-
-				foreach (var handlerType in handlers)
-				{
-					object handler = null;
-					if (handlerType.GetConstructor([typeof(ILogger)]) != null)
-					{
-						handler = Activator.CreateInstance(handlerType, [(object)_logger]);
-					}
-					else
-					{
-						handler = Activator.CreateInstance(handlerType);
-					}
-
-					var handlerMethod = handlerType.GetMethod("Handle", [contentType]);
-					handlerMethod.Invoke(handler, [message.Content]);
-				}
+				await _cloudMessageHandler.HandleMessageAsync(message, cancellationToken).ConfigureAwait(false);
 			};
 
 			return _messagePump.StartAsync(cancellationToken);
@@ -151,28 +165,6 @@ namespace Picton.Messaging
 		internal void AddQueue(QueueManager queueManager, QueueManager poisonQueueManager, TimeSpan? visibilityTimeout, int maxDequeueCount)
 		{
 			_messagePump.AddQueue(queueManager, poisonQueueManager, visibilityTimeout, maxDequeueCount);
-		}
-
-		private void ValidateOptions(MessagePumpOptions options)
-		{
-			if (options == null) throw new ArgumentNullException(nameof(options));
-			if (string.IsNullOrEmpty(options.ConnectionString)) throw new ArgumentNullException(nameof(options.ConnectionString));
-			if (options.ConcurrentTasks < 1) throw new ArgumentOutOfRangeException(nameof(options.ConcurrentTasks), "Number of concurrent tasks must be greather than zero");
-		}
-
-		private void ValidateQueueConfig(QueueConfig queueConfig)
-		{
-			if (queueConfig == null) throw new ArgumentNullException(nameof(queueConfig));
-			if (string.IsNullOrEmpty(queueConfig.QueueName)) throw new ArgumentNullException(nameof(queueConfig.QueueName));
-			if (queueConfig.MaxDequeueCount < 1) throw new ArgumentOutOfRangeException(nameof(queueConfig.MaxDequeueCount), $"Number of retries for {queueConfig.QueueName} must be greater than zero.");
-		}
-
-		private void ValidateQueueConfigs(IEnumerable<QueueConfig> queueConfigs)
-		{
-			foreach (var queueConfig in queueConfigs)
-			{
-				ValidateQueueConfig(queueConfig);
-			}
 		}
 
 		#endregion

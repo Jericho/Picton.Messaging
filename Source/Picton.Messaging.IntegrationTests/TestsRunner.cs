@@ -5,12 +5,13 @@ using Picton.Managers;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Picton.Messaging.IntegrationTests
 {
-	internal class TestsRunner(ILogger<TestsRunner> logger)
+	internal class TestsRunner
 	{
 		private enum ResultCodes
 		{
@@ -19,10 +20,20 @@ namespace Picton.Messaging.IntegrationTests
 			Cancelled = 1223
 		}
 
-		private readonly ILogger _logger = logger;
+		private readonly ILogger<TestsRunner> _logger;
+		private readonly IServiceProvider _serviceProvider;
+
+		public TestsRunner(ILogger<TestsRunner> logger, IServiceProvider serviceProvider)
+		{
+			_logger = logger;
+			_serviceProvider = serviceProvider;
+		}
 
 		public async Task<int> RunAsync()
 		{
+			ServicePointManager.DefaultConnectionLimit = 1000;
+			ServicePointManager.UseNagleAlgorithm = false;
+
 			// Configure Console
 			var cts = new CancellationTokenSource();
 			Console.CancelKeyPress += (s, e) =>
@@ -114,13 +125,10 @@ namespace Picton.Messaging.IntegrationTests
 					_logger.LogInformation("{messageContent}", message.Content.ToString());
 				},
 
-				// Stop the timer and the message pump when the queue is empty.
-				OnEmpty = cancellationToken =>
+				// Stop the message pump when there are no more messages to process.
+				OnAllQueuesEmpty = cancellationToken =>
 				{
-					// Stop the timer
 					if (sw.IsRunning) sw.Stop();
-
-					// Stop the message pump
 					_logger.LogDebug("Asking the message pump to stop...");
 					cts.Cancel();
 				}
@@ -156,15 +164,12 @@ namespace Picton.Messaging.IntegrationTests
 			Stopwatch sw = null;
 			var cts = new CancellationTokenSource();
 			var options = new MessagePumpOptions(connectionString, concurrentTasks, null, null);
-			var messagePump = new AsyncMessagePumpWithHandlers(options, _logger, metrics)
+			var messagePump = new AsyncMessagePumpWithHandlers(options, _serviceProvider, _logger, metrics)
 			{
-				// Stop the timer and the message pump when the queue is empty.
-				OnEmpty = cancellationToken =>
+				// Stop the message pump when there are no more messages to process.
+				OnAllQueuesEmpty = cancellationToken =>
 				{
-					// Stop the timer
 					if (sw.IsRunning) sw.Stop();
-
-					// Stop the message pump
 					_logger.LogDebug("Asking the message pump with handlers to stop...");
 					cts.Cancel();
 				}
@@ -211,13 +216,10 @@ namespace Picton.Messaging.IntegrationTests
 					_logger.LogInformation("{tenantId} - {messageContent}", tenantId, message.Content.ToString());
 				},
 
-				// Stop the timer and the message pump when all tenant queues are empty.
-				OnEmpty = cancellationToken =>
+				// Stop the message pump when there are no more messages to process.
+				OnAllQueuesEmpty = cancellationToken =>
 				{
-					// Stop the timer
 					if (sw.IsRunning) sw.Stop();
-
-					// Stop the message pump
 					_logger.LogDebug("Asking the multi-tenant message pump to stop...");
 					cts.Cancel();
 				}

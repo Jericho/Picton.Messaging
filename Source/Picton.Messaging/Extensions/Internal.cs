@@ -5,12 +5,10 @@ using System.Threading.Tasks;
 namespace Picton.Messaging
 {
 	/// <summary>
-	/// Extension methods.
+	/// Internal extension methods.
 	/// </summary>
-	internal static class Extensions
+	internal static class Internal
 	{
-		#region PUBLIC EXTENSION METHODS
-
 		/// <summary>
 		/// The purpose of this extension method is to avoid a Visual Studio warning about async calls that are not awaited.
 		/// </summary>
@@ -68,7 +66,5 @@ namespace Picton.Messaging
 
 			return result.ToString().Trim();
 		}
-
-		#endregion
 	}
 }
