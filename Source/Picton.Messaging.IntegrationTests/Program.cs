@@ -23,13 +23,7 @@ namespace Picton.Messaging.IntegrationTests
 		{
 			services
 				.AddLogging(loggingBuilder => loggingBuilder.AddNLog(GetNLogConfiguration()))
-
-				// You can either register each message handler by hand like this example:
-				//.AddSingleton<IMessageHandler<MyMessage>, MyMessageHandler>()
-
-				// Or you can allow Picton.Messaging to scan your assemblies and to register all message handlers like this:
 				.AddPictonMessageHandlers()
-
 				.AddTransient<TestsRunner>();
 		}
 

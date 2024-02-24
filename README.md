@@ -45,71 +45,41 @@ The easiest way to include Picton.Messaging in your C# project is by grabing the
 PM> Install-Package Picton.Messaging
 ```
 
-Once you have the Picton.Messaging library properly referenced in your project, modify your RoleEntryPoint like this example:
+## How to use
+
+Once you have the Picton.Messaging library properly referenced in your project, you need to following two CSharp files:
+
+### Program.cs
 
 ```csharp
-using Microsoft.WindowsAzure.ServiceRuntime;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.RetryPolicies;
+using WorkerService1;
+
+var builder = Host.CreateApplicationBuilder(args);
+builder.Services.AddHostedService<Worker>();
+
+var host = builder.Build();
+host.Run();
+```
+
+### Worker.cs
+
+```csharp
 using Picton.Messaging;
-using System;
-using System.Diagnostics;
 
-namespace WorkerRole1
+namespace WorkerService1
 {
-    public class MyWorkerRole : RoleEntryPoint
+    public class Worker : BackgroundService
     {
-        private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
-        private readonly ManualResetEvent runCompleteEvent = new ManualResetEvent(false);
+        private readonly ILogger<Worker> _logger;
 
-        public override void Run()
+        public Worker(ILogger<Worker> logger)
         {
-            Trace.TraceInformation("WorkerRole is running");
-
-            try
-            {
-                this.RunAsync(this.cancellationTokenSource.Token).Wait(); // <-- The cancellation token is important because it will be used to stop the message pump
-            }
-            finally
-            {
-                this.runCompleteEvent.Set();
-            }
+            _logger = logger;
         }
-
-        public override bool OnStart()
+        
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // Use TLS 1.2 for Service Bus connections
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-
-            // Set the maximum number of concurrent connections
-            ServicePointManager.DefaultConnectionLimit = 12;
-
-            // For information on handling configuration changes
-            // see the MSDN topic at https://go.microsoft.com/fwlink/?LinkId=166357.
-
-            bool result = base.OnStart();
-
-            Trace.TraceInformation("WorkerRole has been started");
-
-            return result;
-        }
-
-        public override void OnStop()
-        {
-            Trace.TraceInformation("WorkerRole is stopping");
-
-            // Invoking "Cancel()" will cause the AsyncMessagePump to stop
-            this.cancellationTokenSource.Cancel();
-            this.runCompleteEvent.WaitOne();
-
-            base.OnStop();
-
-            Trace.TraceInformation("WorkerRole has stopped");
-        }
-
-        private async Task RunAsync(CancellationToken cancellationToken)
-        {
-            var connectionString = "<-- insert connection string for your Azure account -->";
+            var connectionString = "<--  connection string for your Azure storage account -->";
             var concurrentTask = 10; // <-- this is the max number of messages that can be processed at a time
 
             // Configure the message pump
@@ -155,11 +125,83 @@ namespace WorkerRole1
             messagePump.AddQueue("queue06", "my-poison-queue", TimeSpan.FromMinutes(1), 3, "large-messages-blob");
             messagePump.AddQueue("queue07", "my-poison-queue", TimeSpan.FromMinutes(1), 3, "large-messages-blob");
 
-            // You can add queues that match a given RegEx pattern
+            // You can add all queues matching a given RegEx pattern
             await messagePump.AddQueuesByPatternAsync("myqueue*", "my-poison-queue", TimeSpan.FromMinutes(1), 3, "large-messages-blob", cancellationToken).ConfigureAwait(false);
 
-            // Start the message pump
-            await messagePump.StartAsync(cancellationToken); // <-- Specifying the cancellation token is particularly important because that's how you later communicate to the message pump that you want it to stop
+            // Start the mesage pump (the token is particularly important because that's how the message pump will be notified when the worker is stopping)
+            await messagePump.StartAsync(stoppingToken).ConfigureAwait(false);
+        }
+    }
+}
+```
+
+## Message handlers
+
+As demonstrated in the previous code sample, you can define your own `OnMessage` delegate which gets invoked by the message pump when each message is processed. This is perfect for simple scenarios where your C# logic is rather simple. However, your C# code can become complicated pretty quickly as the complexity of your logic increases.
+
+The Picton.Messaging library includes a more advanced message pump that can simplify this situation for you: `AsyncMessagePumpWithHandlers`. You C# project must define so-called "handlers" for each of your message types. These handlers are simply c# classes that implement the `IMessageHandler<T>` interface, where `T` is the type of the message. For example, if you expect to process messages of type `MyMessage`, you must define a class with signature similar to this: `public class MyMessageHandler : IMessageHandler<MyMessage>`.
+
+Once you have created all the handlers you need, you must register them with your solution's DI service collection like in this example:
+
+### Program.cs
+
+```csharp
+using Picton.Messaging;
+using WorkerService1;
+
+var builder = Host.CreateApplicationBuilder(args);
+builder.Services.AddHostedService<Worker>();
+
+/*
+    You can either register your message handlers one by one like this:
+    
+    builder.Services.AddSingleton<IMessageHandler<MyMessage>, MyMessageHandler>()
+    builder.Services.AddSingleton<IMessageHandler<MyOtherMessage>, MyOtherMessageHandler>()
+    builder.Services.AddSingleton<IMessageHandler<AnotherMessage>, AnotherMessageHandler>()
+*/
+
+// Or you can allow Picton.Messaging to scan your assemblies and to register all message handlers like this:
+builder.Services.AddPictonMessageHandlers()
+
+var host = builder.Build();
+host.Run();
+```
+
+### Worker.cs
+
+```csharp
+using Picton.Messaging;
+
+namespace WorkerService1
+{
+    public class Worker : BackgroundService
+    {
+        private readonly IServiceProvider _serviceProvider;
+        private readonly ILogger<Worker> _logger;
+
+        public Worker(IServiceProvider serviceProvider, ILogger<Worker> logger)
+        {
+            _serviceProvider = serviceProvider;
+            _logger = logger;
+        }
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            var connectionString = "<--  connection string for your Azure storage account -->";
+            var concurrentTask = 10; // <-- this is the max number of messages that can be processed at a time
+
+            var options = new MessagePumpOptions(connectionString, concurrentTasks, null, null);
+            var messagePump = new AsyncMessagePumpWithHandlers(options, _serviceProvider, _logger)
+            {
+                OnError = (queueName, message, exception, isPoison) =>
+                {
+                    // Insert your custom error handling
+                }
+            };
+
+            messagePump.AddQueue("myqueue", null, TimeSpan.FromMinutes(1), 3);
+
+            await messagePump.StartAsync(stoppingToken).ConfigureAwait(false);
         }
     }
 }
