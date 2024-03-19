@@ -208,47 +208,7 @@ namespace Picton.Messaging
 		public async Task StartAsync(CancellationToken cancellationToken)
 		{
 			if (OnMessage == null) throw new ArgumentNullException(nameof(OnMessage));
-			await ProcessMessagesAsync(cancellationToken).ConfigureAwait(false);
-		}
 
-		#endregion
-
-		#region PRIVATE METHODS
-
-		// This internal method is primarily for unit testing purposes. It allows me to inject mocked queue managers
-		internal void AddQueue(QueueManager queueManager, QueueManager poisonQueueManager, TimeSpan? visibilityTimeout, int maxDequeueCount)
-		{
-			if (queueManager == null) throw new ArgumentNullException(nameof(queueManager));
-			if (string.IsNullOrEmpty(queueManager.QueueName)) throw new ArgumentNullException(nameof(queueManager.QueueName));
-			if (maxDequeueCount < 1) throw new ArgumentOutOfRangeException(nameof(maxDequeueCount), "Number of retries must be greater than zero.");
-
-			var queueConfig = new QueueConfig(queueManager.QueueName, poisonQueueManager?.QueueName, visibilityTimeout, maxDequeueCount);
-
-			_queueManagers.AddOrUpdate(
-				queueManager.QueueName,
-				(queueName) => (queueConfig, queueManager, poisonQueueManager, DateTime.MinValue, TimeSpan.Zero),
-				(queueName, oldConfig) => (queueConfig, queueManager, poisonQueueManager, oldConfig.LastFetched, oldConfig.FetchDelay));
-			_queueNames.AddItem(queueManager.QueueName);
-		}
-
-		private void InitDefaultActions()
-		{
-			OnError = (queueName, message, exception, isPoison) => _logger?.LogError(exception, "An error occured when processing a message in {queueName}", queueName);
-		}
-
-		private IMetrics TurnOffMetrics()
-		{
-			var metricsTurnedOff = new MetricsBuilder();
-			metricsTurnedOff.Configuration.Configure(new MetricsOptions()
-			{
-				Enabled = false,
-				ReportingEnabled = false
-			});
-			return metricsTurnedOff.Build();
-		}
-
-		private async Task ProcessMessagesAsync(CancellationToken cancellationToken)
-		{
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlim(_messagePumpOptions.ConcurrentTasks, _messagePumpOptions.ConcurrentTasks);
 			var channelOptions = new UnboundedChannelOptions() { SingleReader = false, SingleWriter = true };
@@ -446,6 +406,42 @@ namespace Picton.Messaging
 
 			// Task pump has been canceled, wait for the currently running tasks to complete
 			await Task.WhenAll(runningTasks.Values).UntilCancelled().ConfigureAwait(false);
+		}
+
+		#endregion
+
+		#region PRIVATE METHODS
+
+		// This internal method is primarily for unit testing purposes. It allows me to inject mocked queue managers
+		internal void AddQueue(QueueManager queueManager, QueueManager poisonQueueManager, TimeSpan? visibilityTimeout, int maxDequeueCount)
+		{
+			if (queueManager == null) throw new ArgumentNullException(nameof(queueManager));
+			if (string.IsNullOrEmpty(queueManager.QueueName)) throw new ArgumentNullException(nameof(queueManager.QueueName));
+			if (maxDequeueCount < 1) throw new ArgumentOutOfRangeException(nameof(maxDequeueCount), "Number of retries must be greater than zero.");
+
+			var queueConfig = new QueueConfig(queueManager.QueueName, poisonQueueManager?.QueueName, visibilityTimeout, maxDequeueCount);
+
+			_queueManagers.AddOrUpdate(
+				queueManager.QueueName,
+				(queueName) => (queueConfig, queueManager, poisonQueueManager, DateTime.MinValue, TimeSpan.Zero),
+				(queueName, oldConfig) => (queueConfig, queueManager, poisonQueueManager, oldConfig.LastFetched, oldConfig.FetchDelay));
+			_queueNames.AddItem(queueManager.QueueName);
+		}
+
+		private void InitDefaultActions()
+		{
+			OnError = (queueName, message, exception, isPoison) => _logger?.LogError(exception, "An error occured when processing a message in {queueName}", queueName);
+		}
+
+		private IMetrics TurnOffMetrics()
+		{
+			var metricsTurnedOff = new MetricsBuilder();
+			metricsTurnedOff.Configuration.Configure(new MetricsOptions()
+			{
+				Enabled = false,
+				ReportingEnabled = false
+			});
+			return metricsTurnedOff.Build();
 		}
 
 		private async IAsyncEnumerable<(string QueueName, CloudMessage Message)> FetchMessages([EnumeratorCancellation] CancellationToken cancellationToken)
