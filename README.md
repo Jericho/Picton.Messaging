@@ -155,9 +155,9 @@ builder.Services.AddHostedService<Worker>();
 /*
     You can either register your message handlers one by one like this:
     
-    builder.Services.AddSingleton<IMessageHandler<MyMessage>, MyMessageHandler>()
-    builder.Services.AddSingleton<IMessageHandler<MyOtherMessage>, MyOtherMessageHandler>()
-    builder.Services.AddSingleton<IMessageHandler<AnotherMessage>, AnotherMessageHandler>()
+    builder.Services.AddTransient<IMessageHandler<MyMessage>, MyMessageHandler>()
+    builder.Services.AddTransient<IMessageHandler<MyOtherMessage>, MyOtherMessageHandler>()
+    builder.Services.AddTransient<IMessageHandler<AnotherMessage>, AnotherMessageHandler>()
 */
 
 // Or you can allow Picton.Messaging to scan your assemblies and to register all message handlers like this:

@@ -41,7 +41,7 @@ namespace Picton.Messaging
 			{
 				foreach (var interfaceType in handlerType.InterfaceTypes)
 				{
-					services.AddSingleton(interfaceType, handlerType.HandlerType);
+					services.AddTransient(interfaceType, handlerType.HandlerType);
 				}
 			}
 
