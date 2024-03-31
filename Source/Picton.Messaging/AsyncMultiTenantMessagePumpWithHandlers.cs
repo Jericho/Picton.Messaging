@@ -1,7 +1,7 @@
-using App.Metrics;
 using Microsoft.Extensions.Logging;
 using Picton.Messaging.Utilities;
 using System;
+using System.Diagnostics.Metrics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -77,13 +77,13 @@ namespace Picton.Messaging
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="logger">The logger.</param>
-		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMultiTenantMessagePumpWithHandlers(MessagePumpOptions options, IServiceProvider serviceProvider, string queueNamePrefix, TimeSpan? discoverQueuesInterval = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+		/// <param name="meterFactory">The meter factory.</param>
+		public AsyncMultiTenantMessagePumpWithHandlers(MessagePumpOptions options, IServiceProvider serviceProvider, string queueNamePrefix, TimeSpan? discoverQueuesInterval = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMeterFactory meterFactory = null)
 		{
 			_queueNamePrefix = queueNamePrefix;
 			_logger = logger;
 			_cloudMessageHandler = new CloudMessageHandler(serviceProvider);
-			_messagePump = new AsyncMultiTenantMessagePump(options, queueNamePrefix, discoverQueuesInterval, visibilityTimeout, maxDequeueCount, logger, metrics);
+			_messagePump = new AsyncMultiTenantMessagePump(options, queueNamePrefix, discoverQueuesInterval, visibilityTimeout, maxDequeueCount, logger, meterFactory);
 		}
 
 		#endregion

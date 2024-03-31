@@ -1,85 +1,61 @@
-using App.Metrics;
-using App.Metrics.Counter;
-using App.Metrics.Gauge;
-using App.Metrics.Timer;
+using System.Diagnostics.Metrics;
 
 namespace Picton.Messaging
 {
-	internal static class Metrics
+	internal class Metrics
 	{
+		public Metrics(IMeterFactory meterFactory)
+		{
+			var meter = meterFactory.Create("Picton.Messaging");
+
+			MessagesProcessed = meter.CreateCounter<int>("picton.messaging.messages_processed", null, "The number of messages processed by the message pump.");
+			MessageWaitBeforeProcess = meter.CreateHistogram<long>("picton.messaging.message_wait_before_process", null, "How long a message was in queue, waiting to be processed.");
+			MessageProcessing = meter.CreateHistogram<long>("picton.messaging.message_processing", null, "The time it takes to process a message.");
+			MessagesFetching = meter.CreateHistogram<long>("picton.messaging.messages_fetching", null, "The time it takes to fetch a batch of messages from the Azure queue.");
+			QueueEmpty = meter.CreateCounter<int>("picton.messaging.queue_empty", null, "The number of times we attempted to fetch messages from an Azure queue but it was empty.");
+			AllQueuesEmpty = meter.CreateCounter<int>("picton.messaging.all_queues_empty", null, "The number of times we attempted to fetch messages from Azure but all the queues are empty.");
+			QueuedCloudMessages = meter.CreateHistogram<int>("picton.messaging.queued_cloud_messages", null, "The number of messages waiting in the Azure queue over time.");
+			QueuedMemoryMessages = meter.CreateHistogram<int>("picton.messaging.queued_memory_messages", null, "The number of messages waiting in the memory queue over time.");
+		}
+
 		/// <summary>
 		/// Gets the counter indicating the number of messages processed by the message pump.
 		/// </summary>
-		public static CounterOptions MessagesProcessedCounter => new()
-		{
-			Context = "Picton.Messaging",
-			Name = "MessagesProcessedCount",
-			MeasurementUnit = Unit.Items
-		};
+		public Counter<int> MessagesProcessed { get; private set; }
 
 		/// <summary>
 		/// Gets the timer indicating how long a message was in queue, waiting to be processed.
 		/// </summary>
-		public static TimerOptions MessageWaitBeforeProcessTimer => new()
-		{
-			Context = "Picton.Messaging",
-			Name = "MessageWaitBeforeProcessTimer"
-		};
+		public Histogram<long> MessageWaitBeforeProcess { get; private set; }
 
 		/// <summary>
 		/// Gets the timer indicating the time it takes to process a message.
 		/// </summary>
-		public static TimerOptions MessageProcessingTimer => new()
-		{
-			Context = "Picton.Messaging",
-			Name = "MessageProcessingTime"
-		};
+		public Histogram<long> MessageProcessing { get; private set; }
 
 		/// <summary>
 		/// Gets the timer indicating the time it takes to fetch a batch of messages from the Azure queue.
 		/// </summary>
-		public static TimerOptions MessagesFetchingTimer => new()
-		{
-			Context = "Picton.Messaging",
-			Name = "MessagesFetchingTime"
-		};
+		public Histogram<long> MessagesFetching { get; private set; }
 
 		/// <summary>
 		/// Gets the counter indicating the number of times we attempted to fetch messages from an Azure queue but it was empty.
 		/// </summary>
-		public static CounterOptions QueueEmptyCounter => new()
-		{
-			Context = "Picton.Messaging",
-			Name = "QueueEmptyCount"
-		};
+		public Counter<int> QueueEmpty { get; private set; }
 
 		/// <summary>
 		/// Gets the counter indicating the number of times we attempted to fetch messages from Azure but all the queues are empty.
 		/// </summary>
-		public static CounterOptions AllQueuesEmptyCounter => new()
-		{
-			Context = "Picton.Messaging",
-			Name = "AllQueuesEmptyCount"
-		};
+		public Counter<int> AllQueuesEmpty { get; private set; }
 
 		/// <summary>
 		/// Gets the gauge indicating the number of messages waiting in the Azure queue over time.
 		/// </summary>
-		public static GaugeOptions QueuedCloudMessagesGauge => new()
-		{
-			Context = "Picton.Messaging",
-			Name = "QueuedCloudMessages",
-			MeasurementUnit = Unit.Items
-		};
+		public Histogram<int> QueuedCloudMessages { get; private set; }
 
 		/// <summary>
 		/// Gets the gauge indicating the number of messages waiting in the memory queue over time.
 		/// </summary>
-		public static GaugeOptions QueuedMemoryMessagesGauge => new()
-		{
-			Context = "Picton.Messaging",
-			Name = "QueuedMemoryMessages",
-			MeasurementUnit = Unit.Items
-		};
+		public Histogram<int> QueuedMemoryMessages { get; private set; }
 	}
 }

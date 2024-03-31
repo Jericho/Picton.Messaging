@@ -1,10 +1,10 @@
-using App.Metrics;
 using Azure;
 using Azure.Storage.Queues;
 using Azure.Storage.Queues.Models;
 using Microsoft.Extensions.Logging;
 using Picton.Messaging.Utilities;
 using System;
+using System.Diagnostics.Metrics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -103,8 +103,8 @@ namespace Picton.Messaging
 		/// <param name="visibilityTimeout">The visibility timeout.</param>
 		/// <param name="maxDequeueCount">The maximum dequeue count.</param>
 		/// <param name="logger">The logger.</param>
-		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMultiTenantMessagePump(MessagePumpOptions options, string queueNamePrefix, TimeSpan? discoverQueuesInterval = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMetrics metrics = null)
+		/// <param name="meterFactory">The meter factory.</param>
+		public AsyncMultiTenantMessagePump(MessagePumpOptions options, string queueNamePrefix, TimeSpan? discoverQueuesInterval = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMeterFactory meterFactory = null)
 		{
 			if (discoverQueuesInterval != null && discoverQueuesInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(discoverQueuesInterval), "The 'discover queues' interval must be greater than zero.");
 
@@ -114,7 +114,7 @@ namespace Picton.Messaging
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
 			_logger = logger;
-			_messagePump = new AsyncMessagePump(options, logger, metrics);
+			_messagePump = new AsyncMessagePump(options, logger, meterFactory);
 		}
 
 		#endregion
