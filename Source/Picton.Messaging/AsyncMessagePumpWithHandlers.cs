@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Picton.Managers;
 using Picton.Messaging.Utilities;
 using System;
@@ -77,7 +78,7 @@ namespace Picton.Messaging
 		/// <param name="meterFactory">The meter factory.</param>
 		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, IServiceProvider serviceProvider, ILogger logger = null, IMeterFactory meterFactory = null)
 		{
-			_logger = logger;
+			_logger = logger ?? NullLogger<AsyncMessagePumpWithHandlers>.Instance;
 			_cloudMessageHandler = new CloudMessageHandler(serviceProvider);
 			_messagePump = new AsyncMessagePump(options, logger, meterFactory);
 		}

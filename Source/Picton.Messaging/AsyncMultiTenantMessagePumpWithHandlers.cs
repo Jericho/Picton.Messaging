@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Picton.Messaging.Utilities;
 using System;
 using System.Diagnostics.Metrics;
@@ -81,7 +82,7 @@ namespace Picton.Messaging
 		public AsyncMultiTenantMessagePumpWithHandlers(MessagePumpOptions options, IServiceProvider serviceProvider, string queueNamePrefix, TimeSpan? discoverQueuesInterval = null, TimeSpan? visibilityTimeout = null, int maxDequeueCount = 3, ILogger logger = null, IMeterFactory meterFactory = null)
 		{
 			_queueNamePrefix = queueNamePrefix;
-			_logger = logger;
+			_logger = logger ?? NullLogger<AsyncMultiTenantMessagePumpWithHandlers>.Instance;
 			_cloudMessageHandler = new CloudMessageHandler(serviceProvider);
 			_messagePump = new AsyncMultiTenantMessagePump(options, queueNamePrefix, discoverQueuesInterval, visibilityTimeout, maxDequeueCount, logger, meterFactory);
 		}

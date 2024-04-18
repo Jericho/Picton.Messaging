@@ -2,6 +2,7 @@ using Azure;
 using Azure.Storage.Queues;
 using Azure.Storage.Queues.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Picton.Managers;
 using Picton.Messaging.Utilities;
 using System;
@@ -106,7 +107,7 @@ namespace Picton.Messaging
 			if (options.EmptyQueueMaxFetchDelay < options.EmptyQueueFetchDelay) throw new ArgumentOutOfRangeException($"{nameof(options)}.{nameof(options.EmptyQueueMaxFetchDelay)}", "Max fetch delay can not be smaller than fetch delay");
 
 			_messagePumpOptions = options;
-			_logger = logger;
+			_logger = logger ?? NullLogger<AsyncMessagePump>.Instance;
 			_metrics = meterFactory != null ? new Metrics(meterFactory) : null;
 
 			OnError = (queueName, message, exception, isPoison) => _logger?.LogError(exception, "An error occured when processing a message in {queueName}", queueName);
@@ -270,7 +271,7 @@ namespace Picton.Messaging
 							}
 							catch (Exception e)
 							{
-								_logger?.ErrorIgnored("checking how many message are waiting in Azure", e.GetBaseException());
+								_logger.ErrorIgnored("checking how many message are waiting in Azure", e.GetBaseException());
 							}
 						}
 
@@ -293,7 +294,7 @@ namespace Picton.Messaging
 						}
 						catch (Exception e)
 						{
-							_logger?.ErrorIgnored("checking how many messages are waiting in the memory queue", e.GetBaseException());
+							_logger.ErrorIgnored("checking how many messages are waiting in the memory queue", e.GetBaseException());
 						}
 
 						return Task.CompletedTask;
@@ -348,8 +349,8 @@ namespace Picton.Messaging
 										}
 										catch (Exception e)
 										{
-											_logger?.ErrorIgnoredForQueue("handling and exception", result.QueueName, e.GetBaseException());
-											_logger?.LogError(e.GetBaseException(), "An error occured when handling an exception for {queueName}. The error was caught and ignored.", result.QueueName);
+											_logger.ErrorIgnoredForQueue("handling and exception", result.QueueName, e.GetBaseException());
+											_logger.LogError(e.GetBaseException(), "An error occured when handling an exception for {queueName}. The error was caught and ignored.", result.QueueName);
 										}
 
 										if (isPoison)
@@ -436,7 +437,7 @@ namespace Picton.Messaging
 
 			if (_queueNames.Count == 0)
 			{
-				_logger?.NoQueuesMonitored();
+				_logger.NoQueuesMonitored();
 				yield break;
 			}
 
@@ -470,13 +471,13 @@ namespace Picton.Messaging
 						}
 						catch (Exception e)
 						{
-							_logger?.ErrorIgnoredForQueue("fetching messages", queueName, e.GetBaseException());
+							_logger.ErrorIgnoredForQueue("fetching messages", queueName, e.GetBaseException());
 						}
 
 						if (messages != null && messages.Any())
 						{
 							var messagesCount = messages.Count();
-							_logger?.FetchedMessagesForQueue(messagesCount, queueName);
+							_logger.FetchedMessagesForQueue(messagesCount, queueName);
 
 							foreach (var message in messages)
 							{
@@ -489,7 +490,7 @@ namespace Picton.Messaging
 						}
 						else
 						{
-							_logger?.NoMessagesInQueue(queueName);
+							_logger.NoMessagesInQueue(queueName);
 							_metrics?.QueueEmpty.Add(1);
 
 							// Set a "reasonable" fetch delay to ensure we don't query an empty queue too often
@@ -516,7 +517,7 @@ namespace Picton.Messaging
 
 			if (messageCount == 0)
 			{
-				_logger?.TenantQueuesAreEmpty();
+				_logger.TenantQueuesAreEmpty();
 				try
 				{
 					// All queues are empty
@@ -530,7 +531,7 @@ namespace Picton.Messaging
 				}
 				catch (Exception e)
 				{
-					_logger?.ErrorIgnored("handling empty queues", e.GetBaseException());
+					_logger.ErrorIgnored("handling empty queues", e.GetBaseException());
 				}
 			}
 		}

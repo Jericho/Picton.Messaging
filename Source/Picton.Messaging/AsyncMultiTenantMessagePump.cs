@@ -2,6 +2,7 @@ using Azure;
 using Azure.Storage.Queues;
 using Azure.Storage.Queues.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Picton.Messaging.Utilities;
 using System;
 using System.Diagnostics.Metrics;
@@ -113,7 +114,7 @@ namespace Picton.Messaging
 			_discoverQueuesInterval = discoverQueuesInterval ?? _defaultDiscoverQueuesInterval;
 			_visibilityTimeout = visibilityTimeout;
 			_maxDequeueCount = maxDequeueCount;
-			_logger = logger;
+			_logger = logger ?? NullLogger<AsyncMultiTenantMessagePump>.Instance;
 			_messagePump = new AsyncMessagePump(options, logger, meterFactory);
 		}
 
@@ -174,7 +175,7 @@ namespace Picton.Messaging
 					}
 					catch (Exception e)
 					{
-						_logger?.LogError(e.GetBaseException(), "An error occured while fetching the Azure queues that match the naming convention. The error was caught and ignored.");
+						_logger.LogError(e.GetBaseException(), "An error occured while fetching the Azure queues that match the naming convention. The error was caught and ignored.");
 					}
 				},
 				_discoverQueuesInterval,
