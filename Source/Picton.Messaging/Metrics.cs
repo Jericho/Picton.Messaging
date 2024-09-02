@@ -6,7 +6,14 @@ namespace Picton.Messaging
 	{
 		public Metrics(IMeterFactory meterFactory)
 		{
-			var meter = meterFactory.Create("Picton.Messaging");
+			var pictonMessagingVersion =
+#if DEBUG
+				"DEBUG";
+#else
+				typeof(AsyncMessagePump).GetTypeInfo().Assembly.GetName().Version.ToString(3);
+#endif
+
+			var meter = meterFactory.Create("Picton.Messaging", pictonMessagingVersion);
 
 			MessagesProcessed = meter.CreateCounter<int>("picton.messaging.messages_processed", null, "The number of messages processed by the message pump.");
 			MessageWaitBeforeProcess = meter.CreateHistogram<long>("picton.messaging.message_wait_before_process", null, "How long a message was in queue, waiting to be processed.");
