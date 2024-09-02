@@ -164,8 +164,8 @@ namespace Picton.Messaging
 
 						// Please note there is no need to remove queues that no longer exist from the message
 						// pump round-robin list. The reason is: message pump will get a RequestFailedException
-						// with ErrorCode == "QueueNotFound" next time the message pump tries to query those
-						// queues and it will automatically remove them at that time.
+						// with ErrorCode == "QueueNotFound" next time it tries to query those queues and it will
+						// automatically remove them at that time.
 					}
 					catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
 					{

@@ -110,7 +110,7 @@ namespace Picton.Messaging
 			_metrics = metrics ?? TurnOffMetrics();
 			_metricsTurnedOff = metrics == null;
 
-			InitDefaultActions();
+			OnError = (queueName, message, exception, isPoison) => _logger?.LogError(exception, "An error occured when processing a message in {queueName}", queueName);
 		}
 
 		#endregion
@@ -219,7 +219,8 @@ namespace Picton.Messaging
 			RecurrentCancellableTask.StartNew(
 				async () =>
 				{
-					// Fetch messages from Azure when the number of items in the concurrent queue falls below an "acceptable" level.
+					// Fetch messages from Azure when the number of items in the concurrent queue falls below a threshold.
+					// This threshold is calculated by dividing the number of concurrent tasks by 2.
 					if (!cancellationToken.IsCancellationRequested &&
 						!channelCompleted &&
 						channel.Reader.Count <= _messagePumpOptions.ConcurrentTasks / 2)
@@ -426,11 +427,6 @@ namespace Picton.Messaging
 				(queueName) => (queueConfig, queueManager, poisonQueueManager, DateTime.MinValue, TimeSpan.Zero),
 				(queueName, oldConfig) => (queueConfig, queueManager, poisonQueueManager, oldConfig.LastFetched, oldConfig.FetchDelay));
 			_queueNames.AddItem(queueManager.QueueName);
-		}
-
-		private void InitDefaultActions()
-		{
-			OnError = (queueName, message, exception, isPoison) => _logger?.LogError(exception, "An error occured when processing a message in {queueName}", queueName);
 		}
 
 		private IMetrics TurnOffMetrics()
