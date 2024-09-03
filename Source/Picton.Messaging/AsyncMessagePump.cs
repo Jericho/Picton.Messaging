@@ -110,7 +110,7 @@ namespace Picton.Messaging
 			_logger = logger ?? NullLogger<AsyncMessagePump>.Instance;
 			_metrics = meterFactory != null ? new Metrics(meterFactory) : null;
 
-			OnError = (queueName, message, exception, isPoison) => _logger?.LogError(exception, "An error occured when processing a message in {queueName}", queueName);
+			OnError = (queueName, message, exception, isPoison) => _logger.LogError(exception, "An error occured when processing a message in {queueName}", queueName);
 		}
 
 		#endregion
