@@ -5,9 +5,6 @@
     <TargetFramework>net7.0</TargetFramework>
     <AssemblyName>Picton.Messaging.IntegrationTests</AssemblyName>
     <RootNamespace>Picton.Messaging.IntegrationTests</RootNamespace>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 

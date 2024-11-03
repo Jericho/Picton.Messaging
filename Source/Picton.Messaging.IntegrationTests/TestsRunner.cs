@@ -42,10 +42,6 @@ namespace Picton.Messaging.IntegrationTests
 				cts.Cancel();
 			};
 
-			// Ensure the Console is tall enough and centered on the screen
-			if (OperatingSystem.IsWindows()) Console.WindowHeight = Math.Min(60, Console.LargestWindowHeight);
-			Utils.CenterConsole();
-
 			// Configure where metrics are published to. By default, don't publish metrics
 			var metrics = (IMetricsRoot)null;
 
