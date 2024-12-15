@@ -4,6 +4,7 @@ using NLog.Config;
 using NLog.Extensions.Logging;
 using NLog.Targets;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Picton.Messaging.IntegrationTests
@@ -12,11 +13,18 @@ namespace Picton.Messaging.IntegrationTests
 	{
 		public static async Task<int> Main()
 		{
+			var source = new CancellationTokenSource();
+			Console.CancelKeyPress += (s, e) =>
+			{
+				e.Cancel = true;
+				source.Cancel();
+			};
+
 			var services = new ServiceCollection();
 			ConfigureServices(services);
 			using var serviceProvider = services.BuildServiceProvider();
 			var app = serviceProvider.GetService<TestsRunner>();
-			return await app.RunAsync().ConfigureAwait(false);
+			return await app.RunAsync(source.Token).ConfigureAwait(false);
 		}
 
 		private static void ConfigureServices(ServiceCollection services)

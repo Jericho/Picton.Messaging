@@ -5,7 +5,6 @@ using Picton.Managers;
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -29,19 +28,8 @@ namespace Picton.Messaging.IntegrationTests
 			_serviceProvider = serviceProvider;
 		}
 
-		public async Task<int> RunAsync()
+		public async Task<int> RunAsync(CancellationToken cancellationToken = default)
 		{
-			ServicePointManager.DefaultConnectionLimit = 1000;
-			ServicePointManager.UseNagleAlgorithm = false;
-
-			// Configure Console
-			var cts = new CancellationTokenSource();
-			Console.CancelKeyPress += (s, e) =>
-			{
-				e.Cancel = true;
-				cts.Cancel();
-			};
-
 			// Configure where metrics are published to. By default, don't publish metrics
 			var metrics = (IMetricsRoot)null;
 
@@ -77,9 +65,9 @@ namespace Picton.Messaging.IntegrationTests
 				var concurrentTasks = 5;
 
 				// Run the integration tests
-				await RunAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, 25, metrics, cts.Token).ConfigureAwait(false);
-				await RunAsyncMessagePumpWithHandlersTests(connectionString, queueName, concurrentTasks, 25, metrics, cts.Token).ConfigureAwait(false);
-				await RunMultiTenantAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, [6, 12, 18, 24], metrics, cts.Token).ConfigureAwait(false);
+				await RunAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, 25, metrics, cancellationToken).ConfigureAwait(false);
+				await RunAsyncMessagePumpWithHandlersTests(connectionString, queueName, concurrentTasks, 25, metrics, cancellationToken).ConfigureAwait(false);
+				await RunMultiTenantAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, [6, 12, 18, 24], metrics, cancellationToken).ConfigureAwait(false);
 			}
 
 			// Prompt user to press a key in order to allow reading the log in the console
