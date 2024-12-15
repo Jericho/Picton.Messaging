@@ -129,7 +129,7 @@ namespace Picton.Messaging
 		/// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
 		public async Task StartAsync(CancellationToken cancellationToken)
 		{
-			if (OnMessage == null) throw new ArgumentNullException(nameof(OnMessage));
+			if (OnMessage == null) throw new Exception($"You must specify a {nameof(OnMessage)} delegate before starting the message pump.");
 
 			_messagePump.OnQueueEmpty = (queueName, cancellationToken) => OnQueueEmpty?.Invoke(queueName.TrimStart(_queueNamePrefix), cancellationToken);
 			_messagePump.OnAllQueuesEmpty = OnAllQueuesEmpty;

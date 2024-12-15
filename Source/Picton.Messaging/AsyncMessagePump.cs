@@ -99,11 +99,11 @@ namespace Picton.Messaging
 		public AsyncMessagePump(MessagePumpOptions options, ILogger logger = null, IMetrics metrics = null)
 		{
 			if (options == null) throw new ArgumentNullException(nameof(options));
-			if (string.IsNullOrEmpty(options.ConnectionString)) throw new ArgumentNullException(nameof(options.ConnectionString));
-			if (options.ConcurrentTasks < 1) throw new ArgumentOutOfRangeException(nameof(options.ConcurrentTasks), "Number of concurrent tasks must be greather than zero");
-			if (options.FetchMessagesInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options.FetchMessagesInterval), "Fetch messages interval must be greather than zero");
-			if (options.EmptyQueueFetchDelay <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options.EmptyQueueFetchDelay), "Emnpty queue fetch delay must be greather than zero");
-			if (options.EmptyQueueMaxFetchDelay < options.EmptyQueueFetchDelay) throw new ArgumentOutOfRangeException(nameof(options.EmptyQueueMaxFetchDelay), "Max fetch delay can not be smaller than fetch delay");
+			if (string.IsNullOrEmpty(options.ConnectionString)) throw new ArgumentNullException($"{nameof(options)}.{nameof(options.ConnectionString)}");
+			if (options.ConcurrentTasks < 1) throw new ArgumentOutOfRangeException($"{nameof(options)}.{nameof(options.ConcurrentTasks)}", "Number of concurrent tasks must be greather than zero");
+			if (options.FetchMessagesInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException($"{nameof(options)}.{nameof(options.FetchMessagesInterval)}", "Fetch messages interval must be greather than zero");
+			if (options.EmptyQueueFetchDelay <= TimeSpan.Zero) throw new ArgumentOutOfRangeException($"{nameof(options)}.{nameof(options.EmptyQueueFetchDelay)}", "Emnpty queue fetch delay must be greather than zero");
+			if (options.EmptyQueueMaxFetchDelay < options.EmptyQueueFetchDelay) throw new ArgumentOutOfRangeException($"{nameof(options)}.{nameof(options.EmptyQueueMaxFetchDelay)}", "Max fetch delay can not be smaller than fetch delay");
 
 			_messagePumpOptions = options;
 			_logger = logger;
@@ -136,8 +136,8 @@ namespace Picton.Messaging
 		/// <param name="queueConfig">Queue configuration.</param>
 		public void AddQueue(QueueConfig queueConfig)
 		{
-			if (string.IsNullOrEmpty(queueConfig.QueueName)) throw new ArgumentNullException(nameof(queueConfig.QueueName));
-			if (queueConfig.MaxDequeueCount < 1) throw new ArgumentOutOfRangeException(nameof(queueConfig.MaxDequeueCount), "Number of retries must be greater than zero.");
+			if (string.IsNullOrEmpty(queueConfig.QueueName)) throw new ArgumentNullException($"{nameof(queueConfig)}.{nameof(queueConfig.QueueName)}");
+			if (queueConfig.MaxDequeueCount < 1) throw new ArgumentOutOfRangeException($"{nameof(queueConfig)}.{nameof(queueConfig.MaxDequeueCount)}", "Number of retries must be greater than zero.");
 
 			var queueManager = new QueueManager(_messagePumpOptions.ConnectionString, queueConfig.QueueName, queueConfig.OversizedMessagesBlobStorageName, true, _messagePumpOptions.QueueClientOptions, _messagePumpOptions.BlobClientOptions);
 			var poisonQueueManager = string.IsNullOrEmpty(queueConfig.PoisonQueueName) ? null : new QueueManager(_messagePumpOptions.ConnectionString, queueConfig.PoisonQueueName, queueConfig.OversizedMessagesBlobStorageName, true, _messagePumpOptions.QueueClientOptions, _messagePumpOptions.BlobClientOptions);
@@ -207,7 +207,7 @@ namespace Picton.Messaging
 		/// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
 		public async Task StartAsync(CancellationToken cancellationToken)
 		{
-			if (OnMessage == null) throw new ArgumentNullException(nameof(OnMessage));
+			if (OnMessage == null) throw new Exception($"You must specify a {nameof(OnMessage)} delegate before starting the message pump.");
 
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlim(_messagePumpOptions.ConcurrentTasks, _messagePumpOptions.ConcurrentTasks);
@@ -417,7 +417,7 @@ namespace Picton.Messaging
 		internal void AddQueue(QueueManager queueManager, QueueManager poisonQueueManager, TimeSpan? visibilityTimeout, int maxDequeueCount)
 		{
 			if (queueManager == null) throw new ArgumentNullException(nameof(queueManager));
-			if (string.IsNullOrEmpty(queueManager.QueueName)) throw new ArgumentNullException(nameof(queueManager.QueueName));
+			if (string.IsNullOrEmpty(queueManager.QueueName)) throw new ArgumentNullException($"{nameof(queueManager)}.{nameof(queueManager.QueueName)}");
 			if (maxDequeueCount < 1) throw new ArgumentOutOfRangeException(nameof(maxDequeueCount), "Number of retries must be greater than zero.");
 
 			var queueConfig = new QueueConfig(queueManager.QueueName, poisonQueueManager?.QueueName, visibilityTimeout, maxDequeueCount);
@@ -429,7 +429,7 @@ namespace Picton.Messaging
 			_queueNames.AddItem(queueManager.QueueName);
 		}
 
-		private IMetrics TurnOffMetrics()
+		private static IMetrics TurnOffMetrics()
 		{
 			var metricsTurnedOff = new MetricsBuilder();
 			metricsTurnedOff.Configuration.Configure(new MetricsOptions()
