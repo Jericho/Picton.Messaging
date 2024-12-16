@@ -31,28 +31,23 @@ namespace Picton.Messaging.IntegrationTests
 
 		public async Task StartAsync(CancellationToken cancellationToken)
 		{
-			ServicePointManager.DefaultConnectionLimit = 1000;
-			ServicePointManager.UseNagleAlgorithm = false;
-
 			// Start Azurite before running the tests. It will be automaticaly stopped when "emulator" goes out of scope
-			using (var emulator = new AzuriteManager())
-			{
-				var connectionString = "UseDevelopmentStorage=true";
-				var queueName = "myqueue";
-				var concurrentTasks = 5;
+			using var emulator = new AzuriteManager();
+			var connectionString = "UseDevelopmentStorage=true";
+			var queueName = "myqueue";
+			var concurrentTasks = 5;
 
-				// Run the integration tests
-				await RunAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, 25, _meterFactory, cancellationToken).ConfigureAwait(false);
-				await RunAsyncMessagePumpWithHandlersTests(connectionString, queueName, concurrentTasks, 25, _meterFactory, cancellationToken).ConfigureAwait(false);
-				await RunMultiTenantAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, [6, 12, 18, 24], _meterFactory, cancellationToken).ConfigureAwait(false);
-			}
+			// Run the integration tests
+			await RunAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, 25, _meterFactory, cancellationToken).ConfigureAwait(false);
+			await RunAsyncMessagePumpWithHandlersTests(connectionString, queueName, concurrentTasks, 25, _meterFactory, cancellationToken).ConfigureAwait(false);
+			await RunMultiTenantAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, [6, 12, 18, 24], _meterFactory, cancellationToken).ConfigureAwait(false);
 		}
 
 		public Task StopAsync(CancellationToken cancellationToken)
 		{
 			return Task.CompletedTask;
 		}
-		
+
 		private async Task RunAsyncMessagePumpTests(string connectionString, string queueName, int concurrentTasks, int numberOfMessages, IMeterFactory meterFactory, CancellationToken cancellationToken)
 		{
 			if (cancellationToken.IsCancellationRequested) return;

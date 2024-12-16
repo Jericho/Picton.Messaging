@@ -1,11 +1,7 @@
-using Logzio.DotNet.NLog;
+using Formitable.BetterStack.Logger.Microsoft;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using NLog;
-using NLog.Config;
-using NLog.Extensions.Logging;
-using NLog.Targets;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
@@ -17,7 +13,7 @@ namespace Picton.Messaging.IntegrationTests
 {
 	class Program
 	{
-		public static async Task Main(string[] args)
+		public static async Task Main()
 		{
 			var source = new CancellationTokenSource();
 			Console.CancelKeyPress += (s, e) =>
@@ -29,22 +25,44 @@ namespace Picton.Messaging.IntegrationTests
 			var services = new ServiceCollection();
 			ConfigureServices(services);
 			using var serviceProvider = services.BuildServiceProvider();
-			var app = serviceProvider.GetService<TestsRunner>();
-			return await app.RunAsync(source.Token).ConfigureAwait(false);
+			var app = serviceProvider.GetService<IHostedService>();
+			await app.StartAsync(source.Token).ConfigureAwait(false);
 		}
 
-			builder.Services.AddPictonMessageHandlers();
-			builder.Services.AddHostedService<TestsRunner>();
+		private static void ConfigureServices(ServiceCollection services)
+		{
+			services.AddHostedService<TestsRunner>();
+			services.AddPictonMessageHandlers();
+			services.AddMetrics();
 
-			// Configure logging
-			builder.Logging.ClearProviders(); // Remove the built-in providers (which include the Console)
-			builder.Logging.AddNLog(GetNLogConfiguration()); // Add our desired custom providers (which include the Colored Console)
+			services
+				.AddLogging(logging =>
+				{
+					var betterStackToken = Environment.GetEnvironmentVariable("BETTERSTACK_TOKEN");
+					if (!string.IsNullOrEmpty(betterStackToken))
+					{
+						logging.AddBetterStackLogger(options =>
+						{
+							options.SourceToken = betterStackToken;
+							options.Context["source"] = "Picton_messaging_integration_tests";
+							options.Context["Picton-Version"] = typeof(CloudMessage).Assembly.GetName().Version.ToString(3);
+						});
+					}
+
+					logging.AddSimpleConsole(options =>
+					{
+						options.SingleLine = true;
+						options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
+					});
+
+					logging.AddFilter("*", LogLevel.Debug);
+				});
 
 			// Configure metrics
 			var logzioMetricsToken = Environment.GetEnvironmentVariable("LOGZIO_METRICS_TOKEN");
 			if (!string.IsNullOrEmpty(logzioMetricsToken))
 			{
-				builder.Services.AddOpenTelemetry()
+				services.AddOpenTelemetry()
 					.WithMetrics(metrics =>
 					{
 						metrics.AddMeter("Picton.Messaging");
@@ -83,44 +101,6 @@ namespace Picton.Messaging.IntegrationTests
 						});
 					});
 			}
-
-			var host = builder.Build();
-			await host.StartAsync(CancellationToken.None).ConfigureAwait(false);
-
-			// Stop NLog (which has the desirable side-effect of flushing any pending logs)
-			LogManager.Shutdown();
-		}
-
-		private static LoggingConfiguration GetNLogConfiguration()
-		{
-			// Configure logging
-			var nLogConfig = new LoggingConfiguration();
-
-			// Send logs to logz.io
-			var logzioToken = Environment.GetEnvironmentVariable("LOGZIO_TOKEN");
-			if (!string.IsNullOrEmpty(logzioToken))
-			{
-				var logzioTarget = new LogzioTarget
-				{
-					Name = "Logzio",
-					Token = logzioToken,
-					LogzioType = "nlog",
-					JsonKeysCamelCase = true,
-					// ProxyAddress = "http://localhost:8888",
-				};
-				logzioTarget.ContextProperties.Add(new TargetPropertyWithContext("Source", "PictonMessaging_integration_tests"));
-				logzioTarget.ContextProperties.Add(new TargetPropertyWithContext("PictonMessaging-Version", typeof(AsyncMessagePump).Assembly.GetName().Version.ToString(3)));
-
-				nLogConfig.AddTarget("Logzio", logzioTarget);
-				nLogConfig.AddRule(NLog.LogLevel.Info, NLog.LogLevel.Fatal, "Logzio", "*");
-			}
-
-			// Send logs to console
-			var consoleTarget = new ColoredConsoleTarget();
-			nLogConfig.AddTarget("ColoredConsole", consoleTarget);
-			nLogConfig.AddRule(NLog.LogLevel.Debug, NLog.LogLevel.Fatal, "ColoredConsole", "*");
-
-			return nLogConfig;
 		}
 	}
 }
