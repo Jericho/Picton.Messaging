@@ -1,10 +1,9 @@
 using Formitable.BetterStack.Logger.Microsoft;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.Metrics;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OpenTelemetry.Exporter;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Trace;
+using Prometheus;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,25 +14,30 @@ namespace Picton.Messaging.IntegrationTests
 	{
 		public static async Task Main()
 		{
-			var source = new CancellationTokenSource();
+			var cts = new CancellationTokenSource();
 			Console.CancelKeyPress += (s, e) =>
 			{
 				e.Cancel = true;
-				source.Cancel();
+				cts.Cancel();
 			};
 
 			var services = new ServiceCollection();
 			ConfigureServices(services);
 			using var serviceProvider = services.BuildServiceProvider();
 			var app = serviceProvider.GetService<IHostedService>();
-			await app.StartAsync(source.Token).ConfigureAwait(false);
+			await app.StartAsync(cts.Token).ConfigureAwait(false);
 		}
 
 		private static void ConfigureServices(ServiceCollection services)
 		{
 			services.AddHostedService<TestsRunner>();
 			services.AddPictonMessageHandlers();
-			services.AddMetrics();
+
+			services
+				.AddMetrics(metrics =>
+				{
+					metrics.AddDebugConsole();
+				});
 
 			services
 				.AddLogging(logging =>
@@ -57,50 +61,6 @@ namespace Picton.Messaging.IntegrationTests
 
 					logging.AddFilter("*", LogLevel.Debug);
 				});
-
-			// Configure metrics
-			var logzioMetricsToken = Environment.GetEnvironmentVariable("LOGZIO_METRICS_TOKEN");
-			if (!string.IsNullOrEmpty(logzioMetricsToken))
-			{
-				services.AddOpenTelemetry()
-					.WithMetrics(metrics =>
-					{
-						metrics.AddMeter("Picton.Messaging");
-
-						metrics.AddConsoleExporter();
-
-						metrics.AddOtlpExporter("logzio", (exporterConfig, readerConfig) =>
-						{
-							// Either "http" or "https".
-							var scheme = "https";
-
-							// The Logz.io Listener URL for your region: https://docs.logz.io/docs/user-guide/admin/hosting-regions/account-region/
-							var url = "listener.logz.io";
-
-							// I found some documentation on Logz.io web site that says:
-							//     - The required port depends whether HTTP or HTTPS is used: HTTP = 8070, HTTPS = 8071.
-							// And I also found documentation that says:
-							//     - ... port 8052 for http traffic, or port 8053 for https traffic.
-							// This conflicting information is confusing but I suspect that 8070 and 8071 are the correct values
-							// because I am successfully publishing logs to 8071 via HTTPS.
-							var port = scheme switch
-							{
-								"http" => 8070,
-								"https" => 8071,
-								_ => throw new Exception($"Unknown scheme: {scheme}")
-							};
-
-							exporterConfig.Endpoint = (new UriBuilder(scheme, url, port)).Uri;
-							exporterConfig.Protocol = OtlpExportProtocol.HttpProtobuf;
-							exporterConfig.Headers = $"Authorization=Bearer {logzioMetricsToken}";
-
-							// The default export interval is is 60 seconds, but our integration tests take less than 60 seconds to complete.
-							// Also, several of the tasks performed by Picton.Messaging default to a 5 second interval.
-							// Therefore, it makes sense to change the metrics export interval to a value between 5 and 60 seconds.
-							readerConfig.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = 5000;
-						});
-					});
-			}
 		}
 	}
 }
