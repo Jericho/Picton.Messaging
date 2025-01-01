@@ -1,8 +1,9 @@
-using App.Metrics;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Picton.Managers;
 using Picton.Messaging.Utilities;
 using System;
+using System.Diagnostics.Metrics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -74,12 +75,12 @@ namespace Picton.Messaging
 		/// <param name="options">Options for the mesage pump.</param>
 		/// <param name="serviceProvider">DI.</param>
 		/// <param name="logger">The logger.</param>
-		/// <param name="metrics">The system where metrics are published.</param>
-		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, IServiceProvider serviceProvider, ILogger logger = null, IMetrics metrics = null)
+		/// <param name="meterFactory">The meter factory.</param>
+		public AsyncMessagePumpWithHandlers(MessagePumpOptions options, IServiceProvider serviceProvider, ILogger logger = null, IMeterFactory meterFactory = null)
 		{
-			_logger = logger;
+			_logger = logger ?? NullLogger<AsyncMessagePumpWithHandlers>.Instance;
 			_cloudMessageHandler = new CloudMessageHandler(serviceProvider);
-			_messagePump = new AsyncMessagePump(options, logger, metrics);
+			_messagePump = new AsyncMessagePump(options, logger, meterFactory);
 		}
 
 		#endregion
