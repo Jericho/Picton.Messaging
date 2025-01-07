@@ -242,7 +242,7 @@ namespace Picton.Messaging
 				TaskCreationOptions.LongRunning);
 
 			// Define the task that checks how many messages are queued in Azure
-			if (_metrics != null && _messagePumpOptions.CountAzureMessagesInterval > TimeSpan.Zero)
+			if (_messagePumpOptions.CountAzureMessagesInterval > TimeSpan.Zero)
 			{
 				RecurrentCancellableTask.StartNew(
 					async () =>
@@ -275,7 +275,7 @@ namespace Picton.Messaging
 							}
 						}
 
-						_metrics?.QueuedCloudMessages?.Record(count);
+						_metrics.QueuedCloudMessages?.Record(count);
 					},
 					_messagePumpOptions.CountAzureMessagesInterval,
 					cancellationToken,
@@ -283,14 +283,14 @@ namespace Picton.Messaging
 			}
 
 			// Define the task that checks how many messages are queued in memory
-			if (_metrics != null && _messagePumpOptions.CountMemoryMessagesInterval > TimeSpan.Zero)
+			if (_messagePumpOptions.CountMemoryMessagesInterval > TimeSpan.Zero)
 			{
 				RecurrentCancellableTask.StartNew(
 					() =>
 					{
 						try
 						{
-							_metrics?.QueuedMemoryMessages?.Record(channel.Reader.Count);
+							_metrics.QueuedMemoryMessages?.Record(channel.Reader.Count);
 						}
 						catch (Exception e)
 						{
@@ -326,7 +326,7 @@ namespace Picton.Messaging
 									if (result.Message.InsertedOn.HasValue)
 									{
 										var elapsed = DateTimeOffset.UtcNow.Subtract(result.Message.InsertedOn.Value);
-										_metrics?.MessageWaitBeforeProcess?.Record((long)elapsed.TotalMilliseconds);
+										_metrics.MessageWaitBeforeProcess?.Record((long)elapsed.TotalMilliseconds);
 									}
 
 									var processingTimer = Stopwatch.StartNew();
@@ -372,7 +372,7 @@ namespace Picton.Messaging
 									{
 										processingTimer.Stop();
 										messageProcessed = true;
-										_metrics?.MessageProcessing?.Record(processingTimer.ElapsedMilliseconds);
+										_metrics.MessageProcessing?.Record(processingTimer.ElapsedMilliseconds);
 									}
 								}
 								else
@@ -382,7 +382,7 @@ namespace Picton.Messaging
 							}
 
 							// Increment the counter if we processed a message
-							if (messageProcessed) _metrics?.MessagesProcessed?.Add(1);
+							if (messageProcessed) _metrics.MessagesProcessed?.Add(1);
 
 							// Return a value indicating whether we processed a message or not
 							return messageProcessed;
@@ -491,7 +491,7 @@ namespace Picton.Messaging
 						else
 						{
 							_logger.NoMessagesInQueue(queueName);
-							_metrics?.QueueEmpty?.Add(1);
+							_metrics.QueueEmpty?.Add(1);
 
 							// Set a "reasonable" fetch delay to ensure we don't query an empty queue too often
 							var delay = queueInfo.FetchDelay.Add(_messagePumpOptions.EmptyQueueFetchDelay);
@@ -509,7 +509,7 @@ namespace Picton.Messaging
 				}
 
 				fetchingTimer.Stop();
-				_metrics?.MessagesFetching?.Record(fetchingTimer.ElapsedMilliseconds);
+				_metrics.MessagesFetching?.Record(fetchingTimer.ElapsedMilliseconds);
 			}
 
 			// Stop when we either retrieved the desired number of messages OR we have looped through all the queues
@@ -521,7 +521,7 @@ namespace Picton.Messaging
 				try
 				{
 					// All queues are empty
-					_metrics?.AllQueuesEmpty?.Add(1);
+					_metrics.AllQueuesEmpty?.Add(1);
 					OnAllQueuesEmpty?.Invoke(cancellationToken);
 				}
 				catch (Exception e) when (e is TaskCanceledException || e is OperationCanceledException)
