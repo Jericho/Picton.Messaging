@@ -10,7 +10,7 @@ namespace Picton.Messaging
 #if DEBUG
 				"DEBUG";
 #else
-				typeof(AsyncMessagePump).GetTypeInfo().Assembly.GetName().Version.ToString(3);
+				System.Reflection.IntrospectionExtensions.GetTypeInfo(typeof(AsyncMessagePump)).Assembly.GetName().Version.ToString(3);
 #endif
 
 			if (meterFactory != null)
