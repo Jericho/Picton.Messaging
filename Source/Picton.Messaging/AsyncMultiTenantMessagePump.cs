@@ -18,7 +18,7 @@ namespace Picton.Messaging
 	/// a common prefix followed by a unique tenant identifier. For example, if the prefix is "myqueue",
 	/// this message pump will monitor queues such as "myqueue001", myqueue002" and "myqueueabc".
 	///
-	/// Please note that the message pump intentionally ignores queue that follow the following naming convention:
+	/// Please note that the message pump intentionally ignores queues that follow the following naming convention:
 	/// - the common prefix without a postfix. For example "myqueue". Notice the absence of a tenant identifier
 	/// after the "myqueue" part in the name.
 	/// - The common prefix followed by "-poison". For example "myqueue-poison".
