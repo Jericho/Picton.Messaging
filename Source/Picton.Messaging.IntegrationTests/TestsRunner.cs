@@ -34,15 +34,17 @@ namespace Picton.Messaging.IntegrationTests
 		public async Task StartAsync(CancellationToken cancellationToken)
 		{
 			// Start Azurite before running the tests. It will be automaticaly stopped when "emulator" goes out of scope
-			using var emulator = new AzuriteManager();
-			var connectionString = "UseDevelopmentStorage=true";
-			var queueName = "myqueue";
-			var concurrentTasks = 5;
+			using (var emulator = new AzuriteManager())
+			{
+				var connectionString = "UseDevelopmentStorage=true";
+				var queueName = "myqueue";
+				var concurrentTasks = 5;
 
-			// Run the integration tests
-			await RunAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, 25, _meterFactory, cancellationToken).ConfigureAwait(false);
-			await RunAsyncMessagePumpWithHandlersTests(connectionString, queueName, concurrentTasks, 25, _meterFactory, cancellationToken).ConfigureAwait(false);
-			await RunMultiTenantAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, [6, 12, 18, 24], _meterFactory, cancellationToken).ConfigureAwait(false);
+				// Run the integration tests
+				await RunAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, 25, cancellationToken).ConfigureAwait(false);
+				await RunAsyncMessagePumpWithHandlersTests(connectionString, queueName, concurrentTasks, 25, cancellationToken).ConfigureAwait(false);
+				await RunMultiTenantAsyncMessagePumpTests(connectionString, queueName, concurrentTasks, [6, 12, 18, 24], cancellationToken).ConfigureAwait(false);
+			}
 
 			// Shutdown the application
 			_hostApplicationLifetime.StopApplication();
@@ -53,7 +55,7 @@ namespace Picton.Messaging.IntegrationTests
 			return Task.CompletedTask;
 		}
 
-		private async Task RunAsyncMessagePumpTests(string connectionString, string queueName, int concurrentTasks, int numberOfMessages, IMeterFactory meterFactory, CancellationToken cancellationToken)
+		private async Task RunAsyncMessagePumpTests(string connectionString, string queueName, int concurrentTasks, int numberOfMessages, CancellationToken cancellationToken)
 		{
 			if (cancellationToken.IsCancellationRequested) return;
 
@@ -81,7 +83,7 @@ namespace Picton.Messaging.IntegrationTests
 				Stopwatch sw = null;
 				var cts = new CancellationTokenSource();
 				var options = new MessagePumpOptions(connectionString, concurrentTasks, null, null);
-				var messagePump = new AsyncMessagePump(options, _logger, meterFactory)
+				var messagePump = new AsyncMessagePump(options, _logger, _meterFactory)
 				{
 					OnMessage = (queueName, message, cancellationToken) =>
 					{
@@ -112,7 +114,7 @@ namespace Picton.Messaging.IntegrationTests
 			}
 		}
 
-		private async Task RunAsyncMessagePumpWithHandlersTests(string connectionString, string queueName, int concurrentTasks, int numberOfMessages, IMeterFactory meterFactory, CancellationToken cancellationToken)
+		private async Task RunAsyncMessagePumpWithHandlersTests(string connectionString, string queueName, int concurrentTasks, int numberOfMessages, CancellationToken cancellationToken)
 		{
 			if (cancellationToken.IsCancellationRequested) return;
 
@@ -140,7 +142,7 @@ namespace Picton.Messaging.IntegrationTests
 				Stopwatch sw = null;
 				var cts = new CancellationTokenSource();
 				var options = new MessagePumpOptions(connectionString, concurrentTasks, null, null);
-				var messagePump = new AsyncMessagePumpWithHandlers(options, _serviceProvider, _logger, meterFactory)
+				var messagePump = new AsyncMessagePumpWithHandlers(options, _serviceProvider, _logger, _meterFactory)
 				{
 					// Stop the message pump when there are no more messages to process.
 					OnAllQueuesEmpty = cancellationToken =>
@@ -166,7 +168,7 @@ namespace Picton.Messaging.IntegrationTests
 			}
 		}
 
-		private async Task RunMultiTenantAsyncMessagePumpTests(string connectionString, string queueNamePrefix, int concurrentTasks, int[] numberOfMessagesForTenant, IMeterFactory meterFactory, CancellationToken cancellationToken)
+		private async Task RunMultiTenantAsyncMessagePumpTests(string connectionString, string queueNamePrefix, int concurrentTasks, int[] numberOfMessagesForTenant, CancellationToken cancellationToken)
 		{
 			if (cancellationToken.IsCancellationRequested) return;
 
@@ -198,7 +200,7 @@ namespace Picton.Messaging.IntegrationTests
 				// Configure the message pump
 				var cts = new CancellationTokenSource();
 				var options = new MessagePumpOptions(connectionString, concurrentTasks, null, null);
-				var messagePump = new AsyncMultiTenantMessagePump(options, queueNamePrefix, logger: _logger, meterFactory: meterFactory)
+				var messagePump = new AsyncMultiTenantMessagePump(options, queueNamePrefix, logger: _logger, meterFactory: _meterFactory)
 				{
 					OnMessage = (tenantId, message, cancellationToken) =>
 					{
