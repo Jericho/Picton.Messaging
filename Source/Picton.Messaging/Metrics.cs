@@ -2,7 +2,7 @@ using System.Diagnostics.Metrics;
 
 namespace Picton.Messaging
 {
-	internal class Metrics
+	internal sealed class Metrics
 	{
 		public Metrics(IMeterFactory meterFactory)
 		{
