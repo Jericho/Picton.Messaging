@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="BetterStackMetricListener.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Formitable.BetterStack.Logger.Microsoft" Version="0.1.3-beta0002" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics" Version="9.0.8" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.8" />

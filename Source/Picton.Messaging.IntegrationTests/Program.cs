@@ -4,7 +4,6 @@ using Microsoft.Extensions.Diagnostics.Metrics;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Picton.Messaging.IntegrationTests
@@ -13,21 +12,40 @@ namespace Picton.Messaging.IntegrationTests
 	{
 		public static async Task Main()
 		{
-			var cts = new CancellationTokenSource();
-			Console.CancelKeyPress += (s, e) =>
-			{
-				e.Cancel = true;
-				cts.Cancel();
-			};
+			var builder = Host.CreateApplicationBuilder();
 
-			var services = new ServiceCollection();
-			ConfigureServices(services);
-			using var serviceProvider = services.BuildServiceProvider();
-			var app = serviceProvider.GetService<IHostedService>();
-			await app.StartAsync(cts.Token).ConfigureAwait(false);
+			ConfigureLogging(builder.Logging);
+			ConfigureServices(builder.Services);
+
+			var host = builder.Build();
+			await host.StartAsync().ConfigureAwait(false);
 		}
 
-		private static void ConfigureServices(ServiceCollection services)
+		private static void ConfigureLogging(ILoggingBuilder logging)
+		{
+			logging.ClearProviders();
+
+			var betterStackToken = Environment.GetEnvironmentVariable("BETTERSTACK_TOKEN");
+			if (!string.IsNullOrEmpty(betterStackToken))
+			{
+				logging.AddBetterStackLogger(options =>
+				{
+					options.SourceToken = betterStackToken;
+					options.Context["source"] = "Picton_messaging_integration_tests";
+					options.Context["Picton-Version"] = typeof(CloudMessage).Assembly.GetName().Version.ToString(3);
+				});
+			}
+
+			logging.AddSimpleConsole(options =>
+			{
+				options.SingleLine = true;
+				options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
+			});
+
+			logging.AddFilter("*", LogLevel.Debug);
+		}
+
+		private static void ConfigureServices(IServiceCollection services)
 		{
 			services.AddHostedService<TestsRunner>();
 			services.AddPictonMessageHandlers();
@@ -36,29 +54,6 @@ namespace Picton.Messaging.IntegrationTests
 				.AddMetrics(metrics =>
 				{
 					metrics.AddDebugConsole();
-				});
-
-			services
-				.AddLogging(logging =>
-				{
-					var betterStackToken = Environment.GetEnvironmentVariable("BETTERSTACK_TOKEN");
-					if (!string.IsNullOrEmpty(betterStackToken))
-					{
-						logging.AddBetterStackLogger(options =>
-						{
-							options.SourceToken = betterStackToken;
-							options.Context["source"] = "Picton_messaging_integration_tests";
-							options.Context["Picton-Version"] = typeof(CloudMessage).Assembly.GetName().Version.ToString(3);
-						});
-					}
-
-					logging.AddSimpleConsole(options =>
-					{
-						options.SingleLine = true;
-						options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
-					});
-
-					logging.AddFilter("*", LogLevel.Debug);
 				});
 		}
 	}
