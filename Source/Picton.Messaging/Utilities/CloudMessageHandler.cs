@@ -14,7 +14,7 @@ namespace Picton.Messaging.Utilities
 			_serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
 		}
 
-		public async Task HandleMessageAsync(CloudMessage message, CancellationToken cancellationToken)
+		public Task HandleMessageAsync(CloudMessage message, CancellationToken cancellationToken)
 		{
 			// Get the message handler from the DI service provider
 			var contentType = message.Content.GetType();
@@ -23,8 +23,7 @@ namespace Picton.Messaging.Utilities
 
 			// Invoke the "HandleAsync" method asynchronously
 			var handlerMethod = handlerType.GetMethod("HandleAsync", [contentType, typeof(CancellationToken)]);
-			var result = (Task)handlerMethod.Invoke(handler, [message.Content, cancellationToken]);
-			await result.ConfigureAwait(false);
+			return (Task)handlerMethod.Invoke(handler, [message.Content, cancellationToken]);
 		}
 	}
 }
