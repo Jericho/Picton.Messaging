@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="../README.md" />
+  </Folder>
+  <Folder Name="/Source/">
+    <Project Path="Picton.Messaging/Picton.Messaging.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Picton.Messaging.IntegrationTests/Picton.Messaging.IntegrationTests.csproj" />
+    <Project Path="Picton.Messaging.UnitTests/Picton.Messaging.UnitTests.csproj" />
+  </Folder>
+</Solution>
