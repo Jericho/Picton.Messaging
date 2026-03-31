@@ -24,7 +24,7 @@ namespace Picton.Messaging.UnitTests
 		}
 
 		[Fact]
-		public void Throws_when_zero_queues()
+		public async Task Throws_when_zero_queues()
 		{
 			// Arrange
 			var cts = new CancellationTokenSource();
@@ -33,8 +33,7 @@ namespace Picton.Messaging.UnitTests
 			var messagePump = new AsyncMessagePump(options);
 
 			// Act
-			Should.ThrowAsync<ArgumentNullException>(() => messagePump.StartAsync(cts.Token));
-
+			await Should.ThrowAsync<ArgumentNullException>(() => messagePump.StartAsync(cts.Token));
 		}
 
 		[Fact]
@@ -62,7 +61,7 @@ namespace Picton.Messaging.UnitTests
 		}
 
 		[Fact]
-		public void Throws_when_OnMessage_not_set()
+		public async Task Throws_when_OnMessage_not_set()
 		{
 			// Arrange
 			var mockBlobContainerClient = MockUtils.GetMockBlobContainerClient();
@@ -76,7 +75,7 @@ namespace Picton.Messaging.UnitTests
 			messagePump.AddQueue(queueManager, null, null, 3);
 
 			// Act
-			Should.ThrowAsync<ArgumentNullException>(() => messagePump.StartAsync(cts.Token));
+			await Should.ThrowAsync<ArgumentNullException>(() => messagePump.StartAsync(cts.Token));
 		}
 
 		[Fact]
