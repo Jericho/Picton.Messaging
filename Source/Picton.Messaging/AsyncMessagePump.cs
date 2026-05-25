@@ -207,7 +207,7 @@ namespace Picton.Messaging
 		/// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
 		public async Task StartAsync(CancellationToken cancellationToken)
 		{
-			if (OnMessage == null) throw new Exception($"You must specify a {nameof(OnMessage)} delegate before starting the message pump.");
+			if (OnMessage == null) throw new ArgumentNullException($"You must specify a {nameof(OnMessage)} delegate before starting the message pump.");
 
 			var runningTasks = new ConcurrentDictionary<Task, Task>();
 			var semaphore = new SemaphoreSlim(_messagePumpOptions.ConcurrentTasks, _messagePumpOptions.ConcurrentTasks);
