@@ -4,6 +4,7 @@ using Microsoft.Extensions.Diagnostics.Metrics;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace Picton.Messaging.IntegrationTests
@@ -50,11 +51,24 @@ namespace Picton.Messaging.IntegrationTests
 			services.AddHostedService<TestsRunner>();
 			services.AddPictonMessageHandlers();
 
-			services
-				.AddMetrics(metrics =>
+			services.AddMetrics(builder =>
+			{
+				var betterStackToken = Environment.GetEnvironmentVariable("BETTERSTACK_TOKEN");
+				if (!string.IsNullOrEmpty(betterStackToken))
 				{
-					metrics.AddDebugConsole();
-				});
+					var httpClient = new HttpClient();
+					builder.AddListener(new BetterStackMetricsExporter(httpClient, betterStackToken));
+				}
+
+				builder.AddListener<InMemoryMetricsCollector>();
+				builder.AddDebugConsole();
+
+				// Enable all Picton.Messaging metrics on all listeners
+				builder.EnableMetrics("Picton.Messaging");
+
+				// Alternatively, enable Picton.Messaging metrics on a specific listener
+				//builder.EnableMetrics("Picton.Messaging", listenerName: BetterStackMetricsCollector.ListenerName);
+			});
 		}
 	}
 }
