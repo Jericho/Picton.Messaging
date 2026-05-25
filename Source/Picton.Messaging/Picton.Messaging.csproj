@@ -36,10 +36,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="[8.0.2,11)" /> <!-- DO NOT UPGRADE See https://github.com/Jericho/ZoomNet/issues/387 -->
+    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="[8.0.0,11)" /> <!-- DO NOT UPGRADE See https://github.com/Jericho/ZoomNet/issues/387 -->
     <PackageReference Include="Microsoft.Extensions.Logging" Version="[8.0.0,11)" /> <!-- DO NOT UPGRADE See https://github.com/Jericho/ZoomNet/issues/387 -->
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.201" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
     <PackageReference Include="Picton" Version="10.0.0" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="All" />
   </ItemGroup>
@@ -52,7 +52,7 @@
 
   <ItemGroup Condition=" $(TargetFramework.StartsWith('netstandard')) ">
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
-    <PackageReference Include="System.Threading.Channels" Version="10.0.5" />
+    <PackageReference Include="System.Threading.Channels" Version="10.0.8" />
   </ItemGroup>
 
   <ItemGroup>
